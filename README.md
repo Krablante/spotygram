@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/banner.svg" alt="spotygram — Your Telegram music. On your terms." width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.1.0 alpha" src="https://img.shields.io/badge/APK-0.1.0%20alpha-1DB954?style=flat-square"></a>
+  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.1.1 alpha" src="https://img.shields.io/badge/APK-0.1.1%20alpha-1DB954?style=flat-square"></a>
   <img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-121212?style=flat-square">
   <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-121212?style=flat-square">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-121212?style=flat-square"></a>
@@ -48,7 +48,7 @@ TDLib and OpenSSL are built from pinned upstream sources. The release APK includ
 
 - Audio stays in app-private storage. Uninstalling the app removes it; an APK update signed with the same key preserves it.
 - Telegram access is a full account session. Selecting chats controls this app's music index, not Telegram's session permissions.
-- Initial indexing is paginated. **«Загрузить ещё из истории чатов»** fetches older audio; **«Поискать в выбранных чатах»** searches on Telegram explicitly.
+- All accessible music history loads automatically in pages, with no per-chat track cap. Tracks appear as they are indexed; interrupted history resumes from its saved cursor. **«Поискать в выбранных чатах»** also pages through all server matches.
 - No secret chats, voice-message library, YouTube downloader, or cross-device playlist sync.
 - Source-specific limitations and actual verification results are recorded in [the release notes](docs/verification.md), not hidden behind a claim of universal compatibility.
 

@@ -7,10 +7,13 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 2) {
+class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 3) {
     val state = MutableStateFlow(LibraryState())
+    private val publishing = Mutex()
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -19,7 +22,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
         db.execSQL("CREATE INDEX tracks_file ON tracks(file)")
         db.execSQL("CREATE INDEX tracks_chat ON tracks(chat)")
         db.execSQL(
-            "CREATE TABLE sources(id INTEGER PRIMARY KEY,title TEXT,cursor INTEGER DEFAULT 0,complete INTEGER DEFAULT 0,document_cursor INTEGER DEFAULT 0,documents_complete INTEGER DEFAULT 0)"
+            "CREATE TABLE sources(id INTEGER PRIMARY KEY,title TEXT,cursor INTEGER DEFAULT 0,complete INTEGER DEFAULT 0,document_cursor INTEGER DEFAULT 0,documents_complete INTEGER DEFAULT 0,newest INTEGER DEFAULT 0,document_newest INTEGER DEFAULT 0)"
         )
         db.execSQL("CREATE TABLE playlists(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT)")
         db.execSQL(
@@ -29,6 +32,10 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE sources ADD COLUMN newest INTEGER DEFAULT 0")
+            db.execSQL("ALTER TABLE sources ADD COLUMN document_newest INTEGER DEFAULT 0")
+        }
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE tracks ADD COLUMN document INTEGER DEFAULT 0")
             db.execSQL("ALTER TABLE sources ADD COLUMN document_cursor INTEGER DEFAULT 0")
@@ -40,12 +47,12 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
         db.setForeignKeyConstraintsEnabled(true)
     }
 
-    suspend fun reload() =
+    suspend fun reload() = publishing.withLock {
         withContext(Dispatchers.IO) {
             val db = readableDatabase
             val sources = mutableListOf<Source>()
             db.rawQuery(
-                    "SELECT id,title,cursor,complete,document_cursor,documents_complete FROM sources ORDER BY title",
+                    "SELECT id,title,cursor,complete,document_cursor,documents_complete,newest,document_newest FROM sources ORDER BY title",
                     null,
                 )
                 .use { c ->
@@ -57,6 +64,8 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                             c.getInt(3) == 1,
                             c.getLong(4),
                             c.getInt(5) == 1,
+                            c.getLong(6),
+                            c.getLong(7),
                         )
                 }
             val tracks = mutableListOf<Track>()
@@ -97,6 +106,19 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                 }
             }
             state.value = LibraryState(tracks, sources, lists)
+        }
+    }
+
+    suspend fun newest(id: Long, newest: Long, document: Boolean) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.update(
+                "sources",
+                ContentValues().apply {
+                    put(if (document) "document_newest" else "newest", newest)
+                },
+                "id=?",
+                arrayOf(id.toString()),
+            )
         }
 
     suspend fun upsert(tracks: List<Track>) =

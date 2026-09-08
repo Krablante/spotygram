@@ -74,7 +74,9 @@ fun ChatsScreen(
                         supportingContent = {
                             Text(
                                 trackCount(library.tracks.count { it.chatId == source.id }) +
-                                    if (source.fullyIndexed) "" else " · часть истории"
+                                    if (source.fullyIndexed) ""
+                                    else if (busy) " · загружаем историю…"
+                                    else " · история не загружена"
                             )
                         },
                         leadingContent = {
@@ -133,7 +135,7 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     LaunchedEffect(query) {
-        delay(350)
+        if (query.isNotBlank()) delay(350)
         searching = true
         try {
             app.searchChats(query)

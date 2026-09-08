@@ -1,6 +1,9 @@
 package app.spotygram
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -23,6 +26,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
     val auth = MutableStateFlow(AuthState())
     val connection = MutableStateFlow("")
     val files = ConcurrentHashMap<Int, FileState>()
+    val chats = ConcurrentHashMap<Long, ChatChoice>()
     val fileRevision = MutableStateFlow(0L)
     val updates = Channel<JSONObject>(Channel.UNLIMITED)
     private val requests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
@@ -30,6 +34,29 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
     private var client = 0
     private var receiving: Job? = null
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private var networkRegistered = false
+    private val networkCallback =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onCapabilitiesChanged(
+                network: Network,
+                capabilities: NetworkCapabilities,
+            ) = reportNetwork(capabilities)
+
+            override fun onLost(network: Network) = reportNetwork(null)
+        }
+
+    private fun reportNetwork(capabilities: NetworkCapabilities?) {
+        val type =
+            when {
+                capabilities == null -> "networkTypeNone"
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "networkTypeWiFi"
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ->
+                    "networkTypeMobile"
+                else -> "networkTypeOther"
+            }
+        scope.launch { runCatching { request(json("setNetworkType", "type" to json(type))) } }
+    }
 
     @Synchronized
     fun start() {
@@ -37,6 +64,11 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
         auth.value = AuthState("starting", busy = true)
         JsonClient.execute(json("setLogVerbosityLevel", "new_verbosity_level" to 0).toString())
         client = JsonClient.createClientId()
+        if (!networkRegistered) {
+            connectivity.registerDefaultNetworkCallback(networkCallback)
+            networkRegistered = true
+        }
+        reportNetwork(connectivity.getNetworkCapabilities(connectivity.activeNetwork))
         receiving =
             scope.launch(Dispatchers.IO) {
                 while (isActive) {
@@ -56,6 +88,18 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                                     else -> "Подключение к Telegram…"
                                 }
                         "updateFile" -> updateFile(obj.getJSONObject("file"))
+                        "updateNewChat" -> {
+                            val chat = obj.getJSONObject("chat")
+                            if (chat.getJSONObject("type").kind() != "chatTypeSecret")
+                                chats[chat.getLong("id")] =
+                                    ChatChoice(chat.getLong("id"), chat.getString("title"))
+                        }
+                        "updateChatTitle" -> {
+                            val id = obj.getLong("chat_id")
+                            chats.computeIfPresent(id) { _, chat ->
+                                chat.copy(title = obj.getString("title"))
+                            }
+                        }
                         else -> if (obj.kind().startsWith("update")) updates.send(obj)
                     }
                 }
@@ -70,7 +114,12 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
         requests[id] = result
         try {
             JsonClient.send(client, obj.put("@extra", id).toString())
-            val value = withTimeout(timeout) { result.await() }
+            val value =
+                withTimeoutOrNull(timeout) { result.await() }
+                    ?: throw TelegramException(
+                        408,
+                        "Telegram не ответил. Проверьте соединение и повторите.",
+                    )
             if (value.kind() == "error")
                 throw TelegramException(value.optInt("code"), value.optString("message"))
             if (value.kind() == "file") updateFile(value)
@@ -144,6 +193,11 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                 requests.values.forEach { it.cancel() }
                 requests.clear()
                 files.clear()
+                chats.clear()
+                if (networkRegistered) {
+                    connectivity.unregisterNetworkCallback(networkCallback)
+                    networkRegistered = false
+                }
             }
         }
     }
@@ -169,7 +223,8 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                     "authorizationStateWaitEmailCode" ->
                         json(
                             "checkAuthenticationEmailCode",
-                            "code" to json("emailAddressAuthenticationCode", "code" to value.trim()),
+                            "code" to
+                                json("emailAddressAuthenticationCode", "code" to value.trim()),
                         )
                     else -> null
                 }

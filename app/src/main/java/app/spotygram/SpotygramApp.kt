@@ -11,7 +11,9 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import org.json.JSONObject
 
 class SpotygramApp : Application() {
@@ -25,6 +27,11 @@ class SpotygramApp : Application() {
     val downloading = MutableStateFlow(DownloadState())
     val theme = MutableStateFlow("system")
     private val scanning = Mutex()
+    private var scanJob: Job? = null
+    private lateinit var libraryReady: Job
+    private val artworkSlots = Semaphore(2)
+    private val thumbnails = ConcurrentHashMap<String, Int>()
+    private val resolvedFiles = ConcurrentHashMap<String, Int>()
     private val artworkFiles = ConcurrentHashMap<Int, MutableSet<String>>()
     var player: androidx.media3.common.Player? = null
 
@@ -33,7 +40,7 @@ class SpotygramApp : Application() {
         library = Library(this)
         telegram = Telegram(this, scope)
         theme.value = prefs.getString("theme", "system") ?: "system"
-        action {
+        libraryReady = action {
             library.reload()
             library.verifyFiles()
         }
@@ -47,15 +54,20 @@ class SpotygramApp : Application() {
             }
         }
         scope.launch {
-            telegram.auth
-                .map { it.type }
+            combine(telegram.auth.map { it.type }, telegram.connection) { type, connection ->
+                    type == "authorizationStateReady" && connection.isEmpty()
+                }
                 .distinctUntilChanged()
-                .collect { type ->
-                    if (type == "authorizationStateReady")
-                        action {
-                            loadChats()
+                .collectLatest { connected ->
+                    if (!connected) scanJob?.cancelAndJoin()
+                    else {
+                        try {
                             refresh()
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            notices.emit(friendly(e))
                         }
+                    }
                 }
         }
         if (prefs.getBoolean("telegram_connected", false)) telegram.start()
@@ -79,25 +91,46 @@ class SpotygramApp : Application() {
         prefs.edit().putBoolean("local_mode", true).apply()
     }
 
-    fun track(id: String) = library.state.value.tracks.firstOrNull { it.id == id }
+    fun track(id: String) = library.state.value.byId[id]
 
     suspend fun loadChats() {
         val choices = mutableMapOf<Long, String>()
+        fun publish() {
+            chatChoices.value =
+                choices
+                    .map { ChatChoice(it.key, it.value) }
+                    .sortedWith(
+                        compareBy<ChatChoice> { it.title != "Избранное" }
+                            .thenBy { it.title.lowercase() }
+                    )
+        }
         for (list in listOf("chatListMain", "chatListArchive")) {
-            try {
-                telegram.request(json("loadChats", "chat_list" to json(list), "limit" to 100))
-            } catch (e: TelegramException) {
-                if (e.code != 404) throw e
-            }
-            val ids =
-                telegram
-                    .request(json("getChats", "chat_list" to json(list), "limit" to 200))
-                    .getJSONArray("chat_ids")
-            for (i in 0 until ids.length()) {
-                val chat = telegram.request(json("getChat", "chat_id" to ids.getLong(i)))
-                if (chat.optJSONObject("type")?.kind() != "chatTypeSecret")
-                    choices[chat.getLong("id")] = chat.getString("title")
-            }
+            var complete = false
+            do {
+                try {
+                    telegram.request(json("loadChats", "chat_list" to json(list), "limit" to 100))
+                } catch (e: TelegramException) {
+                    if (e.code != 404) throw e
+                    complete = true
+                }
+                val ids =
+                    telegram
+                        .request(
+                            json("getChats", "chat_list" to json(list), "limit" to Int.MAX_VALUE)
+                        )
+                        .getJSONArray("chat_ids")
+                for (i in 0 until ids.length()) {
+                    val cached = telegram.chats[ids.getLong(i)]
+                    if (cached != null) {
+                        choices[cached.id] = cached.title
+                        continue
+                    }
+                    val chat = telegram.request(json("getChat", "chat_id" to ids.getLong(i)))
+                    if (chat.optJSONObject("type")?.kind() != "chatTypeSecret")
+                        choices[chat.getLong("id")] = chat.getString("title")
+                }
+                publish()
+            } while (!complete)
         }
         val me = telegram.request(json("getMe"))
         val saved =
@@ -105,13 +138,7 @@ class SpotygramApp : Application() {
                 json("createPrivateChat", "user_id" to me.getLong("id"), "force" to false)
             )
         choices[saved.getLong("id")] = "Избранное"
-        chatChoices.value =
-            choices
-                .map { ChatChoice(it.key, it.value) }
-                .sortedWith(
-                    compareBy<ChatChoice> { it.title != "Избранное" }
-                        .thenBy { it.title.lowercase() }
-                )
+        publish()
     }
 
     suspend fun searchChats(query: String) {
@@ -125,6 +152,11 @@ class SpotygramApp : Application() {
                 .getJSONArray("chat_ids")
         val choices = mutableListOf<ChatChoice>()
         for (i in 0 until ids.length()) {
+            val cached = telegram.chats[ids.getLong(i)]
+            if (cached != null) {
+                choices += cached
+                continue
+            }
             val chat = telegram.request(json("getChat", "chat_id" to ids.getLong(i)))
             if (chat.optJSONObject("type")?.kind() != "chatTypeSecret")
                 choices += ChatChoice(chat.getLong("id"), chat.getString("title"))
@@ -144,108 +176,128 @@ class SpotygramApp : Application() {
         val chat = telegram.request(json("searchPublicChat", "username" to name))
         val choice = ChatChoice(chat.getLong("id"), chat.getString("title"))
         library.source(choice, true)
-        refresh()
     }
 
-    suspend fun refresh(older: Boolean = false) = scanning.withLock {
+    suspend fun refresh() = scanning.withLock {
+        libraryReady.join()
         if (telegram.auth.value.type != "authorizationStateReady") return@withLock
+        scanJob = currentCoroutineContext().job
         busy.value = true
         try {
             for (source in library.state.value.sources) for (document in listOf(false, true)) {
                 val cursor = if (document) source.documentCursor else source.cursor
                 val complete = if (document) source.documentsComplete else source.complete
-                if (older && complete) continue
-                if (library.state.value.sources.none { it.id == source.id }) continue
-                val newest =
-                    library.state.value.tracks
-                        .filter { it.chatId == source.id && it.document == document }
-                        .maxOfOrNull { it.messageId } ?: 0L
-                var from = if (older) cursor else 0
-                do {
-                    val response =
-                        telegram.request(
-                            json(
-                                "searchChatMessages",
-                                "chat_id" to source.id,
-                                "topic_id" to null,
-                                "query" to "",
-                                "sender_id" to null,
-                                "from_message_id" to from,
-                                "offset" to 0,
-                                "limit" to 100,
-                                "filter" to
-                                    json(
-                                        if (document) "searchMessagesFilterDocument"
-                                        else "searchMessagesFilterAudio"
-                                    ),
-                            )
-                        )
-                    val messages = response.getJSONArray("messages")
-                    val result = mutableListOf<Track>()
-                    for (i in 0 until messages.length()) parseTrack(
-                            messages.getJSONObject(i),
-                            source.title,
-                        )
-                        ?.let { result += it }
-                    library.upsert(result)
-                    val next = response.optLong("next_from_message_id")
-                    if (older || cursor == 0L && !complete)
-                        library.cursor(source.id, next, next == 0L, document)
-                    library.reload()
-                    delay(120)
-                    if (
-                        older ||
-                            newest == 0L ||
-                            next == 0L ||
-                            next == from ||
-                            next <= newest ||
-                            result.any { it.messageId <= newest }
-                    )
-                        break
-                    from = next
-                } while (library.state.value.sources.any { it.id == source.id })
+                var newest = if (document) source.documentNewest else source.newest
+                try {
+                    if (!complete) {
+                        // Upgrade/resume the old one-page library without resetting its cursor.
+                        if (newest == 0L && cursor != 0L) {
+                            newest =
+                                library.state.value.tracks
+                                    .asSequence()
+                                    .filter { it.chatId == source.id && it.document == document }
+                                    .maxOfOrNull { it.messageId } ?: 0L
+                            library.newest(source.id, newest, document)
+                        }
+                        val first =
+                            scanPages(source, document, fromMessage = cursor, history = true)
+                        if (cursor == 0L) newest = first
+                    }
+                    // Advance the catch-up boundary only after every intervening page is saved.
+                    val latest = scanPages(source, document, cutoff = newest)
+                    library.newest(source.id, maxOf(newest, latest), document)
+                } catch (e: Exception) {
+                    if (e is CancellationException || (e as? TelegramException)?.code == 429)
+                        throw e
+                    notices.emit("${source.title}: ${friendly(e)}")
+                }
             }
         } finally {
             busy.value = false
+            scanJob = null
+            withContext(NonCancellable) { library.reload() }
         }
+    }
+
+    private suspend fun scanPages(
+        source: Source,
+        document: Boolean,
+        fromMessage: Long = 0,
+        cutoff: Long = 0,
+        history: Boolean = false,
+        query: String = "",
+    ): Long {
+        var from = fromMessage
+        var newest = 0L
+        var publishedAt = 0L
+        do {
+            currentCoroutineContext().ensureActive()
+            if (library.state.value.sources.none { it.id == source.id }) break
+            val response =
+                telegram.request(
+                    json(
+                        "searchChatMessages",
+                        "chat_id" to source.id,
+                        "topic_id" to null,
+                        "query" to query,
+                        "sender_id" to null,
+                        "from_message_id" to from,
+                        "offset" to 0,
+                        "limit" to 100,
+                        "filter" to
+                            json(
+                                if (document) "searchMessagesFilterDocument"
+                                else "searchMessagesFilterAudio"
+                            ),
+                    )
+                )
+            val messages = response.getJSONArray("messages")
+            val pageNewest =
+                (0 until messages.length()).maxOfOrNull {
+                    messages.getJSONObject(it).getLong("id")
+                } ?: 0L
+            newest = maxOf(newest, pageNewest)
+            val tracks =
+                withContext(Dispatchers.Default) {
+                    (0 until messages.length()).mapNotNull {
+                        parseTrack(messages.getJSONObject(it), source.title)
+                    }
+                }
+            library.upsert(tracks)
+            val next = response.getLong("next_from_message_id")
+            check(next == 0L || next != from) {
+                "Telegram не продвинул историю. Повторите обновление."
+            }
+            if (history) {
+                if (from == 0L) library.newest(source.id, newest, document)
+                library.cursor(source.id, next, next == 0L, document)
+            }
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - publishedAt >= 500 || next == 0L) {
+                library.reload()
+                publishedAt = now
+            }
+            if (next == 0L || cutoff > 0 && next <= cutoff) break
+            from = next
+        } while (true)
+        library.reload()
+        return newest
     }
 
     suspend fun searchMusic(query: String) = scanning.withLock {
         if (query.isBlank() || telegram.auth.value.type != "authorizationStateReady")
             return@withLock
         busy.value = true
+        scanJob = currentCoroutineContext().job
         try {
             for (source in library.state.value.sources) for (document in listOf(false, true)) {
-                val response =
-                    telegram.request(
-                        json(
-                            "searchChatMessages",
-                            "chat_id" to source.id,
-                            "topic_id" to null,
-                            "query" to query,
-                            "sender_id" to null,
-                            "from_message_id" to 0,
-                            "offset" to 0,
-                            "limit" to 100,
-                            "filter" to
-                                json(
-                                    if (document) "searchMessagesFilterDocument"
-                                    else "searchMessagesFilterAudio"
-                                ),
-                        )
-                    )
-                val messages = response.getJSONArray("messages")
-                val tracks =
-                    (0 until messages.length()).mapNotNull {
-                        parseTrack(messages.getJSONObject(it), source.title)
-                    }
-                library.upsert(tracks)
-                library.reload()
-                delay(120)
+                scanPages(source, document, query = query)
             }
             notices.emit("Поиск в выбранных чатах завершён")
         } finally {
             busy.value = false
+            scanJob = null
+            withContext(NonCancellable) { library.reload() }
         }
     }
 
@@ -275,12 +327,9 @@ class SpotygramApp : Application() {
             telegram.updateFile(it)
             val local = it.optJSONObject("local")
             if (local?.optBoolean("is_downloading_completed") == true) art = local.optString("path")
-            else {
-                val fid = it.getInt("id")
-                artworkFiles.getOrPut(fid) { ConcurrentHashMap.newKeySet() }.add(id)
-                scope.launch { runCatching { telegram.download(fid, priority = 1) } }
-            }
         }
+        thumbnails[id] = thumbnail?.getInt("id") ?: 0
+        resolvedFiles[id] = file.getInt("id")
         val local = file.optJSONObject("local")
         return Track(
             id,
@@ -398,6 +447,9 @@ class SpotygramApp : Application() {
 
     suspend fun resolve(track: Track): Int {
         if (track.chatId == 0L) return 0
+        resolvedFiles[track.id]?.let {
+            return it
+        }
         val response =
             telegram.request(
                 json("getMessage", "chat_id" to track.chatId, "message_id" to track.messageId)
@@ -407,6 +459,32 @@ class SpotygramApp : Application() {
         library.upsert(listOf(parsed))
         library.reload()
         return parsed.fileId
+    }
+
+    suspend fun loadArtwork(track: Track) = artworkSlots.withPermit {
+        if (
+            track.chatId == 0L ||
+                track.art.isNotEmpty() ||
+                !track.available ||
+                telegram.auth.value.type != "authorizationStateReady"
+        )
+            return@withPermit
+        try {
+            if (!thumbnails.containsKey(track.id)) resolve(track)
+            val id = thumbnails[track.id]?.takeIf { it != 0 } ?: return@withPermit
+            val complete = telegram.files[id]?.takeIf { it.complete }
+            if (complete != null) library.art(track.id, complete.path)
+            else {
+                artworkFiles.getOrPut(id) { ConcurrentHashMap.newKeySet() }.add(track.id)
+                telegram.download(id, priority = 1)
+                withTimeout(15_000) {
+                    telegram.fileRevision.first { telegram.files[id]?.complete == true }
+                }
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException && e !is TimeoutCancellationException) throw e
+            // Artwork is optional; a failed thumbnail must not interrupt listening.
+        }
     }
 
     suspend fun download(ids: List<String>) {
@@ -504,11 +582,16 @@ class SpotygramApp : Application() {
         }
 
     suspend fun logout() {
+        scanJob?.cancelAndJoin()
         player?.stop()
         player?.clearMediaItems()
         stopService(Intent(this, DownloadService::class.java))
         telegram.request(json("logOut"))
         prefs.edit().putBoolean("telegram_connected", false).apply()
         library.clearTelegram()
+        resolvedFiles.clear()
+        thumbnails.clear()
+        artworkFiles.clear()
+        chatChoices.value = emptyList()
     }
 }

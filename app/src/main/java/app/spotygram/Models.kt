@@ -33,6 +33,8 @@ data class Source(
     val complete: Boolean = false,
     val documentCursor: Long = 0,
     val documentsComplete: Boolean = false,
+    val newest: Long = 0,
+    val documentNewest: Long = 0,
 ) {
     val fullyIndexed
         get() = complete && documentsComplete
@@ -46,7 +48,9 @@ data class LibraryState(
     val tracks: List<Track> = emptyList(),
     val sources: List<Source> = emptyList(),
     val playlists: List<Playlist> = emptyList(),
-)
+) {
+    val byId by lazy { tracks.associateBy { it.id } }
+}
 
 data class AuthState(
     val type: String = "welcome",

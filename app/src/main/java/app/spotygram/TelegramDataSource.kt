@@ -64,6 +64,7 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
         val started = System.nanoTime()
         var available = 0L
         while (!closed && !Thread.currentThread().isInterrupted) {
+            val revision = app.telegram.fileRevision.value
             if (fileId == 0) {
                 available = (input?.length() ?: 0) - position
                 break
@@ -80,7 +81,6 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
             }
             if ((System.nanoTime() - started) / 1_000_000 > 60_000)
                 throw IOException("Не удалось загрузить трек. Проверьте сеть и повторите.")
-            val revision = app.telegram.fileRevision.value
             runBlocking {
                 withTimeoutOrNull(500) { app.telegram.fileRevision.first { it != revision } }
             }

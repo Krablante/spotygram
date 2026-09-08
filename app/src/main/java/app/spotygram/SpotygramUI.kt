@@ -313,7 +313,12 @@ fun SpotygramUI(
                             onImport = onImport,
                             onChats = { tab = 1 },
                             onRefresh = { app.action { app.refresh() } },
-                            onOlder = { app.action { app.refresh(true) } },
+                            onShuffle = { tracks ->
+                                randomTrack(tracks)?.let {
+                                    player?.shuffleModeEnabled = true
+                                    play(it, tracks)
+                                }
+                            },
                             onPlaylists = { sheet = "playlists" },
                             onDownload = onDownload,
                             onSearchChats = { q -> app.action { app.searchMusic(q) } },
@@ -329,7 +334,6 @@ fun SpotygramUI(
                             },
                             onAdd = {
                                 sheet = "chats"
-                                app.action { app.loadChats() }
                             },
                             onOpen = {
                                 sourceId = it
@@ -488,15 +492,7 @@ fun SpotygramUI(
                                     sheet = "addPlaylist"
                                 }
                                 ActionRow(Icons.Rounded.QueuePlayNext, "Слушать следующим") {
-                                    player?.let { p ->
-                                        p.addMediaItem(
-                                            (p.currentMediaItemIndex + 1).coerceIn(
-                                                0,
-                                                p.mediaItemCount,
-                                            ),
-                                            track.mediaItem(),
-                                        )
-                                    }
+                                    playNext(app.player, track)
                                     sheet = ""
                                 }
                                 if (track.local)
@@ -625,7 +621,7 @@ private fun MusicScreen(
     onImport: () -> Unit,
     onChats: () -> Unit,
     onRefresh: () -> Unit,
-    onOlder: () -> Unit,
+    onShuffle: (List<Track>) -> Unit,
     onPlaylists: () -> Unit,
     onDownload: (List<String>) -> Unit,
     onSearchChats: (String) -> Unit,
@@ -634,9 +630,10 @@ private fun MusicScreen(
     var sort by rememberSaveable { mutableStateOf(false) }
     val tracks =
         remember(library.tracks, filter, query, playlist, source, sort) {
+            val positions = playlist?.tracks?.withIndex()?.associate { it.value to it.index }
             val matching =
                 library.tracks.filter { t ->
-                    (playlist == null || t.id in playlist.tracks) &&
+                    (positions == null || t.id in positions) &&
                         (source == null || t.chatId == source.id) &&
                         (filter != "local" || t.local) &&
                         (filter != "liked" || t.liked) &&
@@ -644,8 +641,7 @@ private fun MusicScreen(
                             "${t.title} ${t.artist} ${t.source}".contains(query, ignoreCase = true))
                 }
             if (sort) matching.sortedBy { it.title.lowercase() }
-            else if (playlist != null) matching.sortedBy { playlist.tracks.indexOf(it.id) }
-            else matching
+            else if (positions != null) matching.sortedBy { positions[it.id] } else matching
         }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -741,8 +737,14 @@ private fun MusicScreen(
                 ) {
                     Icon(Icons.Rounded.Download, "Скачать подборку")
                 }
+            IconButton(onClick = { onShuffle(tracks) }, enabled = tracks.isNotEmpty()) {
+                Icon(Icons.Rounded.Shuffle, "Перемешать и слушать")
+            }
             FilledIconButton(
-                onClick = { tracks.firstOrNull()?.let { onPlay(it, tracks) } },
+                onClick = {
+                    if (playing.shuffle) onShuffle(tracks)
+                    else tracks.firstOrNull { it.local || it.available }?.let { onPlay(it, tracks) }
+                },
                 enabled = tracks.isNotEmpty(),
                 modifier = Modifier.size(44.dp),
             ) {
@@ -772,7 +774,9 @@ private fun MusicScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(
                     if (query.isNotBlank())
-                        "Поиск идёт по загруженной части медиатеки. Можно обновить чаты или загрузить больше истории."
+                        if (library.sources.any { !it.fullyIndexed })
+                            "История чатов ещё загружается. Найденная музыка появится здесь автоматически."
+                        else "Попробуй другое название или исполнителя."
                     else if (filter == "liked") "Нажми сердечко у трека — он появится здесь."
                     else "Выбери чаты с аудио или добавь файлы с телефона.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -783,8 +787,8 @@ private fun MusicScreen(
                     TextButton(onClick = onImport) { Text("Добавить с телефона") }
                 }
                 if (library.sources.any { !it.fullyIndexed }) {
-                    TextButton(onClick = onOlder, enabled = !busy) {
-                        Text(if (busy) "Загружаем…" else "Загрузить ещё из истории чатов")
+                    TextButton(onClick = onRefresh, enabled = !busy) {
+                        Text(if (busy) "Загружаем всю историю…" else "Продолжить загрузку истории")
                     }
                 }
             }
@@ -802,11 +806,14 @@ private fun MusicScreen(
                 if (library.sources.any { !it.fullyIndexed })
                     item {
                         TextButton(
-                            onClick = onOlder,
+                            onClick = onRefresh,
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth().padding(12.dp),
                         ) {
-                            Text(if (busy) "Загружаем…" else "Загрузить ещё из истории чатов")
+                            Text(
+                                if (busy) "Загружаем всю историю…"
+                                else "Продолжить загрузку истории"
+                            )
                         }
                     }
             }
