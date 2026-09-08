@@ -356,6 +356,7 @@ fun SpotygramUI(
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 containerColor = MaterialTheme.colorScheme.surface,
             ) {
+                MatchDialogSystemBars()
                 SnackbarHost(snackbar)
                 when (sheet) {
                     "settings" ->
@@ -550,10 +551,11 @@ fun SpotygramUI(
                     TextButton(
                         enabled = playlistName.isNotBlank(),
                         onClick = {
+                            val name = playlistName
+                            val trackToAdd = selectedTrack?.id.takeIf { sheet == "addPlaylist" }
                             app.action {
-                                val id = app.library.createPlaylist(playlistName)
-                                if (sheet == "addPlaylist")
-                                    selectedTrack?.let { app.library.addToPlaylist(id, it.id) }
+                                val id = app.library.createPlaylist(name)
+                                trackToAdd?.let { app.library.addToPlaylist(id, it) }
                             }
                             playlistDialog = false
                             if (sheet == "addPlaylist") sheet = ""

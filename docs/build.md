@@ -6,6 +6,8 @@ Keep generated data outside the checkout:
 
 Run heavy operations sequentially: finish native compilation before Gradle, and stop the emulator during builds. Native builds default to two workers (`SPOTYGRAM_JOBS`); Gradle defaults to two workers and a 2 GB heap. On shared hosts use an additional CPU/memory limit for the build process.
 
+Use debug builds for routine UI iteration; run the slower minified release build after changes settle. Keep compiler project caches under state as the build script does.
+
 ```sh
 export ANDROID_HOME=/path/to/android-sdk
 export SPOTYGRAM_STATE=/path/to/private/spotygram-state

@@ -70,6 +70,8 @@ class PlaybackService : MediaSessionService() {
                         events.containsAny(
                             Player.EVENT_MEDIA_ITEM_TRANSITION,
                             Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                            Player.EVENT_POSITION_DISCONTINUITY,
+                            Player.EVENT_PLAYBACK_STATE_CHANGED,
                             Player.EVENT_TIMELINE_CHANGED,
                             Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED,
                             Player.EVENT_REPEAT_MODE_CHANGED,
@@ -91,7 +93,8 @@ class PlaybackService : MediaSessionService() {
             if (exo.mediaItemCount == 0) {
                 val ids = runCatching {
                     JSONArray(app.prefs.getString("queue", "[]"))
-                }.getOrDefault(JSONArray())
+                }
+                    .getOrDefault(JSONArray())
                 val retained =
                     (0 until ids.length()).mapNotNull { index ->
                         app.track(ids.optString(index))?.let { index to it }
@@ -106,10 +109,17 @@ class PlaybackService : MediaSessionService() {
                             .indexOfFirst { it.first == app.prefs.getInt("queue_index", 0) }
                             .takeIf { it >= 0 }
                             ?: tracks.indexOfFirst { it.id == selected }.coerceAtLeast(0)
+                    val duration =
+                        app.prefs.getLong("queue_duration", 0).takeIf { it > 0 }
+                            ?: tracks[index].duration * 1000L
+                    val position =
+                        app.prefs.getLong("queue_position", 0).let {
+                            if (duration > 0 && it >= duration) 0L else it
+                        }
                     exo.setMediaItems(
                         tracks.map { it.mediaItem() },
                         index,
-                        app.prefs.getLong("queue_position", 0),
+                        position,
                     )
                     exo.shuffleModeEnabled = shuffle
                     exo.repeatMode = repeat
@@ -133,6 +143,7 @@ class PlaybackService : MediaSessionService() {
             .putString("queue_current", exo.currentMediaItem?.mediaId)
             .putInt("queue_index", exo.currentMediaItemIndex.coerceAtLeast(0))
             .putLong("queue_position", exo.currentPosition.coerceAtLeast(0))
+            .putLong("queue_duration", exo.duration.coerceAtLeast(0))
             .putBoolean("queue_shuffle", exo.shuffleModeEnabled)
             .putInt("queue_repeat", exo.repeatMode)
             .apply()

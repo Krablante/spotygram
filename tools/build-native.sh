@@ -8,7 +8,12 @@ JOBS=${SPOTYGRAM_JOBS:-2}
 TD_COMMIT=d1085f9cebc5a62379991ae1652673954f229c1f
 mkdir -p "$SPOTYGRAM_STATE/native" "$SPOTYGRAM_STATE/jniLibs"
 if [ ! -d "$SPOTYGRAM_STATE/tdlib-src/.git" ]; then
-  git clone https://github.com/tdlib/td.git "$SPOTYGRAM_STATE/tdlib-src"
+  git init "$SPOTYGRAM_STATE/tdlib-src"
+  git -C "$SPOTYGRAM_STATE/tdlib-src" remote add origin https://github.com/tdlib/td.git
+  git -C "$SPOTYGRAM_STATE/tdlib-src" fetch --depth 1 origin "$TD_COMMIT"
+fi
+if ! git -C "$SPOTYGRAM_STATE/tdlib-src" cat-file -e "$TD_COMMIT^{commit}" 2>/dev/null; then
+  git -C "$SPOTYGRAM_STATE/tdlib-src" fetch --depth 1 origin "$TD_COMMIT"
 fi
 git -C "$SPOTYGRAM_STATE/tdlib-src" checkout "$TD_COMMIT"
 if [ ! -d "$SPOTYGRAM_STATE/native/openssl/.git" ]; then

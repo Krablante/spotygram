@@ -22,6 +22,14 @@ Connect your account, choose your sources, and listen. Downloaded songs stay on 
 | Fast local search + explicit chat search | Queue, shuffle, repeat, favorites | Dark, light, and system themes |
 | Personal playlists | Seek without a second media cache | Audio import through Android's picker |
 
+## A familiar place for your music
+
+| Library · dark | Player · light | Settings |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/library-dark.png" width="240" alt="Spotygram dark library"> | <img src="docs/screenshots/player-light.png" width="240" alt="Spotygram light player"> | <img src="docs/screenshots/settings-dark.png" width="240" alt="Spotygram dark settings"> |
+
+Captured on Android. The public-domain recording used during manual checks is not bundled with the app.
+
 ## Get started
 
 1. Install the signed APK from **Releases**. Android may ask you to allow installation from the app opening the APK.
