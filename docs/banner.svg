@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400">
+  <rect width="1280" height="400" rx="16" fill="#121212"/>
+  <g fill="#1ed760"><rect x="74" y="88" width="13" height="54"/><rect x="98" y="75" width="13" height="80"/><rect x="122" y="95" width="13" height="40"/></g>
+  <text x="72" y="256" fill="#fff" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="100" letter-spacing="-5">spotygram</text>
+  <text x="78" y="316" fill="#b3b3b3" font-family="Inter,Arial,sans-serif" font-size="25">Your Telegram music. On your terms.</text>
+  <text x="1040" y="112" fill="#1ed760" font-family="Arial,sans-serif" font-size="14" letter-spacing="3">ANDROID</text>
+  <text x="1040" y="145" fill="#b3b3b3" font-family="Arial,sans-serif" font-size="14" letter-spacing="2">LOCAL FIRST</text>
+  <path d="M1040 194h168" stroke="#303030"/>
+  <text x="1040" y="226" fill="#b3b3b3" font-family="Arial,sans-serif" font-size="14">No backend.</text>
+  <text x="1040" y="252" fill="#b3b3b3" font-family="Arial,sans-serif" font-size="14">No tracking.</text>
+  <text x="1040" y="278" fill="#b3b3b3" font-family="Arial,sans-serif" font-size="14">Just your music.</text>
+</svg>

@@ -1,0 +1,3 @@
+-keep class org.drinkless.tdlib.JsonClient { *; }
+-keep class org.drinkless.tdlib.JsonClient$* { *; }
+-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }

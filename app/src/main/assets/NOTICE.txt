@@ -1,0 +1,21 @@
+Spotygram — Copyright (c) 2026 Krablante. MIT License.
+
+TDLib — Copyright Aliaksei Levin (levlam@telegram.org),
+Arseny Smirnov (arseny30@gmail.com), 2014–2026.
+https://github.com/tdlib/td — Boost Software License 1.0.
+The JsonClient.java JNI interface has been reduced to the entry points used by Spotygram.
+See Boost-1.0.txt bundled in these assets.
+
+OpenSSL 3.5.6 — Copyright 1998–2026 The OpenSSL Project Authors.
+https://www.openssl.org/ — Apache License 2.0.
+
+AndroidX / Jetpack Compose / Material / Media3 — The Android Open Source Project.
+https://android.googlesource.com/platform/frameworks/support — Apache License 2.0.
+Kotlin / kotlinx.coroutines — JetBrains s.r.o. and Kotlin Programming Language contributors.
+https://github.com/JetBrains/kotlin — Apache License 2.0.
+Coil — Coil Contributors. https://github.com/coil-kt/coil — Apache License 2.0.
+Guava / ListenableFuture — Google LLC. https://github.com/google/guava — Apache License 2.0.
+See Apache-2.0.txt bundled in these assets.
+
+SQLite within TDLib is in the public domain: https://www.sqlite.org/copyright.html.
+No sample music or generated artwork is bundled with the application.
