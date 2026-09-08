@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import androidx.core.database.sqlite.transaction
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -183,14 +184,28 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             )
         }
 
-    suspend fun like(track: Track) =
+    suspend fun like(track: Track): Boolean =
         withContext(Dispatchers.IO) {
-            writableDatabase.update(
-                "tracks",
-                ContentValues().apply { put("liked", if (track.liked) 0 else 1) },
-                "id=?",
-                arrayOf(track.id),
-            )
+            val liked = writableDatabase.transaction {
+                val value =
+                    rawQuery("SELECT liked FROM tracks WHERE id=?", arrayOf(track.id)).use {
+                        it.moveToFirst() && it.getInt(0) == 0
+                    }
+                update(
+                    "tracks",
+                    ContentValues().apply { put("liked", if (value) 1 else 0) },
+                    "id=?",
+                    arrayOf(track.id),
+                )
+                value
+            }
+            reload()
+            liked
+        }
+
+    suspend fun restoreLike(id: String) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.execSQL("UPDATE tracks SET liked=1 WHERE id=?", arrayOf(id))
             reload()
         }
 
@@ -227,51 +242,146 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             reload()
         }
 
-    suspend fun createPlaylist(name: String): Long =
+    suspend fun createPlaylist(name: String, tracks: List<String> = emptyList()): Long =
         withContext(Dispatchers.IO) {
-            val id =
-                writableDatabase.insertOrThrow(
-                    "playlists",
-                    null,
-                    ContentValues().apply { put("name", name.trim().take(80)) },
-                )
+            require(name.isNotBlank()) { "Введите название плейлиста" }
+            val id = writableDatabase.transaction {
+                val created =
+                    insertOrThrow(
+                        "playlists",
+                        null,
+                        ContentValues().apply { put("name", name.trim().take(80)) },
+                    )
+                addTracks(this, created, tracks)
+                created
+            }
             reload()
             id
         }
 
-    suspend fun addToPlaylist(playlist: Long, track: String) =
-        withContext(Dispatchers.IO) {
-            writableDatabase.execSQL(
-                "INSERT OR IGNORE INTO playlist_tracks VALUES(?,?,(SELECT COALESCE(MAX(position),0)+1 FROM playlist_tracks WHERE playlist=?))",
-                arrayOf<Any>(playlist, track, playlist),
+    private fun addTracks(db: SQLiteDatabase, playlist: Long, tracks: List<String>) {
+        check(
+            db.rawQuery("SELECT id FROM playlists WHERE id=?", arrayOf(playlist.toString())).use {
+                it.moveToFirst()
+            }
+        ) {
+            "Плейлист уже удалён"
+        }
+        var position =
+            db.rawQuery(
+                    "SELECT COALESCE(MAX(position),-1)+1 FROM playlist_tracks WHERE playlist=?",
+                    arrayOf(playlist.toString()),
+                )
+                .use {
+                    it.moveToFirst()
+                    it.getInt(0)
+                }
+        db.compileStatement(
+                "INSERT OR IGNORE INTO playlist_tracks(playlist,track,position) SELECT ?,id,? FROM tracks WHERE id=?"
             )
+            .use { statement ->
+                tracks.distinct().forEach { id ->
+                    statement.bindLong(1, playlist)
+                    statement.bindLong(2, position++.toLong())
+                    statement.bindString(3, id)
+                    statement.executeInsert()
+                }
+            }
+    }
+
+    suspend fun addToPlaylist(playlist: Long, track: String) =
+        addToPlaylist(playlist, listOf(track))
+
+    suspend fun addToPlaylist(playlist: Long, tracks: List<String>) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction { addTracks(this, playlist, tracks) }
             reload()
         }
 
     suspend fun removeFromPlaylist(playlist: Long, track: String) =
+        removeFromPlaylist(playlist, listOf(track))
+
+    suspend fun removeFromPlaylist(playlist: Long, tracks: List<String>) =
         withContext(Dispatchers.IO) {
-            writableDatabase.delete(
-                "playlist_tracks",
-                "playlist=? AND track=?",
-                arrayOf(playlist.toString(), track),
+            writableDatabase.transaction {
+                tracks.forEach { track ->
+                    delete(
+                        "playlist_tracks",
+                        "playlist=? AND track=?",
+                        arrayOf(playlist.toString(), track),
+                    )
+                }
+            }
+            reload()
+        }
+
+    suspend fun renamePlaylist(id: Long, name: String) =
+        withContext(Dispatchers.IO) {
+            require(name.isNotBlank()) { "Введите название плейлиста" }
+            writableDatabase.update(
+                "playlists",
+                ContentValues().apply { put("name", name.trim().take(80)) },
+                "id=?",
+                arrayOf(id.toString()),
             )
+            reload()
+        }
+
+    suspend fun reorderPlaylist(id: Long, order: List<String>) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                val current = mutableListOf<String>()
+                rawQuery(
+                        "SELECT track FROM playlist_tracks WHERE playlist=? ORDER BY position",
+                        arrayOf(id.toString()),
+                    )
+                    .use { c ->
+                        while (c.moveToNext()) current += c.getString(0)
+                    }
+                val members = current.toSet()
+                val requested = order.toSet()
+                val merged =
+                    order.distinct().filter { it in members } + current.filter { it !in requested }
+                compileStatement(
+                        "UPDATE playlist_tracks SET position=? WHERE playlist=? AND track=?"
+                    )
+                    .use { statement ->
+                        merged.forEachIndexed { index, track ->
+                            statement.bindLong(1, index.toLong())
+                            statement.bindLong(2, id)
+                            statement.bindString(3, track)
+                            statement.executeUpdateDelete()
+                        }
+                    }
+            }
             reload()
         }
 
     suspend fun deletePlaylist(id: Long) =
         withContext(Dispatchers.IO) {
-            writableDatabase.delete("playlist_tracks", "playlist=?", arrayOf(id.toString()))
-            writableDatabase.delete("playlists", "id=?", arrayOf(id.toString()))
+            writableDatabase.transaction {
+                delete("playlist_tracks", "playlist=?", arrayOf(id.toString()))
+                delete("playlists", "id=?", arrayOf(id.toString()))
+            }
             reload()
         }
 
     suspend fun enqueue(ids: List<String>) =
         withContext(Dispatchers.IO) {
-            ids.forEach {
-                writableDatabase.execSQL(
-                    "INSERT OR IGNORE INTO downloads VALUES(?,(SELECT COALESCE(MAX(position),0)+1 FROM downloads))",
-                    arrayOf(it),
-                )
+            writableDatabase.transaction {
+                var position =
+                    rawQuery("SELECT COALESCE(MAX(position),-1)+1 FROM downloads", null).use {
+                        it.moveToFirst()
+                        it.getLong(0)
+                    }
+                compileStatement("INSERT OR IGNORE INTO downloads(track,position) VALUES(?,?)")
+                    .use { statement ->
+                        ids.distinct().forEach { id ->
+                            statement.bindString(1, id)
+                            statement.bindLong(2, position++)
+                            statement.executeInsert()
+                        }
+                    }
             }
         }
 

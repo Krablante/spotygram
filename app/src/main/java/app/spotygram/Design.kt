@@ -28,7 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import java.io.File
 
-val Green = Color(0xFF1ED760)
+val Green = Color(0xFF63D698)
 
 /** A modal has its own window; changing the app theme must update that window too. */
 @Composable
@@ -49,11 +49,11 @@ private val Dark =
     darkColorScheme(
         primary = Green,
         onPrimary = Color(0xFF062910),
-        background = Color(0xFF121212),
+        background = Color(0xFF161819),
         onBackground = Color.White,
-        surface = Color(0xFF121212),
+        surface = Color(0xFF161819),
         onSurface = Color(0xFFF7F7F7),
-        surfaceVariant = Color(0xFF242424),
+        surfaceVariant = Color(0xFF232729),
         onSurfaceVariant = Color(0xFFB3B3B3),
         secondaryContainer = Color(0xFF292929),
         onSecondaryContainer = Color.White,
@@ -81,6 +81,12 @@ fun SpotygramTheme(mode: String, content: @Composable () -> Unit) {
         colorScheme = if (dark) Dark else Light,
         typography =
             Typography(
+                headlineSmall =
+                    androidx.compose.ui.text.TextStyle(
+                        fontSize = 24.sp,
+                        lineHeight = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
                 headlineLarge =
                     androidx.compose.ui.text.TextStyle(
                         fontSize = 32.sp,

@@ -499,6 +499,13 @@ class SpotygramApp : Application() {
             "Сначала переключите текущий трек"
         }
         if (track.chatId != 0L) telegram.request(json("deleteFile", "file_id" to track.fileId))
+        else
+            player?.let { queue ->
+                for (index in queue.mediaItemCount - 1 downTo 0) {
+                    if (queue.getMediaItemAt(index).mediaId == track.id)
+                        queue.removeMediaItem(index)
+                }
+            }
         library.removeLocal(track)
     }
 

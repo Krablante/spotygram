@@ -5,115 +5,30 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import androidx.media3.common.Player
 import androidx.media3.session.MediaController
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-data class Playing(
-    val id: String = "",
-    val playing: Boolean = false,
-    val loading: Boolean = false,
-    val position: Long = 0,
-    val duration: Long = 0,
-    val shuffle: Boolean = false,
-    val repeat: Int = 0,
-    val ids: List<String> = emptyList(),
-    val index: Int = 0,
-    val order: List<Int> = emptyList(),
-)
-
-@Composable
-private fun observePlayer(player: Player?): Playing {
-    var state by remember { mutableStateOf(Playing()) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(player) {
-        fun snapshot() {
-            if (player == null) return
-            val order = mutableListOf<Int>()
-            val timeline = player.currentTimeline
-            var window = timeline.getFirstWindowIndex(player.shuffleModeEnabled)
-            while (
-                window != androidx.media3.common.C.INDEX_UNSET && order.size < player.mediaItemCount
-            ) {
-                order += window
-                window =
-                    timeline.getNextWindowIndex(
-                        window,
-                        Player.REPEAT_MODE_OFF,
-                        player.shuffleModeEnabled,
-                    )
-            }
-            state =
-                Playing(
-                    player.currentMediaItem?.mediaId.orEmpty(),
-                    player.isPlaying,
-                    player.playbackState == Player.STATE_BUFFERING,
-                    player.currentPosition.coerceAtLeast(0),
-                    player.duration.coerceAtLeast(0),
-                    player.shuffleModeEnabled,
-                    player.repeatMode,
-                    (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId },
-                    player.currentMediaItemIndex.coerceAtLeast(0),
-                    order,
-                )
-        }
-        val listener =
-            object : Player.Listener {
-                override fun onEvents(p: Player, e: Player.Events) = snapshot()
-            }
-        player?.addListener(listener)
-        snapshot()
-        onDispose { player?.removeListener(listener) }
-    }
-    LaunchedEffect(player, lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                delay(500)
-                if (player != null)
-                    state =
-                        state.copy(
-                            position = player.currentPosition.coerceAtLeast(0),
-                            duration = player.duration.coerceAtLeast(0),
-                        )
-            }
-        }
-    }
-    return state
-}
-
-fun togglePlayback(player: Player?) {
-    if (player == null) return
-    if (player.isPlaying || player.playWhenReady && player.playbackState == Player.STATE_BUFFERING)
-        player.pause()
-    else {
-        if (player.playbackState == Player.STATE_ENDED) player.seekToDefaultPosition()
-        player.prepare()
-        player.play()
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SpotygramUI(
     app: SpotygramApp,
@@ -127,26 +42,59 @@ fun SpotygramUI(
     val connection by app.telegram.connection.collectAsStateWithLifecycle()
     val download by app.downloading.collectAsStateWithLifecycle()
     val playing = observePlayer(player)
-    val current = library.tracks.firstOrNull { it.id == playing.id }
+    val current = library.byId[playing.id]
     var localMode by rememberSaveable { mutableStateOf(app.prefs.getBoolean("local_mode", false)) }
     var connect by rememberSaveable { mutableStateOf(false) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var sheet by remember { mutableStateOf("") }
-    var selectedTrack by remember { mutableStateOf<Track?>(null) }
-    var playlistDialog by remember { mutableStateOf(false) }
-    var playlistName by remember { mutableStateOf("") }
+    var selectedTrackId by remember { mutableStateOf<String?>(null) }
     var playlistId by rememberSaveable { mutableStateOf<Long?>(null) }
     var sourceId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var filter by rememberSaveable { mutableStateOf("all") }
+    var offline by rememberSaveable { mutableStateOf(false) }
+    var editor by rememberSaveable { mutableStateOf(false) }
+    var addingTo by rememberSaveable { mutableStateOf<Long?>(null) }
+    var playlistTracks by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    var selectionReset by rememberSaveable { mutableIntStateOf(0) }
+    var managedPlaylist by remember { mutableStateOf<Playlist?>(null) }
+    var rename by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
+    var delete by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val focus = LocalFocusManager.current
+    val keyboardVisible = WindowInsets.isImeVisible
+    val compact = LocalConfiguration.current.screenHeightDp < 480
+    val pages = rememberSaveableStateHolder()
+    val playlist = library.playlists.firstOrNull { it.id == playlistId }
+    val source = library.sources.firstOrNull { it.id == sourceId }
     LaunchedEffect(Unit) { app.notices.collect { snackbar.showSnackbar(it) } }
     LaunchedEffect(auth.type) { if (auth.type == "authorizationStateReady") connect = false }
+    LaunchedEffect(sheet) { if (sheet.isNotEmpty()) focus.clearFocus() }
     val authVisible =
         connect ||
             (!localMode && auth.type != "authorizationStateReady" && library.tracks.isEmpty())
-    val scope = rememberCoroutineScope()
+
+    fun like(track: Track) {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        app.action {
+            val liked = app.library.like(track)
+            if (!liked)
+                scope.launch {
+                    snackbar.currentSnackbarData?.dismiss()
+                    if (
+                        snackbar.showSnackbar(
+                            "Убрано из любимых",
+                            "Отменить",
+                            duration = SnackbarDuration.Short,
+                        ) == SnackbarResult.ActionPerformed
+                    )
+                        app.action { app.library.restoreLike(track.id) }
+                }
+        }
+    }
     fun play(track: Track, tracks: List<Track>) {
         if (player == null) {
             app.notices.tryEmit("Плеер подключается…")
@@ -162,7 +110,26 @@ fun SpotygramUI(
         player.prepare()
         player.play()
     }
-    BackHandler(enabled = fullPlayer || sourceId != null || playlistId != null || connect) {
+    fun addToPlaylist(ids: List<String>) {
+        playlistTracks = ArrayList(ids)
+        sheet = "addPlaylist"
+    }
+    fun editPlaylist(id: Long? = null) {
+        focus.clearFocus()
+        addingTo = id
+        editor = true
+        sheet = ""
+    }
+    fun navigate(index: Int) {
+        focus.clearFocus()
+        selectionReset++
+        tab = index
+        sourceId = null
+        playlistId = null
+    }
+    BackHandler(
+        enabled = !editor && (fullPlayer || sourceId != null || playlistId != null || connect)
+    ) {
         when {
             fullPlayer -> fullPlayer = false
             connect -> connect = false
@@ -173,183 +140,233 @@ fun SpotygramUI(
         }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        if (authVisible) {
-            AuthScreen(
-                app,
-                auth,
-                onLocal = {
-                    localMode = true
-                    app.localMode()
-                    connect = false
-                },
-                onBack = {
-                    localMode = true
-                    app.localMode()
-                    connect = false
-                },
-            )
-        } else if (fullPlayer && current != null) {
-            PlayerScreen(
-                current,
-                playing,
-                player,
-                onBack = { fullPlayer = false },
-                onMore = {
-                    selectedTrack = current
-                    sheet = "track"
-                },
-                onLike = { app.action { app.library.like(current) } },
-                onDownload = { onDownload(listOf(current.id)) },
-                onQueue = { sheet = "queue" },
-            )
-        } else {
-            Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-                snackbarHost = { SnackbarHost(snackbar) },
-                bottomBar = {
-                    Column {
-                        if (current != null)
-                            MiniPlayer(
-                                current,
-                                playing,
-                                onOpen = { fullPlayer = true },
-                                onToggle = { togglePlayback(player) },
-                                onNext = { player?.seekToNextMediaItem() },
-                            )
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.background,
-                            tonalElevation = 0.dp,
-                        ) {
-                            NavigationBarItem(
-                                selected = tab == 0,
-                                onClick = {
-                                    tab = 0
-                                    sourceId = null
-                                    playlistId = null
-                                },
-                                icon = { Icon(Icons.Rounded.LibraryMusic, null) },
-                                label = { Text("Музыка") },
-                                colors =
-                                    NavigationBarItemDefaults.colors(
-                                        indicatorColor = Color.Transparent
-                                    ),
-                            )
-                            NavigationBarItem(
-                                selected = tab == 1,
-                                onClick = {
-                                    tab = 1
-                                    sourceId = null
-                                    playlistId = null
-                                },
-                                icon = { Icon(Icons.Rounded.Forum, null) },
-                                label = { Text("Чаты") },
-                                colors =
-                                    NavigationBarItemDefaults.colors(
-                                        indicatorColor = Color.Transparent
-                                    ),
-                            )
-                        }
-                    }
-                },
-            ) { padding ->
-                Column(Modifier.padding(padding).fillMaxSize()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            Modifier.size(34.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Rounded.GraphicEq,
-                                null,
-                                Modifier.size(22.dp),
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
-                        Text(
-                            "Spotygram",
-                            Modifier.padding(start = 10.dp).weight(1f),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        IconButton(onClick = onImport) {
-                            Icon(Icons.Rounded.Add, "Добавить аудио с телефона")
-                        }
-                        IconButton(onClick = { sheet = "settings" }) {
-                            Icon(Icons.Rounded.Settings, "Настройки")
-                        }
-                    }
-                    if (connection.isNotBlank() && auth.type == "authorizationStateReady")
-                        Text(
-                            connection,
-                            Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    if (tab == 0) {
-                        val playlist = library.playlists.firstOrNull { it.id == playlistId }
-                        val source = library.sources.firstOrNull { it.id == sourceId }
-                        MusicScreen(
-                            library,
-                            playing,
-                            download,
-                            busy,
-                            filter,
-                            onFilter = { filter = it },
-                            playlist,
-                            source,
-                            onBack = {
-                                playlistId = null
-                                sourceId = null
-                            },
-                            onPlay = ::play,
-                            onMore = {
-                                selectedTrack = it
-                                sheet = "track"
-                            },
-                            onImport = onImport,
-                            onChats = { tab = 1 },
-                            onRefresh = { app.action { app.refresh() } },
-                            onShuffle = { tracks ->
-                                randomTrack(tracks)?.let {
-                                    player?.shuffleModeEnabled = true
-                                    play(it, tracks)
+        when {
+            authVisible ->
+                AuthScreen(
+                    app,
+                    auth,
+                    onLocal = {
+                        localMode = true
+                        app.localMode()
+                        connect = false
+                    },
+                    onBack = {
+                        localMode = true
+                        app.localMode()
+                        connect = false
+                    },
+                )
+            editor ->
+                PlaylistEditor(
+                    app,
+                    library,
+                    addingTo,
+                    onClose = { editor = false },
+                    onSaved = { id ->
+                        editor = false
+                        navigate(2)
+                        playlistId = id
+                    },
+                )
+            fullPlayer && current != null ->
+                PlayerScreen(
+                    current,
+                    playing,
+                    player,
+                    onBack = { fullPlayer = false },
+                    onMore = {
+                        selectedTrackId = current.id
+                        sheet = "track"
+                    },
+                    onLike = { like(current) },
+                    onDownload = { onDownload(listOf(current.id)) },
+                    onQueue = { sheet = "queue" },
+                )
+            else ->
+                Scaffold(
+                    modifier = Modifier.imePadding(),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    snackbarHost = { if (sheet.isEmpty()) SnackbarHost(snackbar) },
+                    bottomBar = {
+                        if (!keyboardVisible)
+                            Column {
+                                if (current != null)
+                                    MiniPlayer(
+                                        current,
+                                        playing,
+                                        onOpen = { fullPlayer = true },
+                                        onToggle = { togglePlayback(player) },
+                                        onNext = { player?.seekToNextMediaItem() },
+                                    )
+                                NavigationBar(
+                                    modifier = Modifier.height(if (compact) 56.dp else 80.dp),
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                    tonalElevation = 0.dp,
+                                ) {
+                                    val destinations =
+                                        listOf(
+                                            "Музыка" to Icons.Rounded.MusicNote,
+                                            "Любимые" to Icons.Rounded.Favorite,
+                                            "Плейлисты" to Icons.Rounded.PlaylistPlay,
+                                            "Чаты" to Icons.Rounded.Forum,
+                                        )
+                                    destinations.forEachIndexed { index, (label, icon) ->
+                                        NavigationBarItem(
+                                            selected = tab == index,
+                                            onClick = { navigate(index) },
+                                            icon = { Icon(icon, if (compact) label else null) },
+                                            label =
+                                                if (compact) null
+                                                else {
+                                                    {
+                                                        Text(
+                                                            label,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                        )
+                                                    }
+                                                },
+                                            colors =
+                                                NavigationBarItemDefaults.colors(
+                                                    indicatorColor = Color.Transparent,
+                                                    selectedIconColor =
+                                                        MaterialTheme.colorScheme.primary,
+                                                    selectedTextColor =
+                                                        MaterialTheme.colorScheme.primary,
+                                                ),
+                                        )
+                                    }
                                 }
-                            },
-                            onPlaylists = { sheet = "playlists" },
-                            onDownload = onDownload,
-                            onSearchChats = { q -> app.action { app.searchMusic(q) } },
-                        )
-                    } else
-                        ChatsScreen(
-                            library,
-                            busy,
-                            auth.type == "authorizationStateReady",
-                            onConnect = {
-                                connect = true
-                                app.telegram.start()
-                            },
-                            onAdd = {
-                                sheet = "chats"
-                            },
-                            onOpen = {
-                                sourceId = it
-                                tab = 0
-                            },
-                            onRemove = { s ->
-                                app.action { app.library.source(ChatChoice(s.id, s.title), false) }
-                            },
-                            onRefresh = { app.action { app.refresh() } },
-                        )
+                            }
+                    },
+                ) { padding ->
+                    Column(Modifier.padding(padding).fillMaxSize()) {
+                        if (!compact)
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .padding(start = 16.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    Modifier.size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.GraphicEq,
+                                        null,
+                                        Modifier.size(19.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                }
+                                Text(
+                                    "Spotygram",
+                                    Modifier.weight(1f).padding(start = 8.dp),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                IconButton(onClick = { sheet = "settings" }) {
+                                    Icon(Icons.Rounded.Settings, "Настройки")
+                                }
+                            }
+                        if (connection.isNotBlank() && auth.type == "authorizationStateReady")
+                            Text(
+                                connection,
+                                Modifier.padding(horizontal = 16.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        pages.SaveableStateProvider("$tab:$playlistId:$sourceId") {
+                            when {
+                                tab == 0 || tab == 1 || tab == 2 && playlist != null ->
+                                    MusicScreen(
+                                        library,
+                                        playing.id,
+                                        playing.shuffle,
+                                        download,
+                                        busy,
+                                        tab == 1,
+                                        if (tab == 0) offline else false,
+                                        source,
+                                        playlist,
+                                        selectionReset,
+                                        onOffline = { offline = it },
+                                        onSource = { sourceId = it },
+                                        onBack = {
+                                            playlistId = null
+                                            sourceId = null
+                                        },
+                                        onPlay = ::play,
+                                        onLike = ::like,
+                                        onMore = {
+                                            selectedTrackId = it.id
+                                            sheet = "track"
+                                        },
+                                        onImport = onImport,
+                                        onChats = { navigate(3) },
+                                        onRefresh = { app.action { app.refresh() } },
+                                        onShuffle = { tracks ->
+                                            randomTrack(tracks)?.let {
+                                                player?.shuffleModeEnabled = true
+                                                play(it, tracks)
+                                            }
+                                        },
+                                        onDownload = onDownload,
+                                        onAddToPlaylist = ::addToPlaylist,
+                                        onSearchChats = { q -> app.action { app.searchMusic(q) } },
+                                        onAddTracks = { editPlaylist(playlistId) },
+                                        onPlaylistMenu = {
+                                            managedPlaylist = playlist
+                                            sheet = "playlist"
+                                        },
+                                        onRemoveTracks = { ids ->
+                                            playlistId?.let { id ->
+                                                app.action {
+                                                    app.library.removeFromPlaylist(id, ids)
+                                                }
+                                            }
+                                        },
+                                    )
+                                tab == 2 ->
+                                    PlaylistsScreen(
+                                        library,
+                                        onCreate = { editPlaylist() },
+                                        onOpen = { playlistId = it },
+                                        onMore = {
+                                            managedPlaylist = it
+                                            sheet = "playlist"
+                                        },
+                                    )
+                                else ->
+                                    ChatsScreen(
+                                        library,
+                                        busy,
+                                        auth.type == "authorizationStateReady",
+                                        onConnect = {
+                                            connect = true
+                                            app.telegram.start()
+                                        },
+                                        onAdd = { sheet = "chats" },
+                                        onOpen = {
+                                            navigate(0)
+                                            sourceId = it
+                                        },
+                                        onRemove = { s ->
+                                            app.action {
+                                                app.library.source(ChatChoice(s.id, s.title), false)
+                                            }
+                                        },
+                                        onRefresh = { app.action { app.refresh() } },
+                                    )
+                            }
+                        }
+                    }
                 }
-            }
         }
-        if (fullPlayer || authVisible)
+        if ((fullPlayer || editor || authVisible) && sheet.isEmpty())
             Box(
-                Modifier.fillMaxSize().safeDrawingPadding(),
+                Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 SnackbarHost(snackbar)
@@ -373,11 +390,17 @@ fun SpotygramUI(
                                 connect = true
                                 app.telegram.start()
                             },
-                            onLogout = { confirmLogout = true },
-                            onImport = onImport,
+                            onLogout = {
+                                sheet = ""
+                                confirmLogout = true
+                            },
+                            onImport = {
+                                sheet = ""
+                                onImport()
+                            },
                             onLocal = {
-                                filter = "local"
-                                tab = 0
+                                navigate(0)
+                                offline = true
                                 sheet = ""
                             },
                             onResume = {
@@ -399,97 +422,69 @@ fun SpotygramUI(
                             },
                         )
                     "queue" -> QueueSheet(library, playing, player)
-                    "playlists" ->
-                        Column(
-                            Modifier.fillMaxWidth()
-                                .padding(horizontal = 20.dp)
-                                .navigationBarsPadding()
-                        ) {
-                            Text("Плейлисты", style = MaterialTheme.typography.headlineMedium)
-                            ActionRow(Icons.Rounded.Add, "Новый плейлист") {
-                                playlistName = ""
-                                playlistDialog = true
-                            }
-                            LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                                items(library.playlists, key = { it.id }) { list ->
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        ListItem(
-                                            headlineContent = { Text(list.name) },
-                                            supportingContent = {
-                                                Text(trackCount(list.tracks.size))
-                                            },
-                                            leadingContent = {
-                                                Icon(Icons.Rounded.QueueMusic, null)
-                                            },
-                                            modifier =
-                                                Modifier.weight(1f).clickable {
-                                                    playlistId = list.id
-                                                    sourceId = null
-                                                    tab = 0
-                                                    sheet = ""
-                                                },
-                                        )
-                                        IconButton(
-                                            onClick = {
-                                                app.action { app.library.deletePlaylist(list.id) }
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.DeleteOutline,
-                                                "Удалить плейлист ${list.name}",
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(24.dp))
-                        }
                     "addPlaylist" ->
-                        Column(Modifier.padding(horizontal = 20.dp).navigationBarsPadding()) {
-                            Text("Добавить в плейлист", style = MaterialTheme.typography.titleLarge)
-                            ActionRow(Icons.Rounded.Add, "Новый плейлист") {
-                                playlistName = ""
-                                playlistDialog = true
-                            }
-                            LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                                items(library.playlists, key = { it.id }) { p ->
-                                    ActionRow(Icons.Rounded.QueueMusic, p.name) {
-                                        selectedTrack?.let { t ->
-                                            app.action {
-                                                app.library.addToPlaylist(p.id, t.id)
-                                                app.notices.emit("Добавлено: ${p.name}")
-                                            }
-                                        }
-                                        sheet = ""
-                                    }
+                        AddToPlaylistSheet(
+                            app,
+                            library,
+                            playlistTracks,
+                            onDone = {
+                                sheet = ""
+                                selectionReset++
+                                app.notices.tryEmit("Добавлено в плейлист")
+                            },
+                        )
+                    "order" ->
+                        managedPlaylist?.let { p ->
+                            PlaylistOrderSheet(app, library, p.id, onDone = { sheet = "" })
+                        }
+                    "playlist" ->
+                        managedPlaylist?.let { p ->
+                            Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp)) {
+                                Text(
+                                    p.name,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                )
+                                ActionRow(Icons.Rounded.PlaylistAdd, "Добавить треки") {
+                                    editPlaylist(p.id)
                                 }
+                                ActionRow(Icons.Rounded.SwapVert, "Изменить порядок") {
+                                    sheet = "order"
+                                }
+                                ActionRow(Icons.Rounded.Edit, "Переименовать") {
+                                    renameText = p.name
+                                    sheet = ""
+                                    rename = true
+                                }
+                                ActionRow(Icons.Rounded.DeleteOutline, "Удалить плейлист") {
+                                    sheet = ""
+                                    delete = true
+                                }
+                                Spacer(Modifier.height(12.dp))
                             }
-                            Spacer(Modifier.height(24.dp))
                         }
                     "track" ->
-                        selectedTrack?.let { initial ->
-                            val track =
-                                library.tracks.firstOrNull { it.id == initial.id } ?: initial
-                            Column(Modifier.padding(horizontal = 12.dp).navigationBarsPadding()) {
+                        library.byId[selectedTrackId]?.let { track ->
+                            Column(
+                                Modifier.navigationBarsPadding()
+                                    .padding(horizontal = 12.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
                                 ListItem(
                                     headlineContent = { Text(track.title, maxLines = 2) },
                                     supportingContent = { Text(track.subtitle) },
-                                    leadingContent = { Artwork(track, 56.dp) },
-                                )
-                                HorizontalDivider(
-                                    Modifier.padding(vertical = 12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    leadingContent = { Artwork(track, 48.dp) },
                                 )
                                 ActionRow(
                                     if (track.liked) Icons.Rounded.Favorite
                                     else Icons.Rounded.FavoriteBorder,
                                     if (track.liked) "Убрать из любимых" else "В любимые",
                                 ) {
-                                    app.action { app.library.like(track) }
+                                    like(track)
                                     sheet = ""
                                 }
                                 ActionRow(Icons.Rounded.PlaylistAdd, "В плейлист") {
-                                    sheet = "addPlaylist"
+                                    addToPlaylist(listOf(track.id))
                                 }
                                 ActionRow(Icons.Rounded.QueuePlayNext, "Слушать следующим") {
                                     playNext(app.player, track)
@@ -505,64 +500,82 @@ fun SpotygramUI(
                                         onDownload(listOf(track.id))
                                         sheet = ""
                                     }
-                                if (playlistId != null)
-                                    ActionRow(
-                                        Icons.Rounded.PlaylistRemove,
-                                        "Убрать из этого плейлиста",
-                                    ) {
-                                        app.action {
-                                            app.library.removeFromPlaylist(playlistId!!, track.id)
-                                        }
+                                playlistId?.let { id ->
+                                    ActionRow(Icons.Rounded.PlaylistRemove, "Убрать из плейлиста") {
+                                        app.action { app.library.removeFromPlaylist(id, track.id) }
                                         sheet = ""
                                     }
+                                }
                                 if (track.chatId != 0L && track.available)
                                     ActionRow(Icons.Rounded.OpenInNew, "Открыть в Telegram") {
                                         app.action {
-                                            val link = app.messageLink(track)
                                             app.startActivity(
-                                                Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                                                Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse(app.messageLink(track)),
+                                                    )
                                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                             )
                                         }
                                         sheet = ""
                                     }
-                                Spacer(Modifier.height(24.dp))
+                                Spacer(Modifier.height(12.dp))
                             }
                         }
                 }
             }
-        if (playlistDialog)
+        if (rename)
             AlertDialog(
-                onDismissRequest = { playlistDialog = false },
-                title = { Text("Новый плейлист") },
+                onDismissRequest = { rename = false },
+                title = { Text("Название плейлиста") },
                 text = {
                     OutlinedTextField(
-                        playlistName,
-                        { playlistName = it.take(80) },
-                        label = { Text("Название") },
+                        renameText,
+                        { renameText = it.take(80) },
                         singleLine = true,
+                        label = { Text("Название") },
                     )
                 },
                 confirmButton = {
                     TextButton(
-                        enabled = playlistName.isNotBlank(),
+                        enabled = renameText.isNotBlank(),
                         onClick = {
-                            val name = playlistName
-                            val trackToAdd = selectedTrack?.id.takeIf { sheet == "addPlaylist" }
-                            app.action {
-                                val id = app.library.createPlaylist(name)
-                                trackToAdd?.let { app.library.addToPlaylist(id, it) }
-                            }
-                            playlistDialog = false
-                            if (sheet == "addPlaylist") sheet = ""
+                            val id = managedPlaylist?.id
+                            val name = renameText
+                            if (id != null) app.action { app.library.renamePlaylist(id, name) }
+                            rename = false
                         },
                     ) {
-                        Text("Создать")
+                        Text("Сохранить")
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = { playlistDialog = false }) { Text("Отмена") }
+                dismissButton = { TextButton(onClick = { rename = false }) { Text("Отмена") } },
+            )
+        if (delete)
+            AlertDialog(
+                onDismissRequest = { delete = false },
+                title = { Text("Удалить плейлист?") },
+                text = {
+                    Text(
+                        "«${managedPlaylist?.name}» будет удалён. Треки останутся в музыке и на телефоне."
+                    )
                 },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val id = managedPlaylist?.id
+                            if (id != null)
+                                app.action {
+                                    app.library.deletePlaylist(id)
+                                    if (playlistId == id) playlistId = null
+                                }
+                            delete = false
+                        }
+                    ) {
+                        Text("Удалить")
+                    }
+                },
+                dismissButton = { TextButton(onClick = { delete = false }) { Text("Отмена") } },
             )
         if (confirmLogout)
             AlertDialog(
@@ -570,14 +583,13 @@ fun SpotygramUI(
                 title = { Text("Выйти из Telegram?") },
                 text = {
                     Text(
-                        "Сессия будет завершена. Telegram-треки и их связи с плейлистами будут удалены из медиатеки. Импортированные файлы останутся."
+                        "Telegram-треки и их связи с плейлистами будут удалены из медиатеки. Импортированные файлы останутся."
                     )
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             confirmLogout = false
-                            sheet = ""
                             app.action { app.logout() }
                         }
                     ) {
@@ -606,281 +618,6 @@ fun ActionRow(icon: ImageVector, text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun MusicScreen(
-    library: LibraryState,
-    playing: Playing,
-    download: DownloadState,
-    busy: Boolean,
-    filter: String,
-    onFilter: (String) -> Unit,
-    playlist: Playlist?,
-    source: Source?,
-    onBack: () -> Unit,
-    onPlay: (Track, List<Track>) -> Unit,
-    onMore: (Track) -> Unit,
-    onImport: () -> Unit,
-    onChats: () -> Unit,
-    onRefresh: () -> Unit,
-    onShuffle: (List<Track>) -> Unit,
-    onPlaylists: () -> Unit,
-    onDownload: (List<String>) -> Unit,
-    onSearchChats: (String) -> Unit,
-) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var sort by rememberSaveable { mutableStateOf(false) }
-    val tracks =
-        remember(library.tracks, filter, query, playlist, source, sort) {
-            val positions = playlist?.tracks?.withIndex()?.associate { it.value to it.index }
-            val matching =
-                library.tracks.filter { t ->
-                    (positions == null || t.id in positions) &&
-                        (source == null || t.chatId == source.id) &&
-                        (filter != "local" || t.local) &&
-                        (filter != "liked" || t.liked) &&
-                        (query.isBlank() ||
-                            "${t.title} ${t.artist} ${t.source}".contains(query, ignoreCase = true))
-                }
-            if (sort) matching.sortedBy { it.title.lowercase() }
-            else if (positions != null) matching.sortedBy { positions[it.id] } else matching
-        }
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.padding(start = 20.dp, end = 8.dp, top = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (playlist != null || source != null)
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Вся музыка")
-                }
-            Text(
-                playlist?.name ?: source?.title ?: "Твоя музыка",
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            IconButton(onClick = onRefresh, enabled = !busy) {
-                if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Rounded.Refresh, "Обновить")
-            }
-        }
-        OutlinedTextField(
-            query,
-            { query = it },
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-            placeholder = { Text("Что хочешь послушать?") },
-            leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon =
-                if (query.isNotEmpty()) {
-                    {
-                        IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Rounded.Close, "Очистить поиск")
-                        }
-                    }
-                } else null,
-            singleLine = true,
-            shape = RoundedCornerShape(8.dp),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                ),
-        )
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf("all" to "Все", "local" to "На телефоне", "liked" to "Любимые").forEach {
-                (key, label) ->
-                FilterChip(
-                    selected = filter == key,
-                    onClick = { onFilter(key) },
-                    label = { Text(label) },
-                    shape = CircleShape,
-                )
-            }
-            AssistChip(onClick = onPlaylists, label = { Text("Плейлисты") }, shape = CircleShape)
-        }
-        if (query.isNotBlank() && library.sources.isNotEmpty())
-            TextButton(
-                onClick = { onSearchChats(query) },
-                enabled = !busy,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            ) {
-                Text(if (busy) "Ищем…" else "Поискать в выбранных чатах")
-            }
-        Row(
-            Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                trackCount(tracks.size),
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            IconButton(onClick = { sort = !sort }) {
-                Icon(
-                    Icons.Rounded.SortByAlpha,
-                    if (sort) "Сначала новые" else "По алфавиту",
-                    tint =
-                        if (sort) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            if (playlist != null || source != null)
-                IconButton(
-                    onClick = { onDownload(tracks.map { it.id }) },
-                    enabled = tracks.any { !it.local && it.available },
-                ) {
-                    Icon(Icons.Rounded.Download, "Скачать подборку")
-                }
-            IconButton(onClick = { onShuffle(tracks) }, enabled = tracks.isNotEmpty()) {
-                Icon(Icons.Rounded.Shuffle, "Перемешать и слушать")
-            }
-            FilledIconButton(
-                onClick = {
-                    if (playing.shuffle) onShuffle(tracks)
-                    else tracks.firstOrNull { it.local || it.available }?.let { onPlay(it, tracks) }
-                },
-                enabled = tracks.isNotEmpty(),
-                modifier = Modifier.size(44.dp),
-            ) {
-                Icon(Icons.Rounded.PlayArrow, "Слушать всё")
-            }
-        }
-        if (tracks.isEmpty()) {
-            Column(
-                Modifier.fillMaxWidth().weight(1f).padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    if (query.isNotBlank()) Icons.Rounded.SearchOff else Icons.Rounded.LibraryMusic,
-                    null,
-                    Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    if (query.isNotBlank()) "Ничего не найдено"
-                    else if (filter == "local") "Здесь будет музыка без сети"
-                    else if (filter == "liked") "Сохраняй то, что нравится"
-                    else "Начнём с твоей музыки",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (query.isNotBlank())
-                        if (library.sources.any { !it.fullyIndexed })
-                            "История чатов ещё загружается. Найденная музыка появится здесь автоматически."
-                        else "Попробуй другое название или исполнителя."
-                    else if (filter == "liked") "Нажми сердечко у трека — он появится здесь."
-                    else "Выбери чаты с аудио или добавь файлы с телефона.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (query.isBlank() && filter == "all") {
-                    Spacer(Modifier.height(20.dp))
-                    Button(onClick = onChats) { Text("Выбрать чаты") }
-                    TextButton(onClick = onImport) { Text("Добавить с телефона") }
-                }
-                if (library.sources.any { !it.fullyIndexed }) {
-                    TextButton(onClick = onRefresh, enabled = !busy) {
-                        Text(if (busy) "Загружаем всю историю…" else "Продолжить загрузку истории")
-                    }
-                }
-            }
-        } else
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 12.dp)) {
-                items(tracks, key = { it.id }) { track ->
-                    TrackRow(
-                        track,
-                        track.id == playing.id,
-                        download.takeIf { it.trackId == track.id },
-                        onClick = { onPlay(track, tracks) },
-                        onMore = { onMore(track) },
-                    )
-                }
-                if (library.sources.any { !it.fullyIndexed })
-                    item {
-                        TextButton(
-                            onClick = onRefresh,
-                            enabled = !busy,
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        ) {
-                            Text(
-                                if (busy) "Загружаем всю историю…"
-                                else "Продолжить загрузку истории"
-                            )
-                        }
-                    }
-            }
-    }
-}
-
-@Composable
-fun TrackRow(
-    track: Track,
-    active: Boolean,
-    download: DownloadState? = null,
-    onClick: () -> Unit,
-    onMore: () -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(start = 20.dp, end = 4.dp, top = 7.dp, bottom = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Artwork(track, 52.dp)
-        Column(Modifier.weight(1f).padding(start = 12.dp, end = 6.dp)) {
-            Text(
-                track.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMedium,
-                color =
-                    if (active) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface,
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (track.local) {
-                    Icon(
-                        Icons.Rounded.DownloadForOffline,
-                        "На телефоне",
-                        Modifier.size(13.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                }
-                Text(
-                    if (!track.available && !track.local) "Сообщение удалено" else track.subtitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (download != null)
-            CircularProgressIndicator(
-                progress = { download.progress },
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
-            )
-        else
-            Text(
-                if (track.duration > 0) seconds(track.duration.toLong()) else "—",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        IconButton(onClick = onMore) { Icon(Icons.Rounded.MoreVert, "Действия: ${track.title}") }
-    }
-}
-
-@Composable
 private fun MiniPlayer(
     track: Track,
     state: Playing,
@@ -895,10 +632,10 @@ private fun MiniPlayer(
             .clickable(onClick = onOpen)
     ) {
         Row(
-            Modifier.padding(start = 8.dp, top = 6.dp, bottom = 4.dp),
+            Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Artwork(track, 42.dp)
+            Artwork(track, 40.dp)
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(
                     track.title,

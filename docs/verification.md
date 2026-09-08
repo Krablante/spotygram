@@ -1,5 +1,35 @@
 # Verification record
 
+## 0.2.0 — four destinations and touch interaction
+
+Verification remains manual UI operation and runtime inspection, without test files or automated test scaffolds. Android 16 x86-64 emulator, 480×1040 at 192 dpi. Compilation and emulator runs were sequential under a two-core CPU limit. The debug package is separate from the signed release package.
+
+| Surface | Observation |
+| --- | --- |
+| Debug build | Debug APK compilation/packaging and Android Lint passed before manual checks and after the keyboard/landscape fixes. |
+| Final build/artifacts | Final minified release build and release Lint passed. ARM64/x86-64 signatures and 16 KB zip alignment passed. Manifest reports `app.spotygram`, versionCode 3, versionName 0.2.0, minSdk 26. The installed final x86-64 APK matched SHA-256 `9428e0dda5404da946b10e1119d6de6ae9a43157a3a22e25872af1e57fa1139a`. |
+| Release update | Signed 0.2.0 installed over 0.1.1 without clearing data. The three local tracks, one favorite and `Night` playlist remained; schema stayed at 3. Queue `[1,2,0]`, selected index 1 and 71262 ms restored in the non-playing state. |
+| Favorites | Heart tap populated the separate Favorites destination. Removing the heart removed the row; the snackbar Undo restored it. The action did not start playback. |
+| Long-press | Holding a song entered selection with `Выбрано: 1`, without starting playback. A second tap selected another song. Searching `nomatch` left `Выбрано: 2`; clearing search and adding to an existing playlist added both. |
+| Playlist creation | Created `Evening` from one selected song; it contained that song immediately. Created empty `Road` through the full editor, then used its Add Tracks action. Batch-adding two more imported entries produced three members. |
+| Membership uniqueness | Adding an already included song to `Road` again left three members, rather than four. |
+| Drag reorder | Held the first drag handle, moved it to the third row and released. SQLite positions changed from `[681640e6…,76a007a7…,8e28a8a1…]` to `[76a007a7…,8e28a8a1…,681640e6…]`. The up-arrow then moved the second row to the first position. |
+| Rename/delete | Renamed `Road` to `Travel`; all three members remained. Deleted the newly created debug-only `Evening` through its confirmation dialog: the three local tracks remained and no orphan playlist memberships remained. |
+| Editor cancellation | Selected a song in the editor, rotated back to portrait and observed `Выбрано: 1`. Back showed a discard confirmation. Confirming exit created no additional playlist. |
+| Keyboard | Initial inspection caught search focus reopening the keyboard after closing the add sheet. After the fix, repeating the operation ended with `mInputShown=false`, usable bottom navigation and unchanged playlist membership. While typing in search, bottom navigation/player were absent rather than covered by the keyboard. |
+| Layout | Font scale 1.3 kept all four portrait navigation labels readable. Initial landscape inspection exposed a near-zero-height list; the revised compact layout displayed scrollable track rows, and the playlist editor placed name/search side by side. Font scale and orientation were restored afterwards. |
+| Logs | Inspected AndroidRuntime and ExoPlayerImplInternal error logs contained no Spotygram error during the debug scenarios. The emulator again showed a boot-time System UI ANR outside Spotygram. |
+| Final queue deletion check | Imported a temporary duplicate recording and placed its ID twice in a four-entry queue. Deleting that non-current import removed both entries: the queue became two valid IDs, the current ID was unchanged, and next/play reached PLAYING on the remaining recording without a source error. Final-process AndroidRuntime/ExoPlayerImplInternal error logs were empty. |
+| Final offline/background check | With Wi-Fi/mobile data disabled and `mWakefulness=Asleep`, the final release media session remained PLAYING and advanced to 62503 ms. Network settings were restored and the emulator stopped afterwards. This checks local decoding/session progression, not audible output or remote streaming. |
+
+These observations used local recordings and independently imported entries, not a seeded database or a generated fixture suite. Artwork/network behavior and large-library throughput are not inferred from these small local samples. A user-provided 0.1.1 phone screenshot showed 805 indexed tracks, which demonstrates exceeding the former 100-per-chat symptom, but is not proof that every accessible Telegram message was indexed.
+
+Physical-device haptics, touch latency, battery drain, full authorized Telegram operation and ARM64 execution remain outside the local verification. New gestures use Android's platform feedback API, whose actual sensation was not observed on this audio-less emulator.
+
+The release UI also imported and played Ogg Vorbis [Für Elise by Sebion7125](https://commons.wikimedia.org/wiki/File:Fur_Elise.ogg), licensed [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). The app read its embedded title `Fur Elise` and artist `sebion`; the media session reported PLAYING with advancing position. This recording and the earlier public-domain *The Entertainer* are local demonstration media only, not APK/repository assets. Screenshots show their real imported metadata and ordinary artwork fallbacks.
+
+Cleaning up two duplicate demonstration imports exposed a pre-existing queue problem: deleted imported IDs remained queued and advancing reached `Source error`. The deletion path was changed to remove all matching queued entries before deleting an imported record. It still refuses to delete the currently selected track. Telegram tracks retain their remote references when only their local copy is removed.
+
 ## 0.1.1 — history, network and shuffle
 
 Manual checks use the same Android 16 x86-64 emulator, at 480×1040/192 dpi. Builds and emulator runs remain sequential, with a two-core CPU limit. No automated test files, fixtures or scaffolding were added.
