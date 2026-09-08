@@ -42,7 +42,9 @@ fun SpotygramUI(
     val connection by app.telegram.connection.collectAsStateWithLifecycle()
     val download by app.downloading.collectAsStateWithLifecycle()
     val mode by app.playbackMode.collectAsStateWithLifecycle()
-    val playing = observePlayer(player).copy(shuffle = mode.shuffle, repeat = mode.repeat)
+    val playing =
+        observePlayer(player)
+            .copy(shuffle = mode.shuffle, random = mode.random, repeat = mode.repeat)
     val current = library.byId[playing.id]
     var localMode by rememberSaveable { mutableStateOf(app.prefs.getBoolean("local_mode", false)) }
     var connect by rememberSaveable { mutableStateOf(false) }
@@ -190,7 +192,7 @@ fun SpotygramUI(
                     onLike = { like(current) },
                     onDownload = { onDownload(listOf(current.id)) },
                     onQueue = { sheet = "queue" },
-                    onShuffle = { app.playback?.setMode(shuffle = !mode.shuffle) },
+                    onShuffle = { app.playback?.setMode(order = mode.order.next()) },
                     onRepeat = { app.playback?.setMode(repeat = it) },
                 )
             else ->
@@ -302,6 +304,7 @@ fun SpotygramUI(
                                         library,
                                         playing.id,
                                         playing.shuffle,
+                                        playing.random,
                                         download,
                                         busy,
                                         tab == 1,
@@ -332,7 +335,9 @@ fun SpotygramUI(
                                                 app.playback?.start(
                                                     available,
                                                     available.indexOf(it),
-                                                    shuffle = true,
+                                                    order =
+                                                        if (mode.random) PlaybackOrder.RANDOM
+                                                        else PlaybackOrder.SHUFFLE,
                                                 )
                                             }
                                         },

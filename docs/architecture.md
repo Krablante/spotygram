@@ -63,7 +63,13 @@ Shuffle uses Fisher–Yates over compact source indices with Android's `SecureRa
 
 The full queue never becomes a Media3 timeline or a Binder payload. Transitions slide the three-item window while retaining the current media source. Only the open queue sheet observes queue revisions and resolves visible rows through the library ID map. Half-second position updates are scoped to the mini-player/full player, not the whole navigation screen.
 
+`PlaybackOrder` distinguishes ordered, shuffled and absolute-random playback. Random playback samples one source index with `SecureRandom.nextInt(size)`, without excluding the current or previous entries. It retains at most 32 previous selections, current and next (34 indices), and does not build a full permutation. Back/forward can retrace that retained history; new future entries are independent draws. Repeat-all is unnecessary and normalized to off on entering random mode; the repeat button switches between off and repeat-one. Explicit play-next overrides the pending draw. The queue sheet labels the full list as a selection pool, shows the actual next entry, and caches source indices instead of rebuilding them on every transition.
+
 Immutable queue snapshots are serialized by one conflated IO writer. The ID list and path use `playback_queue` preferences; small cursor/position/mode updates use `playback_position`, linked by snapshot version. Position ticks run only during playback and never rewrite the large list. Restoration migrates the former `settings` queue keys, filters missing tracks and remains paused; neither the catalog nor account data is reset.
+
+The stable order name is saved alongside the former shuffle flag; older saved queues map to ordered/shuffled without losing their pass. Random history lives in the small position snapshot, so each random transition saves at most 34 indices rather than rewriting the source list. Its cursor identifies a history occurrence, allowing the same source index to occur repeatedly.
+
+The full player's scroll content has a minimum height equal to the safe viewport. Remaining space is distributed between content blocks, keeping bottom actions near the bottom on tall phones. On smaller heights or larger text, natural content height takes over and the screen scrolls. Artwork stays bounded; there is no screen-size polling, device-specific offset or custom layout engine.
 
 ## Deliberate limits
 

@@ -31,6 +31,7 @@ fun MusicScreen(
     library: LibraryState,
     playingId: String,
     shuffle: Boolean,
+    random: Boolean,
     download: DownloadState,
     busy: Boolean,
     favorites: Boolean,
@@ -243,9 +244,9 @@ fun MusicScreen(
                     onClick = { onShuffle(tracks) },
                     enabled = tracks.any { it.local || it.available },
                 ) {
-                    Icon(Icons.Rounded.Shuffle, null)
+                    Icon(if (random) Icons.Rounded.Casino else Icons.Rounded.Shuffle, null)
                     Spacer(Modifier.width(6.dp))
-                    Text(tr(R.string.shuffle_play))
+                    Text(tr(if (random) R.string.random_play else R.string.shuffle_play))
                 }
                 IconButton(
                     onClick = {

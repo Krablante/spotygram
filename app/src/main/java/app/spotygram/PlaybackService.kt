@@ -39,9 +39,31 @@ fun Track.mediaItem(): MediaItem =
         )
         .build()
 
-data class PlaybackMode(val shuffle: Boolean = false, val repeat: Int = Player.REPEAT_MODE_OFF)
+enum class PlaybackOrder {
+    ORDERED,
+    SHUFFLE,
+    RANDOM;
 
-data class QueueSnapshot(val ids: List<String>, val order: List<Int>, val current: Int)
+    fun next() = entries[(ordinal + 1) % entries.size]
+}
+
+data class PlaybackMode(
+    val order: PlaybackOrder = PlaybackOrder.ORDERED,
+    val repeat: Int = Player.REPEAT_MODE_OFF,
+) {
+    val shuffle
+        get() = order != PlaybackOrder.ORDERED
+
+    val random
+        get() = order == PlaybackOrder.RANDOM
+}
+
+data class QueueSnapshot(
+    val ids: List<String>,
+    val order: List<Int>,
+    val current: Int,
+    val next: Int = -1,
+)
 
 /** The full queue stays in-process; only previous/current/next enter Media3 and Binder. */
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -54,6 +76,7 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var ids: List<String> = emptyList()
     private var path: List<Int> = emptyList()
+    private var poolIndices: List<Int> = emptyList()
     private var cursor = 0
     private var anchor = 0
     private var editing = false
@@ -153,6 +176,7 @@ class PlaybackService : MediaSessionService() {
                             .putInt("cursor", s.cursor)
                             .putLong("position", s.position)
                             .putBoolean("shuffle", s.mode.shuffle)
+                            .putString("order", s.mode.order.name)
                             .putInt("repeat", s.mode.repeat)
                             .commit()
                         written = s.version
@@ -163,6 +187,11 @@ class PlaybackService : MediaSessionService() {
                         .putInt("cursor", s.cursor)
                         .putLong("position", s.position)
                         .putBoolean("shuffle", s.mode.shuffle)
+                        .putString("order", s.mode.order.name)
+                        .putString(
+                            "random_path",
+                            if (s.mode.random) JSONArray(s.path).toString() else null,
+                        )
                         .putInt("repeat", s.mode.repeat)
                         .commit()
                 }
@@ -232,12 +261,13 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    fun start(tracks: List<Track>, index: Int, shuffle: Boolean = mode.shuffle) {
+    fun start(tracks: List<Track>, index: Int, order: PlaybackOrder = mode.order) {
         if (index !in tracks.indices) return
         generation++
         restoring = false
         ids = tracks.map { it.id }
-        app.playbackMode.value = mode.copy(shuffle = shuffle)
+        app.playbackMode.value =
+            mode.copy(order = order, repeat = normalizedRepeat(order, mode.repeat))
         resetOrder(index)
         window()
         exo.prepare()
@@ -258,6 +288,11 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun resetOrder(selected: Int) {
+        if (mode.random) {
+            path = if (selected in ids.indices) listOf(selected) else emptyList()
+            cursor = 0
+            return
+        }
         val order = permutation().toMutableList()
         if (mode.shuffle && selected in ids.indices) {
             order.remove(selected)
@@ -276,7 +311,14 @@ class PlaybackService : MediaSessionService() {
             return
         }
         val n = ids.size
-        if (
+        if (mode.random) {
+            // Keep 32 real previous selections, the current item and one independent draw.
+            if (cursor > 32) {
+                path = path.drop(cursor - 32)
+                cursor = 32
+            }
+            if (cursor == path.lastIndex) path = path + playbackRandom.nextInt(n)
+        } else if (
             mode.repeat == Player.REPEAT_MODE_ALL && cursor % n == n - 1 && cursor == path.lastIndex
         ) {
             val last = current
@@ -296,7 +338,7 @@ class PlaybackService : MediaSessionService() {
         }
         val previous = path.getOrNull(cursor - 1)?.let { app.track(ids[it])?.mediaItem() }
         val next =
-            if (cursor % n < n - 1 || mode.repeat == Player.REPEAT_MODE_ALL)
+            if (mode.random || cursor % n < n - 1 || mode.repeat == Player.REPEAT_MODE_ALL)
                 path.getOrNull(cursor + 1)?.let { app.track(ids[it])?.mediaItem() }
             else null
         val item = app.track(ids[current])?.mediaItem() ?: return
@@ -324,16 +366,25 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    fun setMode(shuffle: Boolean = mode.shuffle, repeat: Int = mode.repeat) {
+    private fun normalizedRepeat(order: PlaybackOrder, repeat: Int) =
+        if (order == PlaybackOrder.RANDOM && repeat == Player.REPEAT_MODE_ALL)
+            Player.REPEAT_MODE_OFF
+        else repeat
+
+    fun setMode(order: PlaybackOrder = mode.order, repeat: Int = mode.repeat) {
         val selected = current
-        val reshuffle = mode.shuffle != shuffle
-        app.playbackMode.value = PlaybackMode(shuffle, repeat)
+        val reshuffle = mode.order != order
+        app.playbackMode.value = PlaybackMode(order, normalizedRepeat(order, repeat))
         if (reshuffle) resetOrder(selected)
         window(preserve = true)
         changed()
     }
 
     fun snapshot(): QueueSnapshot {
+        if (mode.random) {
+            if (poolIndices.size != ids.size) poolIndices = ids.indices.toList()
+            return QueueSnapshot(ids, poolIndices, current, path.getOrNull(cursor + 1) ?: -1)
+        }
         val start = if (ids.isEmpty()) 0 else cursor / ids.size * ids.size
         return QueueSnapshot(
             ids,
@@ -344,8 +395,11 @@ class PlaybackService : MediaSessionService() {
 
     fun select(index: Int) {
         if (index !in ids.indices) return
-        val start = cursor / ids.size * ids.size
-        cursor = path.subList(start, start + ids.size).indexOf(index) + start
+        if (mode.random) resetOrder(index)
+        else {
+            val start = cursor / ids.size * ids.size
+            cursor = path.subList(start, start + ids.size).indexOf(index) + start
+        }
         window()
         exo.prepare()
         exo.play()
@@ -367,6 +421,12 @@ class PlaybackService : MediaSessionService() {
         }
         ids = ids + track.id
         resetOrder(selected)
+        if (mode.random) {
+            path = path + ids.lastIndex
+            window(preserve = true)
+            changed()
+            return
+        }
         val order = path.toMutableList()
         order.remove(ids.lastIndex)
         order.add(cursor + 1, ids.lastIndex)
@@ -419,6 +479,7 @@ class PlaybackService : MediaSessionService() {
         restoring = false
         ids = emptyList()
         path = emptyList()
+        poolIndices = emptyList()
         cursor = 0
         exo.stop()
         window()
@@ -465,10 +526,25 @@ class PlaybackService : MediaSessionService() {
         if (retained.isEmpty()) return null
         val restoredIds = retained.map { raw.optString(it) }
         val remap = retained.withIndex().associate { it.value to it.index }
-        val rawOrder = array(if (legacy) "queue_order" else "path")
+        val restoredOrder =
+            runCatching { PlaybackOrder.valueOf(progress.getString("order", "")!!) }.getOrNull()
+                ?: if (progress.getBoolean(if (legacy) "queue_shuffle" else "shuffle", false))
+                    PlaybackOrder.SHUFFLE
+                else PlaybackOrder.ORDERED
+        val random = restoredOrder == PlaybackOrder.RANDOM
+        val rawOrder =
+            if (random)
+                runCatching {
+                        JSONArray(progress.getString("random_path", source.getString("path", "[]")))
+                    }
+                    .getOrDefault(JSONArray())
+            else array(if (legacy) "queue_order" else "path")
         var restoredPath = (0 until rawOrder.length()).mapNotNull { remap[rawOrder.optInt(it, -1)] }
         val n = restoredIds.size
-        if (
+        if (random) {
+            if (restoredPath.isEmpty()) restoredPath = listOf(0)
+            restoredPath = restoredPath.take(34)
+        } else if (
             restoredPath.isEmpty() ||
                 restoredPath.size % n != 0 ||
                 restoredPath.chunked(n).any { it.toSet().size != n }
@@ -480,6 +556,10 @@ class PlaybackService : MediaSessionService() {
             } else {
                 val rawCursor = progress.getInt("cursor", 0)
                 if (retained.size == raw.length()) rawCursor
+                else if (random)
+                    (0 until rawCursor.coerceAtMost(rawOrder.length())).count {
+                        rawOrder.optInt(it, -1) in remap
+                    }
                 else restoredPath.indexOf(remap[rawOrder.optInt(rawCursor, -1)]).coerceAtLeast(0)
             }
         val c = oldCursor.coerceIn(restoredPath.indices)
@@ -492,8 +572,14 @@ class PlaybackService : MediaSessionService() {
             c,
             if (duration > 0 && pos >= duration) 0 else pos,
             PlaybackMode(
-                progress.getBoolean(if (legacy) "queue_shuffle" else "shuffle", false),
-                progress.getInt(if (legacy) "queue_repeat" else "repeat", Player.REPEAT_MODE_OFF),
+                restoredOrder,
+                normalizedRepeat(
+                    restoredOrder,
+                    progress.getInt(
+                        if (legacy) "queue_repeat" else "repeat",
+                        Player.REPEAT_MODE_OFF,
+                    ),
+                ),
             ),
         )
     }

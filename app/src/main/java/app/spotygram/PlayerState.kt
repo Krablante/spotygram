@@ -14,6 +14,7 @@ data class Playing(
     val position: Long = 0,
     val duration: Long = 0,
     val shuffle: Boolean = false,
+    val random: Boolean = false,
     val repeat: Int = 0,
 )
 
@@ -32,6 +33,7 @@ fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
                     player.currentPosition.coerceAtLeast(0),
                     player.duration.coerceAtLeast(0),
                     player.shuffleModeEnabled,
+                    false,
                     player.repeatMode,
                 )
         }

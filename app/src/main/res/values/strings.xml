@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ordered_mode">In order</string>
+    <string name="shuffle_no_repeats">Shuffle · no repeats</string>
+    <string name="random_mode">Absolute random · repeats possible</string>
+    <string name="random_play">Random play</string>
+    <string name="change_playback_order">%1$s. Change playback order</string>
+    <string name="random_pool">Random selection</string>
+    <string name="random_pool_help">%1$s · each next song is chosen independently. Playback continues until you stop it.</string>
+    <string name="next_named">Next: %1$s</string>
     <string name="language">Language</string>
     <string name="language_help">Follows your phone language. English and Russian are supported.</string>
     <string name="language_phone_settings">Change the language in your phone settings.</string>

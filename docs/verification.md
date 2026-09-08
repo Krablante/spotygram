@@ -1,5 +1,30 @@
 # Verification record
 
+## 0.4.0 — absolute random and full-height player
+
+Verification used manual Android UI operations, media-session inspection, app-owned playback preferences and runtime logs. No test files or scaffolds were created. The existing debug catalog of three independent local imports was used; no synthetic large catalog was added. Builds and emulator remained sequential under the two-core resource limit.
+
+| Surface | Observation |
+| --- | --- |
+| Debug build | Debug APK compilation/packaging and Lint passed. |
+| Mode migration | The existing 0.3.0 debug queue opened as shuffle without repeats at its saved 9960 ms position. One mode-button press selected RANDOM without restarting the current recording. |
+| Independent draw | The first random path was `[1,1]`. System Next reached cursor 1 and extended it to `[1,1,2]`: the same source occurrence genuinely played twice consecutively. |
+| Bounded history and writes | After 40 additional system Next key presses, the saved history contained 34 indices and cursor 32. It included runs such as `0,0,0,0` and `1,1,1,1`. The full queue file's modification time remained unchanged (`1788902321`); the small position/history snapshot advanced instead. No distribution benchmark is inferred from this sample. |
+| Back and restore | Previous returned cursor 32 → 31 without changing the retained path. Force-stop/relaunch restored that exact 34-index path, cursor 31 and RANDOM without autoplay. |
+| Explicit next and automatic transition | Play Next inserted source occurrence 3 immediately after current occurrence 1 (`[1,3]`). Seeking the playing item to its end automatically reached cursor 1/occurrence 3 and prepared another independent draw (`[1,3,0]`). The media session remained PLAYING with three physical entries. |
+| Repeat-one | In random mode, enabling repeat-one and seeking to the end retained cursor 1 and path `[1,3,0]`, restarting the same recording. Turning it off restored endless random traversal. |
+| One-entry pool | Launching Random from the one-track Favorites collection and pressing system Next produced `[0,0,0]`, cursor 1 and repeat off; the app did not stop or crash because the pool had one entry. |
+| Pool UI | The queue sheet displayed “Подборка для рандома”, its track count, explanation of independent selection, the prepared next song and the three selectable source rows. |
+| Height and text | At 480×1040/192 dpi, bottom-action bounds ended at y=973 above the system navigation area. At 480×1200, the player spread its blocks over the taller viewport instead of leaving a large bottom void; the capture was visually inspected. At 480×1072 with font scale 1.3 (close to the supplied phone screenshot's aspect ratio), both bottom actions remained visible through y=1010. |
+| Landscape | At 1072×480, scrolling exposed metadata, seek, all transport buttons, mode caption and both bottom actions together; their observed bounds remained inside the viewport. Size and font scale were restored afterwards. |
+| Debug runtime logs | AndroidRuntime/ExoPlayerImplInternal error logs were empty during the checked scenarios. The emulator again displayed a boot-time System UI ANR outside Spotygram. |
+| Final build/artifacts | Minified release build and release Lint passed. Both ABI signatures and 16 KB zip alignment passed with the existing certificate. Manifest: `app.spotygram`, versionCode 5, versionName 0.4.0, minSdk 26. Installed x86-64 SHA-256 matched `faeb039fd5229d60e540cb328d26d7f70a6291672631ab2be0340f83125eac91`. EN/RU key and format-argument validation passed for 221 resources. |
+| Signed update and mode cycle | Release installed over 0.3.0 and restored Fur Elise at 73543 ms, non-playing, in shuffle mode. UI presses visibly cycled RANDOM → ORDERED → SHUFFLE → RANDOM. After another force-stop/relaunch it retained RANDOM, The Entertainer at 61253 ms and a three-item physical timeline without autoplay. |
+| Signed background playback | From Fur Elise in RANDOM, system Next reached The Entertainer. With Wi-Fi/mobile data disabled and `mWakefulness=Asleep`, it remained PLAYING at 35028 ms with three physical items. Network settings were restored and playback paused. Release AndroidRuntime/ExoPlayerImplInternal logs were empty. |
+| Release visual inspection | Updated the light-player and settings screenshots from 0.4.0, and captured the Russian dark player at 480×1072. All were visually inspected. The emulator was returned to 480×1040, English override and font scale 1.0, then stopped. |
+
+The physical phone in the user's screenshot was not connected. These are layout and local playback observations in an x86-64 emulator, not claims about physical touch feel, ARM64 execution, battery life, remote Telegram playback or large-catalog performance. The existing 0.3.0 long-queue evidence remains below; this change's new random history was checked directly for its bounded size and lack of full-list writes.
+
 ## 0.3.0 — languages, navigation and bounded playback queue
 
 Manual UI and runtime inspection used the Android 16 x86-64 emulator at 480×1040/192 dpi. Builds and emulator runs were sequential, with two-core CPU and bounded memory limits. Commands had short timeouts; long builds ran as asynchronously polled units. No test files, fixture suites or automation scaffolds were added to the project.

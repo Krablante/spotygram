@@ -38,7 +38,11 @@ fun PlayerScreen(
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val cover = minOf(maxWidth - 48.dp, maxHeight * 0.43f, 360.dp)
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)
+            Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
                 Modifier.fillMaxWidth().height(56.dp),
@@ -154,8 +158,8 @@ fun PlayerScreen(
             ) {
                 IconButton(onClick = onShuffle) {
                     Icon(
-                        Icons.Rounded.Shuffle,
-                        tr(R.string.shuffle_mode),
+                        if (state.random) Icons.Rounded.Casino else Icons.Rounded.Shuffle,
+                        tr(R.string.change_playback_order, playbackOrderLabel(state)),
                         tint =
                             if (state.shuffle) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -197,7 +201,9 @@ fun PlayerScreen(
                     onClick = {
                         onRepeat(
                             when (state.repeat) {
-                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                                Player.REPEAT_MODE_OFF ->
+                                    if (state.random) Player.REPEAT_MODE_ONE
+                                    else Player.REPEAT_MODE_ALL
                                 Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
                                 else -> Player.REPEAT_MODE_OFF
                             }
@@ -215,6 +221,13 @@ fun PlayerScreen(
                     )
                 }
             }
+            Text(
+                playbackOrderLabel(state),
+                Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -249,12 +262,26 @@ fun QueueSheet(library: LibraryState, state: Playing, app: SpotygramApp) {
             app.playback?.snapshot() ?: QueueSnapshot(emptyList(), emptyList(), -1)
         }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding()) {
-        Text(tr(R.string.queue), style = MaterialTheme.typography.headlineMedium)
         Text(
-            if (state.shuffle) tr(R.string.shuffled_queue) else trackCount(queue.ids.size),
+            tr(if (state.random) R.string.random_pool else R.string.queue),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            if (state.random) tr(R.string.random_pool_help, trackCount(queue.ids.size))
+            else if (state.shuffle) tr(R.string.shuffled_queue) else trackCount(queue.ids.size),
             Modifier.padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (state.random)
+            queue.ids.getOrNull(queue.next)?.let(library.byId::get)?.let {
+                Text(
+                    tr(R.string.next_named, it.title),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 500.dp)) {
             val order = queue.order
             items(
@@ -307,3 +334,12 @@ fun QueueSheet(library: LibraryState, state: Playing, app: SpotygramApp) {
         Spacer(Modifier.height(20.dp))
     }
 }
+
+private fun playbackOrderLabel(state: Playing): String =
+    tr(
+        when {
+            state.random -> R.string.random_mode
+            state.shuffle -> R.string.shuffle_no_repeats
+            else -> R.string.ordered_mode
+        }
+    )
