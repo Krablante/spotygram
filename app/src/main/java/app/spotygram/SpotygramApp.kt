@@ -35,6 +35,8 @@ class SpotygramApp : Application() {
     private val artworkFiles = ConcurrentHashMap<Int, MutableSet<String>>()
     var player: androidx.media3.common.Player? = null
     var playback: PlaybackService? = null
+    var downloadService: DownloadService? = null
+    val musicCache by lazy { MusicCache(this) }
     val playbackMode = MutableStateFlow(PlaybackMode())
     val queueRevision = MutableStateFlow(0L)
 
@@ -492,6 +494,7 @@ class SpotygramApp : Application() {
     }
 
     suspend fun download(ids: List<String>) {
+        check(!musicCache.state.value.clearing) { tr(R.string.cache_clearing) }
         val valid = ids.filter { track(it)?.let { t -> !t.local && t.available } == true }
         if (valid.isEmpty()) return
         library.enqueue(valid)

@@ -1,5 +1,26 @@
 # Verification record
 
+## 0.5.0 — Telegram music cache cleanup
+
+Manual inspection used the existing Android 16 x86-64 emulator and local demonstration imports. No unit/integration/smoke files, synthetic cache media or account fixtures were created. Build and emulator runs were sequential under the two-core resource limit.
+
+| Surface | Observation |
+| --- | --- |
+| Debug build | Debug APK compilation/packaging and Lint passed. |
+| Entry point and sizing | Settings showed three imported tracks occupying 12 MB. Its new Clear music cache entry opened the dedicated screen, which showed `0 Б` and “Кэш музыки пуст”: imports were not counted as Telegram cache. Refresh returned the same empty result. |
+| Disabled empty action | Accessibility inspection identified the clickable clear-action parent as `enabled=false`; it was visually disabled. The empty screen did not offer an unnecessary destructive confirmation. |
+| Layout | The Russian cache screen was visually inspected at normal scale and font scale 1.3. At 1.3 the title wrapped to two lines, explanatory text remained visible and the button fit above system navigation. Font scale was restored to 1.0. |
+| Catalog integrity | After visiting/refreshing the screen, an in-memory inspection of the existing debug database returned `integrity_check: ok`, three tracks/all three local imports, one favorite, one playlist and three memberships. No application-data reset. |
+| Playback regression | The existing random queue resumed the imported recording and the media session reached PLAYING at 82796 ms with three physical entries. AndroidRuntime and ExoPlayerImplInternal error logs were empty. Playback was paused afterwards. |
+| Resource validation | All 237 EN/RU resources had matching keys and string format arguments. |
+| API/source review | Storage statistics field names and `optimizeStorage` parameters were checked against the pinned TDLib schema. Deletion is restricted to audio/document file types; account storage and imported directories are not deletion targets. Cancellation, physical-player release, media-command guards, path reconciliation and finally-block recovery were reviewed in source. |
+| Audit corrections | Source review caught a size-request cancellation path that could leave `loading` set; completion now clears it in `finally`. File reconciliation was changed from separate row commits to one transaction/prepared statement and one final library reload. These error/mass-deletion branches were reviewed, not simulated as an authenticated cleanup. |
+| Final build/artifacts | Minified release and release Lint passed after the audit changes. Both ABI signature checks and 16 KB zip alignment passed with the existing signing certificate. Manifest: `app.spotygram`, versionCode 6, versionName 0.5.0, minSdk 26. Installed final x86-64 SHA-256 matched `17a3a8e4a1006079473d624999dd60a8f91ae93fa2f73b0ca872713f81a2dce8`. |
+| Signed update/UI | The 0.5.0 update over 0.4.0 retained Night/Road playlists and the two imported recordings (7 MB). Final English cache/settings captures were visually inspected: cache size was 0 B, explanatory text named explicit downloads, and the clear action was disabled. |
+| Final playback/logs | After visiting the final cache screen, the imported recording reached PLAYING at 17398 ms with three physical entries. AndroidRuntime/ExoPlayerImplInternal error logs were empty. Playback was paused and the emulator stopped. |
+
+**Nonempty authenticated Telegram cache deletion, its positive confirmation/result flow, cancellation of an actual remote download, partial-delete errors and subsequent remote redownload were not exercised end to end.** The emulator has no authorized Telegram account and no cached Telegram audio. Local empty-cache UI checks and source/API review are not represented as proof of those scenarios. Physical ARM64 execution and device-specific storage behavior remain unverified locally.
+
 ## 0.4.0 — absolute random and full-height player
 
 Verification used manual Android UI operations, media-session inspection, app-owned playback preferences and runtime logs. No test files or scaffolds were created. The existing debug catalog of three independent local imports was used; no synthetic large catalog was added. Builds and emulator remained sequential under the two-core resource limit.

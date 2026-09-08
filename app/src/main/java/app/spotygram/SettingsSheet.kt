@@ -23,6 +23,7 @@ fun SettingsSheet(
     onImport: () -> Unit,
     onLocal: () -> Unit,
     onResume: () -> Unit,
+    onCache: () -> Unit,
 ) {
     val theme by app.theme.collectAsStateWithLifecycle()
     var wifi by remember { mutableStateOf(app.prefs.getBoolean("wifi_only", false)) }
@@ -90,6 +91,13 @@ fun SettingsSheet(
             Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ListItem(
+            headlineContent = { Text(tr(R.string.clear_music_cache)) },
+            supportingContent = { Text(tr(R.string.cache_settings_help)) },
+            leadingContent = { Icon(Icons.Rounded.DeleteSweep, null) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+            modifier = Modifier.clickable(onClick = onCache),
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,

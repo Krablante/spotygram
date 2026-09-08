@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="music_cache">Кэш музыки Telegram</string>
+    <string name="clear_music_cache">Очистить кэш музыки</string>
+    <string name="cache_settings_help">Посмотреть размер скачанных аудиофайлов Telegram</string>
+    <string name="refresh_cache_size">Обновить размер кэша</string>
+    <string name="cache_calculating">Считаем занятое место…</string>
+    <string name="cache_clearing">Очищаем кэш музыки…</string>
+    <string name="cache_empty">Кэш музыки пуст</string>
+    <string name="cache_description">Локальные копии аудио из Telegram, включая песни, сохранённые кнопкой «Скачать». Их можно загрузить снова, пока доступны исходные сообщения.</string>
+    <string name="cache_preserved">Импортированные файлы, любимые, плейлисты и вход в Telegram сохранятся.</string>
+    <string name="cache_freed">Освобождено %1$s</string>
+    <string name="cache_remaining">В кэше ещё остались файлы. Можно повторить очистку.</string>
+    <string name="cache_connect_required">Подключи Telegram, чтобы он безопасно удалил свои скачанные файлы.</string>
+    <string name="cache_confirm_title">Удалить скачанные копии?</string>
+    <string name="cache_confirm_help">Воспроизведение и загрузки остановятся. Музыка Telegram, специально скачанная для офлайна, тоже удалится с телефона. Любимые, плейлисты, импортированные файлы и аккаунт сохранятся. Если исходное сообщение больше недоступно, скачать копию заново не получится.</string>
+    <string name="stop_and_clear_cache">Остановить и очистить</string>
+    <plurals name="cache_files">
+        <item quantity="one">%d файл в кэше</item>
+        <item quantity="few">%d файла в кэше</item>
+        <item quantity="many">%d файлов в кэше</item>
+        <item quantity="other">%d файла в кэше</item>
+    </plurals>
     <string name="ordered_mode">По порядку</string>
     <string name="shuffle_no_repeats">Перемешивание · без повторов</string>
     <string name="random_mode">Абсолютный рандом · возможны повторы</string>

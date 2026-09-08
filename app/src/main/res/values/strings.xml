@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="music_cache">Telegram music cache</string>
+    <string name="clear_music_cache">Clear music cache</string>
+    <string name="cache_settings_help">Review space used by downloaded Telegram audio</string>
+    <string name="refresh_cache_size">Refresh cache size</string>
+    <string name="cache_calculating">Calculating space used…</string>
+    <string name="cache_clearing">Clearing music cache…</string>
+    <string name="cache_empty">The music cache is empty</string>
+    <string name="cache_description">Local Telegram audio copies, including songs saved with Download. They can be downloaded again while their original messages remain available.</string>
+    <string name="cache_preserved">Imported audio, favorites, playlists and your Telegram sign-in are kept.</string>
+    <string name="cache_freed">Freed %1$s</string>
+    <string name="cache_remaining">Some cached files remain. You can try clearing them again.</string>
+    <string name="cache_connect_required">Connect Telegram to let it safely remove its downloaded files.</string>
+    <string name="cache_confirm_title">Delete downloaded copies?</string>
+    <string name="cache_confirm_help">Playback and downloads will stop. Telegram audio saved for offline use will also be removed. Favorites, playlists, imported files and your account are kept. A copy cannot be downloaded again if its original message is no longer available.</string>
+    <string name="stop_and_clear_cache">Stop and clear</string>
+    <plurals name="cache_files">
+        <item quantity="one">%d cached file</item>
+        <item quantity="other">%d cached files</item>
+    </plurals>
     <string name="ordered_mode">In order</string>
     <string name="shuffle_no_repeats">Shuffle · no repeats</string>
     <string name="random_mode">Absolute random · repeats possible</string>

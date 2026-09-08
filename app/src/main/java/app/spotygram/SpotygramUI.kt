@@ -42,6 +42,7 @@ fun SpotygramUI(
     val connection by app.telegram.connection.collectAsStateWithLifecycle()
     val download by app.downloading.collectAsStateWithLifecycle()
     val mode by app.playbackMode.collectAsStateWithLifecycle()
+    val cache by app.musicCache.state.collectAsStateWithLifecycle()
     val playing =
         observePlayer(player)
             .copy(shuffle = mode.shuffle, random = mode.random, repeat = mode.repeat)
@@ -257,6 +258,14 @@ fun SpotygramUI(
                     },
                 ) { padding ->
                     Column(Modifier.padding(padding).fillMaxSize()) {
+                        if (cache.clearing) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text(
+                                tr(R.string.cache_clearing),
+                                Modifier.padding(horizontal = 16.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                         if (!compact)
                             Row(
                                 Modifier.fillMaxWidth()
@@ -439,6 +448,18 @@ fun SpotygramUI(
                                         app.notices.emit(tr(R.string.no_pending_downloads))
                                     else onDownload(ids)
                                 }
+                            },
+                            onCache = { sheet = "cache" },
+                        )
+                    "cache" ->
+                        CacheScreen(
+                            app,
+                            auth.type == "authorizationStateReady",
+                            onBack = { sheet = "settings" },
+                            onConnect = {
+                                sheet = ""
+                                connect = true
+                                app.telegram.start()
                             },
                         )
                     "chats" ->

@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/banner.svg" alt="spotygram — Your Telegram music. On your terms." width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.4.0 alpha" src="https://img.shields.io/badge/APK-0.4.0%20alpha-1DB954?style=flat-square"></a>
+  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.5.0 alpha" src="https://img.shields.io/badge/APK-0.5.0%20alpha-1DB954?style=flat-square"></a>
   <img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-121212?style=flat-square">
   <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-121212?style=flat-square">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-121212?style=flat-square"></a>
@@ -25,6 +25,10 @@ Connect your account, choose your sources, and listen. Downloaded songs stay on 
 **Chats · Favorites · Playlists · Music.** Four direct destinations, with your last section restored on reopening. Tap a heart to save a favorite; hold a song to select it and add several tracks to a playlist together. Create a playlist with its songs in one screen, then drag its tracks into the order you want.
 
 The player's order button cycles through **in order → shuffle without repeats → absolute random**. The dice mode independently draws each next entry, including possible immediate repeats, and continues until stopped. Its short listening history supports going back without growing the queue indefinitely. The player spreads its content over the available screen height, with scrolling when space is tight.
+
+**Settings → Clear music cache** shows space used by Telegram audio and asks before removing local copies, including explicit offline downloads. Imported audio, favorites, playlists and sign-in remain. Playback/downloads stop for cleanup, and the result reports actual space freed.
+
+See the [cache screen](docs/screenshots/cache-dark.png), captured with local imports excluded from its total.
 
 ## A familiar place for your music
 

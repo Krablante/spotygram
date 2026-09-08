@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionResult
 import java.io.File
 import java.security.SecureRandom
 import java.util.UUID
@@ -85,6 +86,7 @@ class PlaybackService : MediaSessionService() {
     private var version = UUID.randomUUID().toString()
     private var positionSaving: Job? = null
     private var restoringJob: Job? = null
+    private var cleanupPosition: Long? = null
     private lateinit var writer: Job
     private val mode
         get() = app.playbackMode.value
@@ -132,6 +134,15 @@ class PlaybackService : MediaSessionService() {
             MediaSession.Builder(this, exo)
                 .setCallback(
                     object : MediaSession.Callback {
+                        override fun onPlayerCommandRequest(
+                            session: MediaSession,
+                            controller: MediaSession.ControllerInfo,
+                            playerCommand: Int,
+                        ): Int =
+                            if (app.musicCache.state.value.clearing)
+                                SessionResult.RESULT_ERROR_INVALID_STATE
+                            else SessionResult.RESULT_SUCCESS
+
                         override fun onConnect(
                             session: MediaSession,
                             controller: MediaSession.ControllerInfo,
@@ -254,7 +265,8 @@ class PlaybackService : MediaSessionService() {
                 path = restored.path
                 cursor = restored.cursor
                 app.playbackMode.value = restored.mode
-                window(position = restored.position)
+                if (app.musicCache.state.value.clearing) cleanupPosition = restored.position
+                else window(position = restored.position)
             }
             restoring = false
             changed()
@@ -262,6 +274,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     fun start(tracks: List<Track>, index: Int, order: PlaybackOrder = mode.order) {
+        if (blockedByCleanup()) return
         if (index !in tracks.indices) return
         generation++
         restoring = false
@@ -372,6 +385,7 @@ class PlaybackService : MediaSessionService() {
         else repeat
 
     fun setMode(order: PlaybackOrder = mode.order, repeat: Int = mode.repeat) {
+        if (blockedByCleanup()) return
         val selected = current
         val reshuffle = mode.order != order
         app.playbackMode.value = PlaybackMode(order, normalizedRepeat(order, repeat))
@@ -394,6 +408,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     fun select(index: Int) {
+        if (blockedByCleanup()) return
         if (index !in ids.indices) return
         if (mode.random) resetOrder(index)
         else {
@@ -407,6 +422,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     fun addNext(track: Track) {
+        if (blockedByCleanup()) return
         if (ids.isEmpty()) {
             start(listOf(track), 0)
             return
@@ -440,6 +456,7 @@ class PlaybackService : MediaSessionService() {
     fun removeTrack(id: String) = removeIndices(ids.indices.filter { ids[it] == id }.toSet())
 
     private fun removeIndices(removed: Set<Int>) {
+        if (blockedByCleanup()) return
         if (removed.isEmpty()) return
         val selected = current
         val retained = ids.indices.filter { it !in removed }
@@ -457,6 +474,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     fun moveUp(index: Int) {
+        if (blockedByCleanup()) return
         if (mode.shuffle || index !in 1 until ids.size) return
         val selected = current
         val updated = ids.toMutableList()
@@ -486,6 +504,36 @@ class PlaybackService : MediaSessionService() {
         changed()
     }
 
+    private fun blockedByCleanup(): Boolean {
+        val blocked = app.musicCache.state.value.clearing
+        if (blocked) app.notices.tryEmit(tr(R.string.cache_clearing))
+        return blocked
+    }
+
+    fun pauseForCacheCleanup() {
+        cleanupPosition = exo.currentPosition.coerceAtLeast(0)
+        exo.pause()
+        exo.stop()
+        handler.removeCallbacks(slide)
+        editing = true
+        try {
+            exo.clearMediaItems()
+        } finally {
+            editing = false
+        }
+        save()
+    }
+
+    fun finishCacheCleanup() {
+        val position = cleanupPosition ?: return
+        val selected = ids.getOrNull(current)
+        cleanupPosition = null
+        val missing = ids.indices.filter { app.track(ids[it]) == null }.toSet()
+        if (missing.isNotEmpty()) removeIndices(missing)
+        window(position = if (selected == ids.getOrNull(current)) position else 0)
+        changed(false)
+    }
+
     private fun changed(structural: Boolean = true) {
         if (structural) version = UUID.randomUUID().toString()
         app.queueRevision.value++
@@ -500,7 +548,7 @@ class PlaybackService : MediaSessionService() {
                     ids,
                     path,
                     cursor,
-                    exo.currentPosition.coerceAtLeast(0).let {
+                    (cleanupPosition ?: exo.currentPosition.coerceAtLeast(0)).let {
                         if (exo.duration > 0 && it >= exo.duration) 0 else it
                     },
                     mode,

@@ -22,6 +22,7 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        app.downloadService = this
         getSystemService(NotificationManager::class.java)
             .createNotificationChannel(
                 NotificationChannel(
@@ -72,6 +73,11 @@ class DownloadService : Service() {
             notification(tr(R.string.preparing_downloads)),
             if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
         )
+        if (app.musicCache.state.value.clearing) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (job?.isActive != true)
             job = scope.launch {
                 try {
@@ -159,12 +165,18 @@ class DownloadService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    suspend fun cancelForCacheCleanup() {
+        job?.cancelAndJoin()
+        stopSelf()
+    }
+
     override fun onTimeout(startId: Int, fgsType: Int) {
         job?.cancel()
         stopSelf()
     }
 
     override fun onDestroy() {
+        if (app.downloadService === this) app.downloadService = null
         scope.cancel()
         super.onDestroy()
     }

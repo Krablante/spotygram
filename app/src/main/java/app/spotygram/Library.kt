@@ -71,7 +71,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                 }
             val tracks = mutableListOf<Track>()
             db.rawQuery(
-                    "SELECT * FROM tracks WHERE chat=0 OR path!='' OR chat IN (SELECT id FROM sources) ORDER BY date DESC,id DESC",
+                    "SELECT * FROM tracks WHERE chat=0 OR path!='' OR liked=1 OR id IN (SELECT track FROM playlist_tracks) OR chat IN (SELECT id FROM sources) ORDER BY date DESC,id DESC",
                     null,
                 )
                 .use { c ->
@@ -142,7 +142,8 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                             put("available", if (t.available) 1 else 0)
                             put("document", if (t.document) 1 else 0)
                             if (t.art.isNotEmpty()) put("art", t.art)
-                            if (t.path.isNotEmpty()) put("path", t.path)
+                            if (t.path.isNotEmpty())
+                                put("path", t.path.takeIf { File(it).isFile }.orEmpty())
                         }
                     if (db.update("tracks", v, "id=?", arrayOf(t.id)) == 0) {
                         v.put("id", t.id)
@@ -213,7 +214,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
         withContext(Dispatchers.IO) {
             writableDatabase.update(
                 "tracks",
-                ContentValues().apply { put("path", path) },
+                ContentValues().apply { put("path", path.takeIf { File(it).isFile }.orEmpty()) },
                 "file=?",
                 arrayOf(fileId.toString()),
             )
@@ -426,15 +427,23 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
 
     suspend fun verifyFiles() =
         withContext(Dispatchers.IO) {
-            state.value.tracks
-                .filter { it.local && !File(it.path).isFile }
-                .forEach { t ->
-                    writableDatabase.update(
-                        "tracks",
-                        ContentValues().apply { put("path", "") },
-                        "id=?",
-                        arrayOf(t.id),
-                    )
+            val missing = mutableListOf<Pair<String, String>>()
+            readableDatabase.rawQuery("SELECT id,path FROM tracks WHERE path!=''", null).use { c ->
+                while (c.moveToNext()) {
+                    val path = c.getString(1)
+                    if (!File(path).isFile) missing += c.getString(0) to path
+                }
+            }
+            if (missing.isNotEmpty())
+                writableDatabase.transaction {
+                    compileStatement("UPDATE tracks SET path='' WHERE id=? AND path=?").use {
+                        statement ->
+                        for ((id, path) in missing) {
+                            statement.bindString(1, id)
+                            statement.bindString(2, path)
+                            statement.executeUpdateDelete()
+                        }
+                    }
                 }
             reload()
         }
