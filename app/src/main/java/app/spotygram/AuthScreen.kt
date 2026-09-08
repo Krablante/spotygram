@@ -31,7 +31,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, "Назад") }
+            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, tr(R.string.back)) }
         }
         Spacer(Modifier.height(44.dp))
         Icon(
@@ -45,23 +45,24 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
         Spacer(Modifier.height(12.dp))
         val welcome = auth.type in listOf("welcome", "authorizationStateClosed")
         Text(
-            if (welcome) "Твоя музыка. Из твоих чатов."
+            if (welcome) tr(R.string.welcome_tagline)
             else
                 when (auth.type) {
-                    "authorizationStateWaitPhoneNumber" -> "Вход в Telegram"
-                    "authorizationStateWaitCode" -> "Код подтверждения"
-                    "authorizationStateWaitPassword" -> "Пароль Telegram"
-                    "authorizationStateWaitEmailAddress" -> "Электронная почта"
-                    "authorizationStateWaitEmailCode" -> "Код из письма"
-                    "authorizationStateWaitOtherDeviceConfirmation" -> "Подтвердите вход в Telegram"
-                    else -> "Подключение"
+                    "authorizationStateWaitPhoneNumber" -> tr(R.string.telegram_login)
+                    "authorizationStateWaitCode" -> tr(R.string.verification_code)
+                    "authorizationStateWaitPassword" -> tr(R.string.telegram_password)
+                    "authorizationStateWaitEmailAddress" -> tr(R.string.email_address)
+                    "authorizationStateWaitEmailCode" -> tr(R.string.email_code)
+                    "authorizationStateWaitOtherDeviceConfirmation" ->
+                        tr(R.string.confirm_telegram_login)
+                    else -> tr(R.string.connecting)
                 },
             style = MaterialTheme.typography.titleLarge,
         )
         Spacer(Modifier.height(16.dp))
         if (welcome) {
             Text(
-                "Собери аудиофайлы из любимых чатов в одну медиатеку. Слушай с выключенным экраном и сохраняй на телефон.",
+                tr(R.string.welcome_help),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(36.dp))
@@ -69,10 +70,10 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 onClick = { app.telegram.start() },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
             ) {
-                Text("Подключить Telegram")
+                Text(tr(R.string.connect_telegram))
             }
             TextButton(onClick = onLocal, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Пока без Telegram")
+                Text(tr(R.string.continue_without_telegram))
             }
         } else {
             val supported =
@@ -88,21 +89,18 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
             val password = auth.type == "authorizationStateWaitPassword"
             Text(
                 when (auth.type) {
-                    "authorizationStateWaitPhoneNumber" ->
-                        "Введите номер своего аккаунта с кодом страны."
+                    "authorizationStateWaitPhoneNumber" -> tr(R.string.enter_phone_help)
                     "authorizationStateWaitCode" ->
-                        if (auth.detail.contains("TelegramMessage"))
-                            "Код отправлен в приложение Telegram."
-                        else "Введите код, отправленный способом, выбранным Telegram."
+                        if (auth.detail.contains("TelegramMessage")) tr(R.string.code_sent_telegram)
+                        else tr(R.string.enter_code_help)
                     "authorizationStateWaitPassword" ->
-                        "Ваш пароль двухэтапной аутентификации." +
-                            if (auth.detail.isNotBlank()) " Подсказка: ${auth.detail}" else ""
-                    "authorizationStateWaitEmailCode" -> "Код отправлен на ${auth.detail}"
-                    "authorizationStateWaitRegistration" ->
-                        "Сначала создайте аккаунт в официальном Telegram, затем войдите здесь."
-                    "authorizationStateWaitPremiumPurchase" ->
-                        "Telegram требует оплату для этого способа входа. Попробуйте сначала войти в официальном приложении."
-                    else -> "Дождитесь ответа Telegram."
+                        tr(R.string.password_help) +
+                            if (auth.detail.isNotBlank()) tr(R.string.password_hint, auth.detail)
+                            else ""
+                    "authorizationStateWaitEmailCode" -> tr(R.string.email_code_sent, auth.detail)
+                    "authorizationStateWaitRegistration" -> tr(R.string.registration_help)
+                    "authorizationStateWaitPremiumPurchase" -> tr(R.string.auth_payment_help)
+                    else -> tr(R.string.wait_telegram)
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -113,10 +111,10 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                     { value = it },
                     label = {
                         Text(
-                            if (phone) "Номер телефона"
-                            else if (password) "Пароль"
+                            if (phone) tr(R.string.phone_number)
+                            else if (password) tr(R.string.password)
                             else if (auth.type == "authorizationStateWaitEmailAddress") "Email"
-                            else "Код"
+                            else tr(R.string.code)
                         )
                     },
                     singleLine = true,
@@ -140,7 +138,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                                     Icon(
                                         if (passwordVisible) Icons.Rounded.VisibilityOff
                                         else Icons.Rounded.Visibility,
-                                        "Показать пароль",
+                                        tr(R.string.show_password),
                                     )
                                 }
                             }
@@ -154,7 +152,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 ) {
                     if (auth.busy)
                         CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    else Text("Продолжить")
+                    else Text(tr(R.string.continue_action))
                 }
                 if (auth.type == "authorizationStateWaitCode")
                     TextButton(
@@ -166,7 +164,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                             }
                         }
                     ) {
-                        Text("Отправить код ещё раз")
+                        Text(tr(R.string.resend_code))
                     }
             } else if (auth.busy || auth.type == "starting")
                 CircularProgressIndicator(Modifier.padding(16.dp))
@@ -176,11 +174,11 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                     Modifier.padding(top = 16.dp),
                     color = MaterialTheme.colorScheme.error,
                 )
-            TextButton(onClick = onLocal) { Text("Перейти к локальной музыке") }
+            TextButton(onClick = onLocal) { Text(tr(R.string.open_local_music)) }
         }
         Spacer(Modifier.height(32.dp))
         Text(
-            "Неофициальное приложение на Telegram API. Вход создаёт сессию с доступом к аккаунту; музыку добавляем только из выбранных чатов. Сессия хранится на этом устройстве.",
+            tr(R.string.auth_privacy_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,7 +30,10 @@ fun PlayerScreen(
     onLike: () -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
+    onShuffle: () -> Unit,
+    onRepeat: (Int) -> Unit,
 ) {
+    val progress = observePlayer(player, positionUpdates = true)
     var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val cover = minOf(maxWidth - 48.dp, maxHeight * 0.43f, 360.dp)
@@ -41,23 +45,26 @@ fun PlayerScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, "Свернуть плеер")
+                    Icon(Icons.Rounded.KeyboardArrowDown, tr(R.string.close_player))
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "ИГРАЕТ ИЗ",
+                        tr(R.string.playing_from),
                         fontSize = 10.sp,
                         letterSpacing = 1.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        track.source,
+                        if (track.chatId == 0L) tr(R.string.from_device)
+                        else chatTitle(track.chatId, track.source),
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(onClick = onMore) { Icon(Icons.Rounded.MoreVert, "Действия с треком") }
+                IconButton(onClick = onMore) {
+                    Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions))
+                }
             }
             Spacer(Modifier.height(24.dp))
             Artwork(track, cover, Modifier.align(Alignment.CenterHorizontally))
@@ -82,7 +89,7 @@ fun PlayerScreen(
                 IconButton(onClick = onLike) {
                     Icon(
                         if (track.liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        if (track.liked) "Убрать из любимых" else "В любимые",
+                        if (track.liked) tr(R.string.unlike) else tr(R.string.like),
                         tint =
                             if (track.liked) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurface,
@@ -90,11 +97,11 @@ fun PlayerScreen(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            val duration = state.duration.takeIf { it > 0 } ?: track.duration * 1000L
+            val duration = progress.duration.takeIf { it > 0 } ?: track.duration * 1000L
             Slider(
                 value =
                     scrub
-                        ?: state.position
+                        ?: progress.position
                             .toFloat()
                             .coerceIn(0f, duration.toFloat().coerceAtLeast(1f)),
                 onValueChange = { scrub = it },
@@ -130,7 +137,7 @@ fun PlayerScreen(
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    seconds((scrub?.toLong() ?: state.position) / 1000),
+                    seconds((scrub?.toLong() ?: progress.position) / 1000),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -145,10 +152,10 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { player?.shuffleModeEnabled = !state.shuffle }) {
+                IconButton(onClick = onShuffle) {
                     Icon(
                         Icons.Rounded.Shuffle,
-                        "Перемешивание",
+                        tr(R.string.shuffle_mode),
                         tint =
                             if (state.shuffle) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -156,11 +163,15 @@ fun PlayerScreen(
                 }
                 IconButton(
                     onClick = {
-                        if (state.position > 3000) player?.seekTo(0)
+                        if (progress.position > 3000) player?.seekTo(0)
                         else player?.seekToPreviousMediaItem()
                     }
                 ) {
-                    Icon(Icons.Rounded.SkipPrevious, "Предыдущий трек", Modifier.size(36.dp))
+                    Icon(
+                        Icons.Rounded.SkipPrevious,
+                        tr(R.string.previous_track),
+                        Modifier.size(36.dp),
+                    )
                 }
                 FilledIconButton(
                     onClick = { togglePlayback(player) },
@@ -175,27 +186,28 @@ fun PlayerScreen(
                     else
                         Icon(
                             if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            if (state.playing) "Пауза" else "Воспроизвести",
+                            if (state.playing) tr(R.string.pause) else tr(R.string.play),
                             Modifier.size(42.dp),
                         )
                 }
                 IconButton(onClick = { player?.seekToNextMediaItem() }) {
-                    Icon(Icons.Rounded.SkipNext, "Следующий трек", Modifier.size(36.dp))
+                    Icon(Icons.Rounded.SkipNext, tr(R.string.next_track), Modifier.size(36.dp))
                 }
                 IconButton(
                     onClick = {
-                        player?.repeatMode =
+                        onRepeat(
                             when (state.repeat) {
                                 Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
                                 Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
                                 else -> Player.REPEAT_MODE_OFF
                             }
+                        )
                     }
                 ) {
                     Icon(
                         if (state.repeat == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne
                         else Icons.Rounded.Repeat,
-                        "Повтор",
+                        tr(R.string.repeat_mode),
                         tint =
                             if (state.repeat != Player.REPEAT_MODE_OFF)
                                 MaterialTheme.colorScheme.primary
@@ -216,12 +228,12 @@ fun PlayerScreen(
                         Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(if (track.local) "На телефоне" else "Скачать")
+                    Text(if (track.local) tr(R.string.on_device) else tr(R.string.download))
                 }
                 TextButton(onClick = onQueue) {
                     Icon(Icons.Rounded.QueueMusic, null, Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Очередь")
+                    Text(tr(R.string.queue))
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -230,29 +242,32 @@ fun PlayerScreen(
 }
 
 @Composable
-fun QueueSheet(library: LibraryState, state: Playing, player: Player?) {
+fun QueueSheet(library: LibraryState, state: Playing, app: SpotygramApp) {
+    val revision by app.queueRevision.collectAsStateWithLifecycle()
+    val queue =
+        remember(revision) {
+            app.playback?.snapshot() ?: QueueSnapshot(emptyList(), emptyList(), -1)
+        }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding()) {
-        Text("Очередь", style = MaterialTheme.typography.headlineMedium)
+        Text(tr(R.string.queue), style = MaterialTheme.typography.headlineMedium)
         Text(
-            if (state.shuffle) "Перемешанная очередь" else trackCount(state.ids.size),
+            if (state.shuffle) tr(R.string.shuffled_queue) else trackCount(queue.ids.size),
             Modifier.padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 500.dp)) {
-            val order = state.order.ifEmpty { state.ids.indices.toList() }
+            val order = queue.order
             items(
                 order.size,
-                key = { position -> "${order[position]}:${state.ids[order[position]]}" },
+                key = { position -> "${order[position]}:${queue.ids[order[position]]}" },
             ) { position ->
                 val index = order[position]
-                val track = library.tracks.firstOrNull { it.id == state.ids[index] }
+                val track = library.byId[queue.ids[index]]
                 if (track != null)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(
                             onClick = {
-                                player?.seekToDefaultPosition(index)
-                                player?.prepare()
-                                player?.play()
+                                app.playback?.select(index)
                             },
                             modifier = Modifier.weight(1f),
                         ) {
@@ -262,7 +277,8 @@ fun QueueSheet(library: LibraryState, state: Playing, player: Player?) {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     color =
-                                        if (index == state.index) MaterialTheme.colorScheme.primary
+                                        if (index == queue.current)
+                                            MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -277,13 +293,13 @@ fun QueueSheet(library: LibraryState, state: Playing, player: Player?) {
                         }
                         if (!state.shuffle)
                             IconButton(
-                                onClick = { player?.moveMediaItem(index, index - 1) },
+                                onClick = { app.playback?.moveUp(index) },
                                 enabled = index > 0,
                             ) {
-                                Icon(Icons.Rounded.ArrowUpward, "Переместить выше")
+                                Icon(Icons.Rounded.ArrowUpward, tr(R.string.move_up))
                             }
-                        IconButton(onClick = { player?.removeMediaItem(index) }) {
-                            Icon(Icons.Rounded.Close, "Убрать из очереди")
+                        IconButton(onClick = { app.playback?.remove(index) }) {
+                            Icon(Icons.Rounded.Close, tr(R.string.remove_from_queue))
                         }
                     }
             }

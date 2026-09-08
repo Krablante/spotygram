@@ -1,5 +1,25 @@
 # Verification record
 
+## 0.3.0 — languages, navigation and bounded playback queue
+
+Manual UI and runtime inspection used the Android 16 x86-64 emulator at 480×1040/192 dpi. Builds and emulator runs were sequential, with two-core CPU and bounded memory limits. Commands had short timeouts; long builds ran as asynchronously polled units. No test files, fixture suites or automation scaffolds were added to the project.
+
+| Surface | Observation |
+| --- | --- |
+| Builds | Debug and minified release APKs, debug Lint and release Lint passed. EN/RU resource validation found matching keys and format arguments across 213 resources, including the track-count plural. |
+| Artifacts | ARM64/x86-64 signature checks and 16 KB zip alignment passed. The signing certificate remains `b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`. Manifest: `app.spotygram`, versionCode 4, versionName 0.3.0, minSdk 26. Installed release SHA-256 matched `ebe51fe7fa78eef3061b38c81caca57e0a014b2f156f43998f1ffe69c1cab5d5`. |
+| Update and migration | Signed release installed over 0.2.0 without clearing data. Both local recordings, both favorites and Night/Road playlists remained visible. The legacy queue restored The Entertainer at 93680 ms, non-playing. Debug legacy migration separately retained 29629 ms. |
+| Navigation | The visible order is Chats, Favorites, Playlists, Music. After selecting Favorites, inspecting that screen, force-stopping and reopening the debug app, Favorites remained selected. |
+| Languages | System-default English, explicit Russian and explicit English rendered translated screens, local-source labels and accessibility text. Observed plurals included `1 трек`, `3 трека` and `2 tracks`. Release Settings → Language opened Android's native selector with English/Russian entries. Requesting German through the locale-manager command produced English app text. The release override was returned to English. |
+| Transition correction | An intermediate debug build crashed on system Next because timeline edits ran inside a Media3 transition callback. Window sliding was deferred until that notification completes. Repeating system Next twice then advanced logical cursor 0 → 1 → 2 without the error. |
+| Repeat | With three independently imported local entries, repeat-all prepared a second pass and system Next crossed cursor 2 → 3. Repeat-one followed by a seek to the end retained cursor 3 and restarted the current recording. This checks behavior, not the statistical quality of shuffle. |
+| Long queue | A temporary debug-only queue contained 10000 references to the three existing local recordings; no catalog rows or audio files were added. Shuffle produced 10000 distinct source indices. Three system Next actions reached cursor 3 while the media-session timeline stayed at 2–3 items. The full queue sheet opened and scrolled; removing a visible non-current occurrence left 9999 entries and playback continued. After pause/force-stop/relaunch, all 9999 entries and shuffle restored at 51324 ms without autoplay. The original debug queue/position were then restored and the two temporary backup files removed. |
+| Final release playback | The minified release played The Entertainer, then system Next with shuffle enabled reached Fur Elise/sebion and PLAYING. With Wi-Fi/data disabled and `mWakefulness=Asleep`, playback advanced to 59755 ms. Network settings were restored and playback paused afterwards. |
+| UI evidence | All six README screenshots were recaptured from the signed release and visually inspected, showing English and Russian, light/dark themes, the new navigation order and language setting. |
+| Runtime logs | AndroidRuntime and ExoPlayerImplInternal error logs were empty after the corrected build's debug and release scenarios. Initial emulator startup still occasionally stalled installation/UI hierarchy inspection; timed-out operations were retried only after checking actual state. |
+
+The long-queue check is deliberately synthetic queue state, not 10000 unique tracks or an authenticated large Telegram chat. It demonstrates bounded Media3/IPC representation and local queue operations, not large-catalog indexing speed, network playback, phone latency or battery behavior. The original user-reported phone crash was not accompanied by a device stack trace, so its exact cause is not claimed as reproduced. Physical ARM64 execution, Android versions below 13 and authorized Telegram flows remain unverified locally.
+
 ## 0.2.0 — four destinations and touch interaction
 
 Verification remains manual UI operation and runtime inspection, without test files or automated test scaffolds. Android 16 x86-64 emulator, 480×1040 at 192 dpi. Compilation and emulator runs were sequential under a two-core CPU limit. The debug package is separate from the signed release package.

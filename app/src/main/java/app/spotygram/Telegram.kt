@@ -83,9 +83,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                             connection.value =
                                 when (obj.getJSONObject("state").kind()) {
                                     "connectionStateReady" -> ""
-                                    "connectionStateWaitingForNetwork" -> "Нет подключения к сети"
-                                    "connectionStateUpdating" -> "Обновление Telegram…"
-                                    else -> "Подключение к Telegram…"
+                                    else -> obj.getJSONObject("state").kind()
                                 }
                         "updateFile" -> updateFile(obj.getJSONObject("file"))
                         "updateNewChat" -> {
@@ -108,7 +106,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
     }
 
     suspend fun request(obj: JSONObject, timeout: Long = 30_000): JSONObject {
-        check(client != 0) { "Подключите Telegram" }
+        check(client != 0) { tr(R.string.telegram_required) }
         val id = sequence.incrementAndGet().toString()
         val result = CompletableDeferred<JSONObject>()
         requests[id] = result
@@ -118,7 +116,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                 withTimeoutOrNull(timeout) { result.await() }
                     ?: throw TelegramException(
                         408,
-                        "Telegram не ответил. Проверьте соединение и повторите.",
+                        tr(R.string.telegram_timeout),
                     )
             if (value.kind() == "error")
                 throw TelegramException(value.optInt("code"), value.optString("message"))
@@ -162,7 +160,8 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                                 "api_id" to prefs.getInt("api_id", BuildConfig.TELEGRAM_API_ID),
                                 "api_hash" to
                                     prefs.getString("api_hash", BuildConfig.TELEGRAM_API_HASH),
-                                "system_language_code" to "ru",
+                                "system_language_code" to
+                                    context.resources.configuration.locales[0].language,
                                 "device_model" to "${Build.MANUFACTURER} ${Build.MODEL}",
                                 "system_version" to Build.VERSION.RELEASE,
                                 "application_version" to BuildConfig.VERSION_NAME,
@@ -184,6 +183,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                                 "value" to json("optionValueBoolean", "value" to false),
                             )
                         )
+                        AppText.rememberSavedChat(request(json("getMe")).getLong("id"))
                     }
                 }
             }
@@ -308,7 +308,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                 )
                 .commit()
         ) {
-            "Не удалось сохранить ключ базы. Освободите место на телефоне."
+            tr(R.string.database_key_error)
         }
         return Base64.encodeToString(secret, Base64.NO_WRAP)
     }
@@ -318,17 +318,13 @@ class TelegramException(val code: Int, message: String) : Exception(message)
 
 fun friendly(error: Throwable): String =
     when {
-        error is TimeoutCancellationException ->
-            "Telegram не ответил. Проверьте соединение и повторите."
-        error.message.orEmpty().contains("PHONE_CODE_INVALID") ->
-            "Неверный код. Проверьте сообщение от Telegram."
-        error.message.orEmpty().contains("PHONE_CODE_EXPIRED") -> "Код истёк. Запросите новый."
-        error.message.orEmpty().contains("PASSWORD_HASH_INVALID") ->
-            "Неверный пароль двухэтапной аутентификации."
-        error.message.orEmpty().contains("PHONE_NUMBER_INVALID") ->
-            "Укажите номер с кодом страны, например +7…"
+        error is TimeoutCancellationException -> tr(R.string.telegram_timeout)
+        error.message.orEmpty().contains("PHONE_CODE_INVALID") -> tr(R.string.code_invalid)
+        error.message.orEmpty().contains("PHONE_CODE_EXPIRED") -> tr(R.string.code_expired)
+        error.message.orEmpty().contains("PASSWORD_HASH_INVALID") -> tr(R.string.password_invalid)
+        error.message.orEmpty().contains("PHONE_NUMBER_INVALID") -> tr(R.string.phone_invalid)
         error.message.orEmpty().contains("FLOOD_WAIT") ||
             (error as? TelegramException)?.code == 429 ->
-            "Telegram просит подождать перед следующим запросом. ${error.message.orEmpty().take(120)}"
-        else -> error.message?.take(180) ?: "Не удалось выполнить действие. Попробуйте ещё раз."
+            tr(R.string.flood_wait, error.message.orEmpty().take(120))
+        else -> error.message?.take(180) ?: tr(R.string.action_failed)
     }

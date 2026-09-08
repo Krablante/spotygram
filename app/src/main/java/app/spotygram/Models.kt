@@ -23,7 +23,9 @@ data class Track(
         get() = path.isNotEmpty()
 
     val subtitle
-        get() = artist.ifBlank { source }
+        get() = artist.ifBlank {
+            if (chatId == 0L) tr(R.string.from_device) else chatTitle(chatId, source)
+        }
 }
 
 data class Source(
@@ -38,9 +40,15 @@ data class Source(
 ) {
     val fullyIndexed
         get() = complete && documentsComplete
+
+    val displayTitle
+        get() = chatTitle(id, title)
 }
 
-data class ChatChoice(val id: Long, val title: String)
+data class ChatChoice(val id: Long, val title: String) {
+    val displayTitle
+        get() = chatTitle(id, title)
+}
 
 data class Playlist(val id: Long, val name: String, val tracks: List<String>)
 
@@ -83,14 +91,8 @@ fun seconds(value: Long): String =
     "%d:%02d".format(value.coerceAtLeast(0) / 60, value.coerceAtLeast(0) % 60)
 
 fun bytes(value: Long): String =
-    if (value >= 1_073_741_824) "%.1f ГБ".format(value / 1_073_741_824.0)
-    else "%.0f МБ".format(value / 1_048_576.0)
+    if (value >= 1_073_741_824) tr(R.string.gigabytes).format(value / 1_073_741_824.0)
+    else tr(R.string.megabytes).format(value / 1_048_576.0)
 
 fun trackCount(value: Int): String =
-    "$value " +
-        when {
-            value % 100 in 11..14 -> "треков"
-            value % 10 == 1 -> "трек"
-            value % 10 in 2..4 -> "трека"
-            else -> "треков"
-        }
+    AppText.context.resources.getQuantityString(R.plurals.track_count, value, value)

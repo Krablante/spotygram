@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.media3.common.C
 import androidx.media3.common.Player
 import kotlinx.coroutines.delay
 
@@ -16,30 +15,15 @@ data class Playing(
     val duration: Long = 0,
     val shuffle: Boolean = false,
     val repeat: Int = 0,
-    val ids: List<String> = emptyList(),
-    val index: Int = 0,
-    val order: List<Int> = emptyList(),
 )
 
 @Composable
-fun observePlayer(player: Player?): Playing {
+fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
     var state by remember { mutableStateOf(Playing()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(player) {
         fun snapshot() {
             if (player == null) return
-            val order = mutableListOf<Int>()
-            val timeline = player.currentTimeline
-            var window = timeline.getFirstWindowIndex(player.shuffleModeEnabled)
-            while (window != C.INDEX_UNSET && order.size < player.mediaItemCount) {
-                order += window
-                window =
-                    timeline.getNextWindowIndex(
-                        window,
-                        Player.REPEAT_MODE_OFF,
-                        player.shuffleModeEnabled,
-                    )
-            }
             state =
                 Playing(
                     player.currentMediaItem?.mediaId.orEmpty(),
@@ -49,9 +33,6 @@ fun observePlayer(player: Player?): Playing {
                     player.duration.coerceAtLeast(0),
                     player.shuffleModeEnabled,
                     player.repeatMode,
-                    (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId },
-                    player.currentMediaItemIndex.coerceAtLeast(0),
-                    order,
                 )
         }
         val listener =
@@ -62,7 +43,8 @@ fun observePlayer(player: Player?): Playing {
         snapshot()
         onDispose { player?.removeListener(listener) }
     }
-    LaunchedEffect(player, lifecycle) {
+    LaunchedEffect(player, lifecycle, positionUpdates) {
+        if (!positionUpdates) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 delay(500)

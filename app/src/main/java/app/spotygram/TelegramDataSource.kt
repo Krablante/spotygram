@@ -29,7 +29,7 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
         transferInitializing(dataSpec)
         val track =
             app.track(Uri.decode(dataSpec.uri.lastPathSegment ?: ""))
-                ?: throw IOException("Трек больше не в библиотеке")
+                ?: throw IOException(tr(R.string.track_missing))
         position = dataSpec.position
         remaining =
             if (dataSpec.length != C.LENGTH_UNSET.toLong()) dataSpec.length
@@ -44,8 +44,7 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
                     else (input!!.length() - position).coerceAtLeast(0)
                 fileId = 0
             } else {
-                if (!track.available)
-                    throw IOException("Исходное сообщение удалено. Локальной копии нет.")
+                if (!track.available) throw IOException(tr(R.string.message_deleted_no_copy))
                 fileId = runBlocking(Dispatchers.IO) { app.resolve(track) }
                 runBlocking(Dispatchers.IO) { app.telegram.download(fileId, position, 32) }
             }
@@ -80,18 +79,18 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
                 }
             }
             if ((System.nanoTime() - started) / 1_000_000 > 60_000)
-                throw IOException("Не удалось загрузить трек. Проверьте сеть и повторите.")
+                throw IOException(tr(R.string.track_download_failed))
             runBlocking {
                 withTimeoutOrNull(500) { app.telegram.fileRevision.first { it != revision } }
             }
         }
         if (closed || Thread.currentThread().isInterrupted)
-            throw IOException("Загрузка остановлена")
+            throw IOException(tr(R.string.loading_stopped))
         if (available <= 0) return C.RESULT_END_OF_INPUT
         val count =
             minOf(length.toLong(), available, if (remaining >= 0) remaining else Long.MAX_VALUE)
                 .toInt()
-        val file = input ?: throw IOException("Аудиофайл недоступен")
+        val file = input ?: throw IOException(tr(R.string.audio_unavailable))
         file.seek(position)
         val read = file.read(buffer, offset, count)
         if (read < 0) return C.RESULT_END_OF_INPUT

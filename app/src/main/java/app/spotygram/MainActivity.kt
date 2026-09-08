@@ -50,9 +50,7 @@ class MainActivity : ComponentActivity() {
                     {
                         runCatching { controller = future.get() }
                             .onFailure {
-                                app.notices.tryEmit(
-                                    "Плеер не запустился. Перезапустите приложение."
-                                )
+                                app.notices.tryEmit(tr(R.string.player_start_failed))
                             }
                     },
                     ContextCompat.getMainExecutor(this@MainActivity),

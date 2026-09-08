@@ -33,29 +33,51 @@ fun SettingsSheet(
             .padding(horizontal = 20.dp)
             .navigationBarsPadding()
     ) {
-        Text("Настройки", style = MaterialTheme.typography.headlineMedium)
+        Text(tr(R.string.settings), style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Оформление",
+            tr(R.string.appearance),
             Modifier.padding(top = 24.dp, bottom = 8.dp),
             style = MaterialTheme.typography.titleMedium,
         )
-        listOf("system" to "Как в системе", "light" to "Светлая", "dark" to "Тёмная").forEach {
-            (key, label) ->
-            Row(
-                Modifier.fillMaxWidth().clickable { app.changeTheme(key) },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(theme == key, { app.changeTheme(key) })
-                Text(label)
+        listOf(
+                "system" to tr(R.string.system_default),
+                "light" to tr(R.string.light_theme),
+                "dark" to tr(R.string.dark_theme),
+            )
+            .forEach { (key, label) ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { app.changeTheme(key) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(theme == key, { app.changeTheme(key) })
+                    Text(label)
+                }
             }
+        ActionRow(Icons.Rounded.Language, tr(R.string.language)) {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                app.startActivity(
+                    android.content
+                        .Intent(
+                            android.provider.Settings.ACTION_APP_LOCALE_SETTINGS,
+                            android.net.Uri.parse("package:${app.packageName}"),
+                        )
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } else app.notices.tryEmit(tr(R.string.language_phone_settings))
         }
+        Text(
+            tr(R.string.language_help),
+            Modifier.padding(horizontal = 12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         HorizontalDivider(
             Modifier.padding(vertical = 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         )
         val local = library.tracks.filter { it.local }.distinctBy { it.path }
         ListItem(
-            headlineContent = { Text("На телефоне") },
+            headlineContent = { Text(tr(R.string.on_device)) },
             supportingContent = {
                 Text("${trackCount(local.size)} · ${bytes(local.sumOf {it.size})}")
             },
@@ -64,7 +86,7 @@ fun SettingsSheet(
             modifier = Modifier.clickable(onClick = onLocal),
         )
         Text(
-            "Загруженные аудиофайлы остаются на устройстве. Удалить копию можно в меню трека.",
+            tr(R.string.local_storage_help),
             Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -74,9 +96,9 @@ fun SettingsSheet(
             modifier = Modifier.padding(horizontal = 12.dp),
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Скачивать только по Wi-Fi")
+                Text(tr(R.string.wifi_only))
                 Text(
-                    "Для кнопки «Скачать», не для прослушивания",
+                    tr(R.string.wifi_only_help),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -91,25 +113,25 @@ fun SettingsSheet(
         }
         if (download.queued > 0)
             Text(
-                "Скачивается: ${download.queued} · ${(download.progress*100).toInt()}%",
+                tr(R.string.download_progress, download.queued, (download.progress * 100).toInt()),
                 Modifier.padding(12.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
-        ActionRow(Icons.Rounded.Download, "Продолжить загрузки", onResume)
+        ActionRow(Icons.Rounded.Download, tr(R.string.resume_downloads), onResume)
         if (download.queued > 0)
-            ActionRow(Icons.Rounded.Close, "Остановить загрузки") {
+            ActionRow(Icons.Rounded.Close, tr(R.string.stop_downloads)) {
                 app.startService(
                     android.content.Intent(app, DownloadService::class.java).setAction("cancel")
                 )
             }
-        ActionRow(Icons.Rounded.Add, "Добавить файлы с телефона", onImport)
+        ActionRow(Icons.Rounded.Add, tr(R.string.import_files), onImport)
         HorizontalDivider(
             Modifier.padding(vertical = 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         )
         ActionRow(
             Icons.Rounded.Forum,
-            if (connected) "Выйти из Telegram" else "Подключить Telegram",
+            if (connected) tr(R.string.logout_telegram) else tr(R.string.connect_telegram),
             if (connected) onLogout else onConnect,
         )
         Text(
@@ -118,7 +140,7 @@ fun SettingsSheet(
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            "Личный музыкальный плеер на Telegram API. Без своего сервера, рекламы приложения и аналитики. Музыка и сессия остаются на телефоне.",
+            tr(R.string.app_description),
             Modifier.padding(vertical = 12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

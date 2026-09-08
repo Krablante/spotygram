@@ -41,11 +41,19 @@ fun SpotygramUI(
     val busy by app.busy.collectAsStateWithLifecycle()
     val connection by app.telegram.connection.collectAsStateWithLifecycle()
     val download by app.downloading.collectAsStateWithLifecycle()
-    val playing = observePlayer(player)
+    val mode by app.playbackMode.collectAsStateWithLifecycle()
+    val playing = observePlayer(player).copy(shuffle = mode.shuffle, repeat = mode.repeat)
     val current = library.byId[playing.id]
     var localMode by rememberSaveable { mutableStateOf(app.prefs.getBoolean("local_mode", false)) }
     var connect by rememberSaveable { mutableStateOf(false) }
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val destinationKeys = listOf("music", "favorites", "playlists", "chats")
+    var tab by rememberSaveable {
+        mutableIntStateOf(
+            destinationKeys
+                .indexOf(app.prefs.getString("last_destination", "music"))
+                .coerceAtLeast(0)
+        )
+    }
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var sheet by remember { mutableStateOf("") }
     var selectedTrackId by remember { mutableStateOf<String?>(null) }
@@ -71,6 +79,9 @@ fun SpotygramUI(
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
     val source = library.sources.firstOrNull { it.id == sourceId }
     LaunchedEffect(Unit) { app.notices.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(tab) {
+        app.prefs.edit().putString("last_destination", destinationKeys[tab]).apply()
+    }
     LaunchedEffect(auth.type) { if (auth.type == "authorizationStateReady") connect = false }
     LaunchedEffect(sheet) { if (sheet.isNotEmpty()) focus.clearFocus() }
     val authVisible =
@@ -86,8 +97,8 @@ fun SpotygramUI(
                     snackbar.currentSnackbarData?.dismiss()
                     if (
                         snackbar.showSnackbar(
-                            "Убрано из любимых",
-                            "Отменить",
+                            tr(R.string.removed_favorite),
+                            tr(R.string.undo),
                             duration = SnackbarDuration.Short,
                         ) == SnackbarResult.ActionPerformed
                     )
@@ -97,18 +108,16 @@ fun SpotygramUI(
     }
     fun play(track: Track, tracks: List<Track>) {
         if (player == null) {
-            app.notices.tryEmit("Плеер подключается…")
+            app.notices.tryEmit(tr(R.string.player_connecting))
             return
         }
         val available = tracks.filter { it.local || it.available }
         val index = available.indexOfFirst { it.id == track.id }
         if (index < 0) {
-            app.notices.tryEmit("Нет локальной копии. Исходное сообщение удалено.")
+            app.notices.tryEmit(tr(R.string.no_local_copy))
             return
         }
-        player.setMediaItems(available.map { it.mediaItem() }, index, 0)
-        player.prepare()
-        player.play()
+        app.playback?.start(available, index)
     }
     fun addToPlaylist(ids: List<String>) {
         playlistTracks = ArrayList(ids)
@@ -181,6 +190,8 @@ fun SpotygramUI(
                     onLike = { like(current) },
                     onDownload = { onDownload(listOf(current.id)) },
                     onQueue = { sheet = "queue" },
+                    onShuffle = { app.playback?.setMode(shuffle = !mode.shuffle) },
+                    onRepeat = { app.playback?.setMode(repeat = it) },
                 )
             else ->
                 Scaffold(
@@ -193,7 +204,7 @@ fun SpotygramUI(
                                 if (current != null)
                                     MiniPlayer(
                                         current,
-                                        playing,
+                                        player,
                                         onOpen = { fullPlayer = true },
                                         onToggle = { togglePlayback(player) },
                                         onNext = { player?.seekToNextMediaItem() },
@@ -205,12 +216,15 @@ fun SpotygramUI(
                                 ) {
                                     val destinations =
                                         listOf(
-                                            "Музыка" to Icons.Rounded.MusicNote,
-                                            "Любимые" to Icons.Rounded.Favorite,
-                                            "Плейлисты" to Icons.Rounded.PlaylistPlay,
-                                            "Чаты" to Icons.Rounded.Forum,
+                                            3 to (tr(R.string.chats) to Icons.Rounded.Forum),
+                                            1 to (tr(R.string.favorites) to Icons.Rounded.Favorite),
+                                            2 to
+                                                (tr(R.string.playlists) to
+                                                    Icons.Rounded.PlaylistPlay),
+                                            0 to (tr(R.string.music) to Icons.Rounded.MusicNote),
                                         )
-                                    destinations.forEachIndexed { index, (label, icon) ->
+                                    destinations.forEach { (index, destination) ->
+                                        val (label, icon) = destination
                                         NavigationBarItem(
                                             selected = tab == index,
                                             onClick = { navigate(index) },
@@ -267,12 +281,16 @@ fun SpotygramUI(
                                     style = MaterialTheme.typography.titleMedium,
                                 )
                                 IconButton(onClick = { sheet = "settings" }) {
-                                    Icon(Icons.Rounded.Settings, "Настройки")
+                                    Icon(Icons.Rounded.Settings, tr(R.string.settings))
                                 }
                             }
                         if (connection.isNotBlank() && auth.type == "authorizationStateReady")
                             Text(
-                                connection,
+                                when (connection) {
+                                    "connectionStateWaitingForNetwork" -> tr(R.string.no_network)
+                                    "connectionStateUpdating" -> tr(R.string.telegram_updating)
+                                    else -> tr(R.string.telegram_connecting)
+                                },
                                 Modifier.padding(horizontal = 16.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -308,8 +326,14 @@ fun SpotygramUI(
                                         onRefresh = { app.action { app.refresh() } },
                                         onShuffle = { tracks ->
                                             randomTrack(tracks)?.let {
-                                                player?.shuffleModeEnabled = true
-                                                play(it, tracks)
+                                                val available = tracks.filter { t ->
+                                                    t.local || t.available
+                                                }
+                                                app.playback?.start(
+                                                    available,
+                                                    available.indexOf(it),
+                                                    shuffle = true,
+                                                )
                                             }
                                         },
                                         onDownload = onDownload,
@@ -407,7 +431,7 @@ fun SpotygramUI(
                                 app.action {
                                     val ids = app.library.pending()
                                     if (ids.isEmpty())
-                                        app.notices.emit("Нет незавершённых загрузок")
+                                        app.notices.emit(tr(R.string.no_pending_downloads))
                                     else onDownload(ids)
                                 }
                             },
@@ -421,7 +445,7 @@ fun SpotygramUI(
                                 app.action { app.refresh() }
                             },
                         )
-                    "queue" -> QueueSheet(library, playing, player)
+                    "queue" -> QueueSheet(library, playing, app)
                     "addPlaylist" ->
                         AddToPlaylistSheet(
                             app,
@@ -430,7 +454,7 @@ fun SpotygramUI(
                             onDone = {
                                 sheet = ""
                                 selectionReset++
-                                app.notices.tryEmit("Добавлено в плейлист")
+                                app.notices.tryEmit(tr(R.string.added_to_playlist))
                             },
                         )
                     "order" ->
@@ -445,18 +469,21 @@ fun SpotygramUI(
                                     style = MaterialTheme.typography.headlineSmall,
                                     modifier = Modifier.padding(bottom = 12.dp),
                                 )
-                                ActionRow(Icons.Rounded.PlaylistAdd, "Добавить треки") {
+                                ActionRow(Icons.Rounded.PlaylistAdd, tr(R.string.add_tracks)) {
                                     editPlaylist(p.id)
                                 }
-                                ActionRow(Icons.Rounded.SwapVert, "Изменить порядок") {
+                                ActionRow(Icons.Rounded.SwapVert, tr(R.string.change_order)) {
                                     sheet = "order"
                                 }
-                                ActionRow(Icons.Rounded.Edit, "Переименовать") {
+                                ActionRow(Icons.Rounded.Edit, tr(R.string.rename)) {
                                     renameText = p.name
                                     sheet = ""
                                     rename = true
                                 }
-                                ActionRow(Icons.Rounded.DeleteOutline, "Удалить плейлист") {
+                                ActionRow(
+                                    Icons.Rounded.DeleteOutline,
+                                    tr(R.string.delete_playlist),
+                                ) {
                                     sheet = ""
                                     delete = true
                                 }
@@ -478,36 +505,48 @@ fun SpotygramUI(
                                 ActionRow(
                                     if (track.liked) Icons.Rounded.Favorite
                                     else Icons.Rounded.FavoriteBorder,
-                                    if (track.liked) "Убрать из любимых" else "В любимые",
+                                    if (track.liked) tr(R.string.unlike) else tr(R.string.like),
                                 ) {
                                     like(track)
                                     sheet = ""
                                 }
-                                ActionRow(Icons.Rounded.PlaylistAdd, "В плейлист") {
+                                ActionRow(Icons.Rounded.PlaylistAdd, tr(R.string.to_playlist)) {
                                     addToPlaylist(listOf(track.id))
                                 }
-                                ActionRow(Icons.Rounded.QueuePlayNext, "Слушать следующим") {
-                                    playNext(app.player, track)
+                                ActionRow(Icons.Rounded.QueuePlayNext, tr(R.string.play_next)) {
+                                    app.playback?.addNext(track)
                                     sheet = ""
                                 }
                                 if (track.local)
-                                    ActionRow(Icons.Rounded.DeleteOutline, "Удалить с телефона") {
+                                    ActionRow(
+                                        Icons.Rounded.DeleteOutline,
+                                        tr(R.string.remove_from_device),
+                                    ) {
                                         app.action { app.removeLocal(track) }
                                         sheet = ""
                                     }
                                 else if (track.available)
-                                    ActionRow(Icons.Rounded.Download, "Скачать на телефон") {
+                                    ActionRow(
+                                        Icons.Rounded.Download,
+                                        tr(R.string.download_to_device),
+                                    ) {
                                         onDownload(listOf(track.id))
                                         sheet = ""
                                     }
                                 playlistId?.let { id ->
-                                    ActionRow(Icons.Rounded.PlaylistRemove, "Убрать из плейлиста") {
+                                    ActionRow(
+                                        Icons.Rounded.PlaylistRemove,
+                                        tr(R.string.remove_from_playlist),
+                                    ) {
                                         app.action { app.library.removeFromPlaylist(id, track.id) }
                                         sheet = ""
                                     }
                                 }
                                 if (track.chatId != 0L && track.available)
-                                    ActionRow(Icons.Rounded.OpenInNew, "Открыть в Telegram") {
+                                    ActionRow(
+                                        Icons.Rounded.OpenInNew,
+                                        tr(R.string.open_in_telegram),
+                                    ) {
                                         app.action {
                                             app.startActivity(
                                                 Intent(
@@ -527,13 +566,13 @@ fun SpotygramUI(
         if (rename)
             AlertDialog(
                 onDismissRequest = { rename = false },
-                title = { Text("Название плейлиста") },
+                title = { Text(tr(R.string.playlist_name)) },
                 text = {
                     OutlinedTextField(
                         renameText,
                         { renameText = it.take(80) },
                         singleLine = true,
-                        label = { Text("Название") },
+                        label = { Text(tr(R.string.name)) },
                     )
                 },
                 confirmButton = {
@@ -546,19 +585,19 @@ fun SpotygramUI(
                             rename = false
                         },
                     ) {
-                        Text("Сохранить")
+                        Text(tr(R.string.save))
                     }
                 },
-                dismissButton = { TextButton(onClick = { rename = false }) { Text("Отмена") } },
+                dismissButton = {
+                    TextButton(onClick = { rename = false }) { Text(tr(R.string.cancel)) }
+                },
             )
         if (delete)
             AlertDialog(
                 onDismissRequest = { delete = false },
-                title = { Text("Удалить плейлист?") },
+                title = { Text(tr(R.string.delete_playlist_title)) },
                 text = {
-                    Text(
-                        "«${managedPlaylist?.name}» будет удалён. Треки останутся в музыке и на телефоне."
-                    )
+                    Text(tr(R.string.delete_playlist_help, managedPlaylist?.name))
                 },
                 confirmButton = {
                     TextButton(
@@ -572,19 +611,19 @@ fun SpotygramUI(
                             delete = false
                         }
                     ) {
-                        Text("Удалить")
+                        Text(tr(R.string.delete))
                     }
                 },
-                dismissButton = { TextButton(onClick = { delete = false }) { Text("Отмена") } },
+                dismissButton = {
+                    TextButton(onClick = { delete = false }) { Text(tr(R.string.cancel)) }
+                },
             )
         if (confirmLogout)
             AlertDialog(
                 onDismissRequest = { confirmLogout = false },
-                title = { Text("Выйти из Telegram?") },
+                title = { Text(tr(R.string.logout_title)) },
                 text = {
-                    Text(
-                        "Telegram-треки и их связи с плейлистами будут удалены из медиатеки. Импортированные файлы останутся."
-                    )
+                    Text(tr(R.string.logout_help))
                 },
                 confirmButton = {
                     TextButton(
@@ -593,11 +632,11 @@ fun SpotygramUI(
                             app.action { app.logout() }
                         }
                     ) {
-                        Text("Выйти")
+                        Text(tr(R.string.leave))
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { confirmLogout = false }) { Text("Отмена") }
+                    TextButton(onClick = { confirmLogout = false }) { Text(tr(R.string.cancel)) }
                 },
             )
     }
@@ -620,11 +659,12 @@ fun ActionRow(icon: ImageVector, text: String, onClick: () -> Unit) {
 @Composable
 private fun MiniPlayer(
     track: Track,
-    state: Playing,
+    player: MediaController?,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
 ) {
+    val state = observePlayer(player, positionUpdates = true)
     Column(
         Modifier.padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(8.dp))
@@ -657,10 +697,10 @@ private fun MiniPlayer(
                 else
                     Icon(
                         if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        if (state.playing) "Пауза" else "Продолжить",
+                        if (state.playing) tr(R.string.pause) else tr(R.string.continue_action),
                     )
             }
-            IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, "Следующий трек") }
+            IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, tr(R.string.next_track)) }
         }
         LinearProgressIndicator(
             progress = {

@@ -26,7 +26,7 @@ class DownloadService : Service() {
             .createNotificationChannel(
                 NotificationChannel(
                     "downloads",
-                    "Сохранение музыки",
+                    tr(R.string.download_channel),
                     NotificationManager.IMPORTANCE_LOW,
                 )
             )
@@ -42,7 +42,7 @@ class DownloadService : Service() {
             )
         return NotificationCompat.Builder(this, "downloads")
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Spotygram · На телефон")
+            .setContentTitle(tr(R.string.download_notification_title))
             .setContentText(text)
             .setOnlyAlertOnce(true)
             .setOngoing(true)
@@ -55,7 +55,7 @@ class DownloadService : Service() {
                 )
             )
             .setProgress(100, progress.coerceAtLeast(0), progress < 0)
-            .addAction(0, "Остановить", cancel)
+            .addAction(0, tr(R.string.stop), cancel)
             .build()
     }
 
@@ -69,7 +69,7 @@ class DownloadService : Service() {
         ServiceCompat.startForeground(
             this,
             20,
-            notification("Подготовка загрузок…"),
+            notification(tr(R.string.preparing_downloads)),
             if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
         )
         if (job?.isActive != true)
@@ -91,9 +91,7 @@ class DownloadService : Service() {
                                     .getNetworkCapabilities(network.activeNetwork)
                                     ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) != true
                         )
-                            error(
-                                "Загрузки приостановлены: требуется Wi-Fi. Возобновите их в настройках."
-                            )
+                            error(tr(R.string.wifi_downloads_paused))
                         val fid = app.resolve(track)
                         activeFile = fid
                         if (app.telegram.files[fid]?.active != true)
@@ -107,7 +105,7 @@ class DownloadService : Service() {
                                             ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) !=
                                             true
                                 )
-                                    error("Wi-Fi отключён. Загрузки приостановлены.")
+                                    error(tr(R.string.wifi_disconnected))
                                 val f = app.telegram.files[fid]
                                 if (f?.complete == true) {
                                     app.library.file(fid, f.path)

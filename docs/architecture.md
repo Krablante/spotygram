@@ -3,7 +3,9 @@
 Spotygram is a single-process, single-module Android application. It connects directly to Telegram and plays media locally. There is no backend.
 
 ```text
-Compose screens ── MediaController ── MediaSessionService / ExoPlayer
+Compose screens ── MediaController ── MediaSession / ExoPlayer (≤3 items)
+      │                                      │
+      ├── PlaybackService (logical ID queue) ─┘
       │                                      │
       └── SpotygramApp ── SQLite              └── TelegramDataSource
                   │                                  │
@@ -17,7 +19,7 @@ Compose screens ── MediaController ── MediaSessionService / ExoPlayer
 - `Telegram` owns one TDLib instance, one blocking receive coroutine, asynchronous JSON requests, authorization, and file state. TDLib's official JSON JNI API avoids committing a large generated Java schema.
 - `Library` owns SQLite. It stores track references and metadata, selected chats, playlist membership, favorite flags, and pending downloads. Media bytes do not go in SQLite. UI reads observable immutable snapshots, not TDLib's private database.
 - `SpotygramApp` coordinates source selection, incremental discovery, metadata updates, file import, and user actions. It never reads other applications' Telegram session files.
-- `PlaybackService` owns ExoPlayer and the media session. The activity connects through MediaController. Queue and position persist locally; restoration does not autoplay.
+- `PlaybackService` owns the logical ID queue, ExoPlayer and the media session. Queue edits stay in-process; MediaController handles transport controls against a window of at most three items (previous/current/next). Queue and position persist locally; restoration does not autoplay.
 - `TelegramDataSource` reads TDLib's downloaded file ranges directly with random access. Missing ranges wait on TDLib updates, with a bounded timeout. There is no second audio cache or HTTP proxy.
 - `DownloadService` runs explicit offline downloads sequentially as a user-visible foreground data-sync service. The queue persists; interruption can be resumed from settings. Wi-Fi-only applies to explicit downloads, not playback.
 
@@ -45,7 +47,9 @@ The TDLib database key is random and wrapped by Android Keystore AES-GCM. Backup
 
 ## UI and performance
 
-Four destinations: music, favorites, playlists and chats. `SpotygramUI` coordinates navigation and shared actions; `MusicScreen` renders music, favorites and playlist contents using the same track rows. `PlaylistScreens` owns playlist browsing, creation, batch-add and ordering. `PlayerState` observes the existing MediaController. No additional module, backend or navigation framework is introduced. Light, dark and system modes share the same components.
+Four destinations, left to right: chats, favorites, playlists and music. The last destination persists by stable name, independently of button order. `SpotygramUI` coordinates navigation and shared actions; `MusicScreen` renders music, favorites and playlist contents using the same track rows. `PlaylistScreens` owns playlist browsing, creation, batch-add and ordering. `PlayerState` observes the existing MediaController. No additional module, backend or navigation framework is introduced. Light, dark and system modes share the same components.
+
+Android resources provide English defaults, Russian translations and native quantity plurals. The app follows system locale selection; Android 13+ also exposes a per-app language picker through `localeConfig`. `AppText` is a small application-resource accessor for screen callbacks and background notices, not a separate localization engine. Saved Messages is recognized by the current user's chat ID, not by a translated name.
 
 Long-press selects a track with platform haptic feedback; while selecting, taps toggle selection rather than start playback. An explicit Select button exposes the same action. Selection and search are saveable per page and survive rotation; changing destinations clears selection. Search does not discard selected hidden matches. Back first exits selection. Hearts are visible in rows, and removing a favorite offers Undo; favorites are independent of the music screen's offline filter.
 
@@ -55,7 +59,11 @@ The compact landscape layout removes the brand row and combines music controls; 
 
 Lazy lists display metadata; thumbnails are decoded by Coil. Artwork is requested for displayed items only, with two concurrent waiters and low TDLib download priority, instead of downloading every cover while indexing. Playback progress updates only while the activity is visible. SQLite and media import run off the main thread; page parsing also runs off the UI thread. Metadata discovery is sequential and cancellable, without artificial per-page sleeps; catalog snapshots publish at most twice per second during a page loop, plus completion. Audio is not prefetched during indexing. Track lookup uses a snapshot-scoped ID map, and playlist filtering uses indexed membership. Load control targets 15–30 seconds of buffered audio with a one-second startup threshold and two-second rebuffer threshold; actual buffer occupancy and startup depend on format, loader granularity and network. No continuous polling job keeps the application alive after playback and downloads finish.
 
-Shuffle uses Fisher–Yates with Android's `SecureRandom`, including an unbiased bounded draw for the first track of a shuffled collection. The selected/current track anchors a pass; every other queue entry appears once in random order. Re-enabling shuffle and replacing a shuffled queue draw a fresh order. Repeat-all draws another order when reaching the last entry, anchored at that entry to avoid an immediate repeat. Manual selections and repeat-one retain their usual meaning; explicit play-next places its entry after the current entry even in shuffle mode. The exact order is saved with queue changes and restored across process restarts. Position saves do not rebuild or serialize the full queue every five seconds, and their timer runs only during playback.
+Shuffle uses Fisher–Yates over compact source indices with Android's `SecureRandom`, including an unbiased bounded draw for the first track. The selected/current entry anchors a pass; every other queue entry appears once in random order. Repeat-all prepares another pass at the boundary and avoids immediately repeating the last entry. At most two index passes are retained for backward navigation. Explicit play-next inserts an occurrence after the current entry, including in shuffle mode.
+
+The full queue never becomes a Media3 timeline or a Binder payload. Transitions slide the three-item window while retaining the current media source. Only the open queue sheet observes queue revisions and resolves visible rows through the library ID map. Half-second position updates are scoped to the mini-player/full player, not the whole navigation screen.
+
+Immutable queue snapshots are serialized by one conflated IO writer. The ID list and path use `playback_queue` preferences; small cursor/position/mode updates use `playback_position`, linked by snapshot version. Position ticks run only during playback and never rewrite the large list. Restoration migrates the former `settings` queue keys, filters missing tracks and remains paused; neither the catalog nor account data is reset.
 
 ## Deliberate limits
 

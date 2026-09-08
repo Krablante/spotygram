@@ -104,10 +104,12 @@ fun MusicScreen(
         ) {
             if (selecting)
                 IconButton(onClick = ::clearSelection) {
-                    Icon(Icons.Rounded.Close, "Снять выделение")
+                    Icon(Icons.Rounded.Close, tr(R.string.clear_selection))
                 }
             else if (playlist != null || source != null)
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Назад") }
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr(R.string.back))
+                }
             else if (favorites)
                 Icon(
                     Icons.Rounded.Favorite,
@@ -116,8 +118,11 @@ fun MusicScreen(
                     tint = MaterialTheme.colorScheme.primary,
                 )
             Text(
-                if (selecting) "Выбрано: ${selected.size}"
-                else playlist?.name ?: source?.title ?: if (favorites) "Любимые" else "Музыка",
+                if (selecting) tr(R.string.selected_count, selected.size)
+                else
+                    playlist?.name
+                        ?: source?.displayTitle
+                        ?: if (favorites) tr(R.string.favorites) else tr(R.string.music),
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1,
@@ -132,17 +137,21 @@ fun MusicScreen(
                 )
                 if (playlist != null)
                     IconButton(onClick = onPlaylistMenu) {
-                        Icon(Icons.Rounded.MoreVert, "Действия с плейлистом")
+                        Icon(Icons.Rounded.MoreVert, tr(R.string.playlist_actions))
                     }
                 else
                     IconButton(onClick = onRefresh, enabled = !busy) {
                         if (busy)
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Rounded.Refresh, "Обновить музыку")
+                        else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
                     }
             }
         }
-        MusicSearch(query, { query = it }, if (favorites) "Поиск в любимых" else "Поиск в музыке")
+        MusicSearch(
+            query,
+            { query = it },
+            if (favorites) tr(R.string.search_favorites) else tr(R.string.search_music),
+        )
         if (selecting) {
             Row(
                 Modifier.fillMaxWidth()
@@ -163,8 +172,8 @@ fun MusicScreen(
                 ) {
                     Text(
                         if (tracks.isNotEmpty() && visibleIds.all { it in selectedSet })
-                            "Снять видимые"
-                        else "Выбрать все"
+                            tr(R.string.deselect_visible)
+                        else tr(R.string.select_all)
                     )
                 }
                 TextButton(
@@ -173,20 +182,20 @@ fun MusicScreen(
                 ) {
                     Icon(Icons.Rounded.PlaylistAdd, null)
                     Spacer(Modifier.width(4.dp))
-                    Text("В плейлист")
+                    Text(tr(R.string.to_playlist))
                 }
                 IconButton(
                     onClick = { onDownload(selected.toList()) },
                     enabled = selected.isNotEmpty(),
                 ) {
-                    Icon(Icons.Rounded.Download, "Скачать выбранные")
+                    Icon(Icons.Rounded.Download, tr(R.string.download_selected))
                 }
                 if (playlist != null)
                     IconButton(
                         onClick = { removeSelected = true },
                         enabled = selected.isNotEmpty(),
                     ) {
-                        Icon(Icons.Rounded.PlaylistRemove, "Убрать выбранные из плейлиста")
+                        Icon(Icons.Rounded.PlaylistRemove, tr(R.string.remove_selected_playlist))
                     }
             }
         } else {
@@ -222,12 +231,12 @@ fun MusicScreen(
                         { sort = !sort },
                     )
                 TextButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
-                    Text("Выбрать")
+                    Text(tr(R.string.select))
                 }
                 if (playlist != null)
                     TextButton(onClick = onAddTracks) {
                         Icon(Icons.Rounded.Add, null)
-                        Text("Треки")
+                        Text(tr(R.string.tracks))
                     }
                 Spacer(Modifier.weight(1f))
                 TextButton(
@@ -236,7 +245,7 @@ fun MusicScreen(
                 ) {
                     Icon(Icons.Rounded.Shuffle, null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Перемешать")
+                    Text(tr(R.string.shuffle_play))
                 }
                 IconButton(
                     onClick = {
@@ -250,7 +259,7 @@ fun MusicScreen(
                 ) {
                     Icon(
                         Icons.Rounded.PlayArrow,
-                        "Слушать всё",
+                        tr(R.string.play_all),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -268,7 +277,7 @@ fun MusicScreen(
                 enabled = !busy,
                 modifier = Modifier.padding(horizontal = 8.dp),
             ) {
-                Text("Поискать в выбранных чатах")
+                Text(tr(R.string.search_selected_chats))
             }
         PullToRefreshBox(
             isRefreshing = busy,
@@ -294,28 +303,27 @@ fun MusicScreen(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                if (query.isNotBlank() || offline) "Ничего не найдено"
-                                else if (favorites) "То, что нравится"
-                                else if (playlist != null) "Добавим музыку?"
-                                else "Твоя музыка из Telegram",
+                                if (query.isNotBlank() || offline) tr(R.string.no_results)
+                                else if (favorites) tr(R.string.favorites_empty_title)
+                                else if (playlist != null) tr(R.string.playlist_empty_title)
+                                else tr(R.string.music_empty_title),
                                 style = MaterialTheme.typography.titleLarge,
                             )
                             Text(
-                                if (query.isNotBlank() || offline)
-                                    "Измени поиск или выключи фильтр."
-                                else if (favorites)
-                                    "Нажми сердечко рядом с песней — она появится здесь."
-                                else if (playlist != null)
-                                    "Выбери сразу несколько песен из своей медиатеки."
-                                else "Выбери чаты или добавь аудиофайлы с телефона.",
+                                if (query.isNotBlank() || offline) tr(R.string.search_empty_help)
+                                else if (favorites) tr(R.string.favorites_empty_help)
+                                else if (playlist != null) tr(R.string.playlist_empty_help)
+                                else tr(R.string.music_empty_help),
                                 Modifier.padding(vertical = 12.dp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             if (playlist != null)
-                                Button(onClick = onAddTracks) { Text("Добавить треки") }
+                                Button(onClick = onAddTracks) { Text(tr(R.string.add_tracks)) }
                             else if (!favorites && query.isBlank() && !offline && !selecting) {
-                                TextButton(onClick = onChats) { Text("Выбрать чаты") }
-                                TextButton(onClick = onImport) { Text("Добавить с телефона") }
+                                TextButton(onClick = onChats) { Text(tr(R.string.choose_chats)) }
+                                TextButton(onClick = onImport) {
+                                    Text(tr(R.string.import_from_device))
+                                }
                             }
                         }
                     }
@@ -343,8 +351,8 @@ fun MusicScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                if (busy) "Загружаем всю историю…"
-                                else "Продолжить загрузку истории"
+                                if (busy) tr(R.string.loading_history)
+                                else tr(R.string.resume_history)
                             )
                         }
                     }
@@ -354,9 +362,9 @@ fun MusicScreen(
     if (removeSelected)
         AlertDialog(
             onDismissRequest = { removeSelected = false },
-            title = { Text("Убрать ${trackCount(selected.size)}?") },
+            title = { Text(tr(R.string.remove_tracks_title, trackCount(selected.size))) },
             text = {
-                Text("Только из этого плейлиста. Музыка останется в медиатеке и на телефоне.")
+                Text(tr(R.string.remove_tracks_help))
             },
             confirmButton = {
                 TextButton(
@@ -366,10 +374,12 @@ fun MusicScreen(
                         removeSelected = false
                     }
                 ) {
-                    Text("Убрать")
+                    Text(tr(R.string.remove))
                 }
             },
-            dismissButton = { TextButton(onClick = { removeSelected = false }) { Text("Отмена") } },
+            dismissButton = {
+                TextButton(onClick = { removeSelected = false }) { Text(tr(R.string.cancel)) }
+            },
         )
 }
 
@@ -387,7 +397,7 @@ private fun MusicFilters(
     Box {
         TextButton(onClick = { expanded = true }) {
             Text(
-                source?.title ?: "Все источники",
+                source?.displayTitle ?: tr(R.string.all_sources),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 148.dp),
@@ -396,7 +406,7 @@ private fun MusicFilters(
         }
         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("Все источники") },
+                text = { Text(tr(R.string.all_sources)) },
                 onClick = {
                     expanded = false
                     onSource(null)
@@ -404,7 +414,7 @@ private fun MusicFilters(
             )
             library.sources.forEach { s ->
                 DropdownMenuItem(
-                    text = { Text(s.title) },
+                    text = { Text(s.displayTitle) },
                     onClick = {
                         expanded = false
                         onSource(s.id)
@@ -416,13 +426,13 @@ private fun MusicFilters(
     FilterChip(
         selected = offline,
         onClick = { onOffline(!offline) },
-        label = { Text("На телефоне") },
+        label = { Text(tr(R.string.on_device)) },
         leadingIcon = { Icon(Icons.Rounded.DownloadForOffline, null, Modifier.size(18.dp)) },
     )
     IconButton(onClick = onSort) {
         Icon(
             Icons.Rounded.SortByAlpha,
-            if (sort) "Сначала новые" else "По алфавиту",
+            if (sort) tr(R.string.newest_first) else tr(R.string.alphabetical),
             tint =
                 if (sort) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -447,7 +457,7 @@ fun MusicSearch(
         trailingIcon = {
             if (value.isNotEmpty())
                 IconButton(onClick = { onChange("") }) {
-                    Icon(Icons.Rounded.Close, "Очистить поиск")
+                    Icon(Icons.Rounded.Close, tr(R.string.clear_search))
                 }
         },
         shape = RoundedCornerShape(8.dp),
@@ -481,11 +491,13 @@ fun TrackRow(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                onLongClickLabel = "Выбрать трек",
+                onLongClickLabel = tr(R.string.select_track),
                 role = Role.Button,
             )
             .semantics {
-                if (selected != null) stateDescription = if (selected) "Выбрано" else "Не выбрано"
+                if (selected != null)
+                    stateDescription =
+                        if (selected) tr(R.string.selected) else tr(R.string.not_selected)
             }
             .heightIn(min = 64.dp)
             .padding(
@@ -517,12 +529,13 @@ fun TrackRow(
                 if (track.local)
                     Icon(
                         Icons.Rounded.DownloadForOffline,
-                        "На телефоне",
+                        tr(R.string.on_device),
                         Modifier.padding(end = 3.dp).size(13.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 Text(
-                    if (!track.available && !track.local) "Сообщение удалено" else track.subtitle,
+                    if (!track.available && !track.local) tr(R.string.message_deleted)
+                    else track.subtitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
@@ -546,8 +559,8 @@ fun TrackRow(
             IconToggleButton(checked = track.liked, onCheckedChange = { onLike() }) {
                 Icon(
                     if (track.liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                    if (track.liked) "Убрать из любимых: ${track.title}"
-                    else "В любимые: ${track.title}",
+                    if (track.liked) tr(R.string.unlike_named, track.title)
+                    else tr(R.string.like_named, track.title),
                     tint =
                         if (track.liked) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -555,7 +568,7 @@ fun TrackRow(
             }
         if (selected == null && onMore != null)
             IconButton(onClick = onMore) {
-                Icon(Icons.Rounded.MoreVert, "Действия: ${track.title}")
+                Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions_named, track.title))
             }
         if (selected != null) Spacer(Modifier.width(12.dp))
     }

@@ -34,9 +34,13 @@ class SpotygramApp : Application() {
     private val resolvedFiles = ConcurrentHashMap<String, Int>()
     private val artworkFiles = ConcurrentHashMap<Int, MutableSet<String>>()
     var player: androidx.media3.common.Player? = null
+    var playback: PlaybackService? = null
+    val playbackMode = MutableStateFlow(PlaybackMode())
+    val queueRevision = MutableStateFlow(0L)
 
     override fun onCreate() {
         super.onCreate()
+        AppText.initialize(this)
         library = Library(this)
         telegram = Telegram(this, scope)
         theme.value = prefs.getString("theme", "system") ?: "system"
@@ -100,7 +104,7 @@ class SpotygramApp : Application() {
                 choices
                     .map { ChatChoice(it.key, it.value) }
                     .sortedWith(
-                        compareBy<ChatChoice> { it.title != "Избранное" }
+                        compareBy<ChatChoice> { it.id != AppText.savedChatId }
                             .thenBy { it.title.lowercase() }
                     )
         }
@@ -137,7 +141,8 @@ class SpotygramApp : Application() {
             telegram.request(
                 json("createPrivateChat", "user_id" to me.getLong("id"), "force" to false)
             )
-        choices[saved.getLong("id")] = "Избранное"
+        choices[saved.getLong("id")] = tr(R.string.saved_messages)
+        AppText.rememberSavedChat(saved.getLong("id"))
         publish()
     }
 
@@ -172,7 +177,7 @@ class SpotygramApp : Application() {
                 .removePrefix("http://t.me/")
                 .removePrefix("@")
                 .substringBefore('/')
-        require(name.matches(Regex("[A-Za-z0-9_]{4,}"))) { "Укажите @имя публичного канала" }
+        require(name.matches(Regex("[A-Za-z0-9_]{4,}"))) { tr(R.string.channel_name_required) }
         val chat = telegram.request(json("searchPublicChat", "username" to name))
         val choice = ChatChoice(chat.getLong("id"), chat.getString("title"))
         library.source(choice, true)
@@ -266,7 +271,7 @@ class SpotygramApp : Application() {
             library.upsert(tracks)
             val next = response.getLong("next_from_message_id")
             check(next == 0L || next != from) {
-                "Telegram не продвинул историю. Повторите обновление."
+                tr(R.string.history_stalled)
             }
             if (history) {
                 if (from == 0L) library.newest(source.id, newest, document)
@@ -293,7 +298,7 @@ class SpotygramApp : Application() {
             for (source in library.state.value.sources) for (document in listOf(false, true)) {
                 scanPages(source, document, query = query)
             }
-            notices.emit("Поиск в выбранных чатах завершён")
+            notices.emit(tr(R.string.chat_search_complete))
         } finally {
             busy.value = false
             scanJob = null
@@ -339,7 +344,7 @@ class SpotygramApp : Application() {
             audio.optString("title").ifBlank {
                 previous?.title
                     ?: audio.optString("file_name").substringBeforeLast('.').ifBlank {
-                        "Аудиозапись"
+                        tr(R.string.audio_recording)
                     }
             },
             audio.optString("performer").ifBlank { previous?.artist.orEmpty() },
@@ -454,8 +459,7 @@ class SpotygramApp : Application() {
             telegram.request(
                 json("getMessage", "chat_id" to track.chatId, "message_id" to track.messageId)
             )
-        val parsed =
-            parseTrack(response, track.source) ?: error("В сообщении больше нет аудиофайла")
+        val parsed = parseTrack(response, track.source) ?: error(tr(R.string.message_audio_missing))
         library.upsert(listOf(parsed))
         library.reload()
         return parsed.fileId
@@ -496,16 +500,10 @@ class SpotygramApp : Application() {
 
     suspend fun removeLocal(track: Track) {
         require(player?.currentMediaItem?.mediaId != track.id) {
-            "Сначала переключите текущий трек"
+            tr(R.string.switch_track_first)
         }
         if (track.chatId != 0L) telegram.request(json("deleteFile", "file_id" to track.fileId))
-        else
-            player?.let { queue ->
-                for (index in queue.mediaItemCount - 1 downTo 0) {
-                    if (queue.getMediaItemAt(index).mediaId == track.id)
-                        queue.removeMediaItem(index)
-                }
-            }
+        else playback?.removeTrack(track.id)
         library.removeLocal(track)
     }
 
@@ -533,12 +531,12 @@ class SpotygramApp : Application() {
             try {
                 contentResolver.openInputStream(uri)?.use { input ->
                     file.outputStream().use { input.copyTo(it) }
-                } ?: error("Файл недоступен")
+                } ?: error(tr(R.string.file_unavailable))
                 retriever.setDataSource(file.path)
                 val duration =
                     (retriever
                         .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                        ?.toLongOrNull() ?: error("Не удалось прочитать аудиофайл")) / 1000
+                        ?.toLongOrNull() ?: error(tr(R.string.audio_read_failed))) / 1000
                 val name =
                     contentResolver
                         .query(
@@ -565,13 +563,15 @@ class SpotygramApp : Application() {
                             retriever
                                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
                                 ?.takeIf { it.isNotBlank() }
-                                ?: name.substringBeforeLast('.').ifBlank { "Аудиозапись" },
+                                ?: name.substringBeforeLast('.').ifBlank {
+                                    tr(R.string.audio_recording)
+                                },
                             retriever
                                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
                                 .orEmpty(),
                             duration.toInt(),
                             file.length(),
-                            "С телефона",
+                            tr(R.string.from_device),
                             System.currentTimeMillis() / 1000,
                             art,
                             file.path,
@@ -579,7 +579,7 @@ class SpotygramApp : Application() {
                     )
                 )
                 library.reload()
-                notices.emit("Добавлено в музыку")
+                notices.emit(tr(R.string.import_complete))
             } catch (e: Exception) {
                 file.delete()
                 throw e
@@ -590,8 +590,7 @@ class SpotygramApp : Application() {
 
     suspend fun logout() {
         scanJob?.cancelAndJoin()
-        player?.stop()
-        player?.clearMediaItems()
+        playback?.clear()
         stopService(Intent(this, DownloadService::class.java))
         telegram.request(json("logOut"))
         prefs.edit().putBoolean("telegram_connected", false).apply()

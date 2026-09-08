@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/banner.svg" alt="spotygram — Your Telegram music. On your terms." width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.2.0 alpha" src="https://img.shields.io/badge/APK-0.2.0%20alpha-1DB954?style=flat-square"></a>
+  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.3.0 alpha" src="https://img.shields.io/badge/APK-0.3.0%20alpha-1DB954?style=flat-square"></a>
   <img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-121212?style=flat-square">
   <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-121212?style=flat-square">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-121212?style=flat-square"></a>
@@ -22,7 +22,7 @@ Connect your account, choose your sources, and listen. Downloaded songs stay on 
 | Fast local search + explicit chat search | Queue, shuffle, repeat, favorites | Dark, light, and system themes |
 | Playlists, multi-select and drag ordering | Seek without a second media cache | Audio import through Android's picker |
 
-**Music · Favorites · Playlists · Chats.** Four direct destinations. Tap a heart to save a favorite; hold a song to select it and add several tracks to a playlist together. Create a playlist with its songs in one screen, then drag its tracks into the order you want.
+**Chats · Favorites · Playlists · Music.** Four direct destinations, with your last section restored on reopening. Tap a heart to save a favorite; hold a song to select it and add several tracks to a playlist together. Create a playlist with its songs in one screen, then drag its tracks into the order you want.
 
 ## A familiar place for your music
 
@@ -42,7 +42,7 @@ Captured on Android. The recordings used during manual checks are not bundled wi
 2. Connect your Telegram account and select chats containing music, or choose **«Пока без Telegram»** to import local audio.
 3. Play a track. Once its file finishes downloading, the offline indicator appears. Use **«Скачать»** to save tracks or collections in advance.
 
-The interface is currently in Russian. Android 8.0+. Choose the **ARM64 APK** for phones; a separate **x86-64 APK** is available for x86-64 Android environments. There is no 32-bit ARM build in this release.
+The interface follows your phone language: **English and Russian**, with English as the fallback. On Android 13+, Settings → Language opens Android's per-app language selector. Android 8.0+. Choose the **ARM64 APK** for phones; a separate **x86-64 APK** is available for x86-64 Android environments. There is no 32-bit ARM build in this release.
 
 ## Deliberately small
 

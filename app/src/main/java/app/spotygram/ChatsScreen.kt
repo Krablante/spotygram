@@ -30,25 +30,28 @@ fun ChatsScreen(
     var removing by remember { mutableStateOf<Source?>(null) }
     Column(Modifier.fillMaxSize()) {
         Text(
-            "Твои чаты",
+            tr(R.string.your_chats),
             Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
             style = MaterialTheme.typography.headlineLarge,
         )
         Text(
-            "Выбирай, откуда собирать музыку.",
+            tr(R.string.choose_sources_help),
             Modifier.padding(horizontal = 20.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(20.dp))
         if (!connected) {
             Column(Modifier.padding(24.dp)) {
-                Text("Подключи свой Telegram", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Аудиофайлы из выбранных чатов появятся в медиатеке. Локальная музыка доступна и без входа.",
+                    tr(R.string.connect_your_telegram),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    tr(R.string.connect_help),
                     Modifier.padding(vertical = 12.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onConnect) { Text("Подключить") }
+                Button(onClick = onConnect) { Text(tr(R.string.connect)) }
             }
         } else {
             Row(
@@ -58,37 +61,44 @@ fun ChatsScreen(
                 Button(onClick = onAdd) {
                     Icon(Icons.Rounded.Add, null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Добавить чаты")
+                    Text(tr(R.string.add_chats))
                 }
                 IconButton(onClick = onRefresh, enabled = !busy) {
                     if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Rounded.Refresh, "Обновить")
+                    else Icon(Icons.Rounded.Refresh, tr(R.string.refresh))
                 }
             }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 12.dp)) {
                 items(library.sources, key = { it.id }) { source ->
                     ListItem(
                         headlineContent = {
-                            Text(source.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                source.displayTitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         },
                         supportingContent = {
                             Text(
                                 trackCount(library.tracks.count { it.chatId == source.id }) +
                                     if (source.fullyIndexed) ""
-                                    else if (busy) " · загружаем историю…"
-                                    else " · история не загружена"
+                                    else if (busy) tr(R.string.history_loading_suffix)
+                                    else tr(R.string.history_incomplete_suffix)
                             )
                         },
                         leadingContent = {
                             Icon(
-                                if (source.title == "Избранное") Icons.Rounded.Bookmark
+                                if (source.id == AppText.savedChatId) Icons.Rounded.Bookmark
                                 else Icons.Rounded.Forum,
                                 null,
                             )
                         },
                         trailingContent = {
                             IconButton(onClick = { removing = source }) {
-                                Icon(Icons.Rounded.Close, "Убрать ${source.title}")
+                                Icon(
+                                    Icons.Rounded.Close,
+                                    tr(R.string.remove_source_named, source.displayTitle),
+                                )
                             }
                         },
                         modifier = Modifier.clickable { onOpen(source.id) },
@@ -97,7 +107,7 @@ fun ChatsScreen(
                 if (library.sources.isEmpty())
                     item {
                         Text(
-                            "Здесь могут быть «Избранное», музыкальный канал или общий чат с друзьями.",
+                            tr(R.string.sources_empty),
                             Modifier.padding(24.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -108,11 +118,9 @@ fun ChatsScreen(
     removing?.let { source ->
         AlertDialog(
             onDismissRequest = { removing = null },
-            title = { Text("Убрать чат?") },
+            title = { Text(tr(R.string.remove_chat_title)) },
             text = {
-                Text(
-                    "Перестанем собирать музыку из «${source.title}». Скачанные треки останутся в медиатеке, сообщения в Telegram не изменятся. Чат можно добавить обратно."
-                )
+                Text(tr(R.string.remove_chat_help, source.displayTitle))
             },
             confirmButton = {
                 TextButton(
@@ -121,10 +129,12 @@ fun ChatsScreen(
                         removing = null
                     }
                 ) {
-                    Text("Убрать")
+                    Text(tr(R.string.remove))
                 }
             },
-            dismissButton = { TextButton(onClick = { removing = null }) { Text("Отмена") } },
+            dismissButton = {
+                TextButton(onClick = { removing = null }) { Text(tr(R.string.cancel)) }
+            },
         )
     }
 }
@@ -149,12 +159,12 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().imePadding()
     ) {
-        Text("Добавить чаты", style = MaterialTheme.typography.headlineMedium)
+        Text(tr(R.string.add_chats), style = MaterialTheme.typography.headlineMedium)
         OutlinedTextField(
             query,
             { query = it },
             Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            placeholder = { Text("Название чата или @канал") },
+            placeholder = { Text(tr(R.string.chat_search_hint)) },
             singleLine = true,
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
         )
@@ -168,7 +178,7 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
                     }
                 }
             ) {
-                Text("Добавить $query")
+                Text(tr(R.string.add_query, query))
             }
         LazyColumn(Modifier.heightIn(max = 400.dp)) {
             items(chats, key = { it.id }) { chat ->
@@ -180,13 +190,13 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        if (chat.title == "Избранное") Icons.Rounded.Bookmark
+                        if (chat.id == AppText.savedChatId) Icons.Rounded.Bookmark
                         else Icons.Rounded.Forum,
                         null,
                         Modifier.padding(end = 14.dp),
                     )
                     Text(
-                        chat.title,
+                        chat.displayTitle,
                         Modifier.weight(1f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -196,13 +206,13 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
             }
         }
         Text(
-            "Выбор ограничивает нашу медиатеку, не разрешения Telegram-сессии.",
+            tr(R.string.telegram_access_help),
             Modifier.padding(vertical = 12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            Text("Готово · ${library.sources.size} чатов")
+            Text(tr(R.string.done_chats, library.sources.size))
         }
         Spacer(Modifier.height(20.dp))
     }

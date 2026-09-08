@@ -76,7 +76,11 @@ fun PlaylistsScreen(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Плейлисты", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                tr(R.string.playlists),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineSmall,
+            )
             Text("${library.playlists.size}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Button(
@@ -89,9 +93,10 @@ fun PlaylistsScreen(
         ) {
             Icon(Icons.Rounded.Add, null)
             Spacer(Modifier.width(8.dp))
-            Text("Новый плейлист")
+            Text(tr(R.string.new_playlist))
         }
-        if (library.playlists.isNotEmpty()) MusicSearch(query, { query = it }, "Найти плейлист")
+        if (library.playlists.isNotEmpty())
+            MusicSearch(query, { query = it }, tr(R.string.find_playlist))
         LazyColumn(
             state = rememberLazyListState(),
             modifier = Modifier.weight(1f),
@@ -101,11 +106,12 @@ fun PlaylistsScreen(
                 item {
                     Column(Modifier.padding(24.dp)) {
                         Text(
-                            if (query.isBlank()) "Собери свою подборку" else "Ничего не найдено",
+                            if (query.isBlank()) tr(R.string.playlists_empty_title)
+                            else tr(R.string.no_results),
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
-                            "Можно добавить несколько песен сразу. Зажми трек в музыке или нажми «Выбрать».",
+                            tr(R.string.playlists_empty_help),
                             Modifier.padding(top = 12.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -121,7 +127,7 @@ fun PlaylistsScreen(
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onMore(playlist)
                             },
-                            onLongClickLabel = "Действия с плейлистом",
+                            onLongClickLabel = tr(R.string.playlist_actions),
                         )
                         .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -141,7 +147,10 @@ fun PlaylistsScreen(
                         )
                     }
                     IconButton(onClick = { onMore(playlist) }) {
-                        Icon(Icons.Rounded.MoreVert, "Действия: ${playlist.name}")
+                        Icon(
+                            Icons.Rounded.MoreVert,
+                            tr(R.string.playlist_actions_named, playlist.name),
+                        )
                     }
                 }
             }
@@ -190,10 +199,10 @@ fun PlaylistEditor(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = ::leave, enabled = !saving) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Назад")
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr(R.string.back))
             }
             Text(
-                if (addingTo == null) "Новый плейлист" else "Добавить треки",
+                if (addingTo == null) tr(R.string.new_playlist) else tr(R.string.add_tracks),
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
@@ -202,36 +211,44 @@ fun PlaylistEditor(
                 OutlinedTextField(
                     name,
                     { name = it.take(80) },
-                    label = { Text("Название плейлиста") },
+                    label = { Text(tr(R.string.playlist_name)) },
                     singleLine = true,
                     enabled = !saving,
                     modifier =
                         Modifier.weight(1f).padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
                 )
-                MusicSearch(query, { query = it }, "Название или исполнитель", Modifier.weight(1f))
+                MusicSearch(
+                    query,
+                    { query = it },
+                    tr(R.string.title_or_artist),
+                    Modifier.weight(1f),
+                )
             }
         else if (addingTo == null)
             OutlinedTextField(
                 name,
                 { name = it.take(80) },
-                label = { Text("Название плейлиста") },
+                label = { Text(tr(R.string.playlist_name)) },
                 singleLine = true,
                 enabled = !saving,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             )
         else
             Text(
-                playlist?.name ?: "Плейлист уже удалён",
+                playlist?.name ?: tr(R.string.playlist_deleted),
                 Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         if (!compact || addingTo != null)
-            MusicSearch(query, { query = it }, "Название или исполнитель")
+            MusicSearch(query, { query = it }, tr(R.string.title_or_artist))
         Row(
             Modifier.padding(horizontal = 8.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Выбрано: ${selected.size}", Modifier.weight(1f).padding(start = 8.dp))
+            Text(
+                tr(R.string.selected_count, selected.size),
+                Modifier.weight(1f).padding(start = 8.dp),
+            )
             TextButton(
                 enabled = !saving && tracks.isNotEmpty(),
                 onClick = {
@@ -244,8 +261,9 @@ fun PlaylistEditor(
                 },
             ) {
                 Text(
-                    if (tracks.isNotEmpty() && tracks.all { it.id in chosen }) "Снять видимые"
-                    else "Выбрать все"
+                    if (tracks.isNotEmpty() && tracks.all { it.id in chosen })
+                        tr(R.string.deselect_visible)
+                    else tr(R.string.select_all)
                 )
             }
         }
@@ -253,9 +271,8 @@ fun PlaylistEditor(
             if (tracks.isEmpty())
                 item {
                     Text(
-                        if (query.isBlank())
-                            "Все доступные треки уже в плейлисте, или медиатека пока пуста."
-                        else "Ничего не найдено",
+                        if (query.isBlank()) tr(R.string.playlist_all_added)
+                        else tr(R.string.no_results),
                         Modifier.padding(24.dp),
                     )
                 }
@@ -305,17 +322,17 @@ fun PlaylistEditor(
             else
                 Text(
                     if (addingTo == null)
-                        if (selected.isEmpty()) "Создать плейлист"
-                        else "Создать · ${trackCount(selected.size)}"
-                    else "Добавить · ${trackCount(selected.size)}"
+                        if (selected.isEmpty()) tr(R.string.create_playlist)
+                        else tr(R.string.create_tracks, trackCount(selected.size))
+                    else tr(R.string.add_tracks_count, trackCount(selected.size))
                 )
         }
     }
     if (discard)
         AlertDialog(
             onDismissRequest = { discard = false },
-            title = { Text("Выйти без сохранения?") },
-            text = { Text("Название и выбранные песни не будут сохранены.") },
+            title = { Text(tr(R.string.discard_title)) },
+            text = { Text(tr(R.string.discard_help)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -323,10 +340,12 @@ fun PlaylistEditor(
                         onClose()
                     }
                 ) {
-                    Text("Выйти")
+                    Text(tr(R.string.leave))
                 }
             },
-            dismissButton = { TextButton(onClick = { discard = false }) { Text("Продолжить") } },
+            dismissButton = {
+                TextButton(onClick = { discard = false }) { Text(tr(R.string.continue_action)) }
+            },
         )
 }
 
@@ -345,9 +364,9 @@ fun AddToPlaylistSheet(
     Column(
         Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 16.dp)
     ) {
-        Text("Добавить в плейлист", style = MaterialTheme.typography.headlineSmall)
+        Text(tr(R.string.add_to_playlist), style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Выбрано: ${ids.size}",
+            tr(R.string.selected_count, ids.size),
             Modifier.padding(top = 4.dp, bottom = 12.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -395,13 +414,13 @@ fun AddToPlaylistSheet(
         ) {
             Icon(Icons.Rounded.Add, null)
             Spacer(Modifier.width(8.dp))
-            Text("Новый плейлист")
+            Text(tr(R.string.new_playlist))
         }
         if (creating)
             OutlinedTextField(
                 name,
                 { name = it.take(80) },
-                label = { Text("Название плейлиста") },
+                label = { Text(tr(R.string.playlist_name)) },
                 singleLine = true,
                 enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
@@ -432,8 +451,9 @@ fun AddToPlaylistSheet(
             shape = RoundedCornerShape(8.dp),
         ) {
             Text(
-                if (saving) "Сохраняем…"
-                else if (creating) "Создать и добавить" else "Добавить · ${trackCount(ids.size)}"
+                if (saving) tr(R.string.saving)
+                else if (creating) tr(R.string.create_and_add)
+                else tr(R.string.add_tracks_count, trackCount(ids.size))
             )
         }
     }
@@ -498,9 +518,9 @@ fun PlaylistOrderSheet(
         }
     }
     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp)) {
-        Text("Порядок треков", style = MaterialTheme.typography.headlineSmall)
+        Text(tr(R.string.track_order), style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Зажми ручку справа и перетащи. Можно также нажимать стрелки.",
+            tr(R.string.reorder_help),
             Modifier.padding(vertical = 12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -545,7 +565,7 @@ fun PlaylistOrderSheet(
                                 save()
                             },
                         ) {
-                            Icon(Icons.Rounded.ArrowUpward, "Выше: ${track.title}")
+                            Icon(Icons.Rounded.ArrowUpward, tr(R.string.move_track_up, track.title))
                         }
                         IconButton(
                             enabled = !saving && dragged == null && index < order.lastIndex,
@@ -554,11 +574,16 @@ fun PlaylistOrderSheet(
                                 save()
                             },
                         ) {
-                            Icon(Icons.Rounded.ArrowDownward, "Ниже: ${track.title}")
+                            Icon(
+                                Icons.Rounded.ArrowDownward,
+                                tr(R.string.move_track_down, track.title),
+                            )
                         }
                         Box(
                             Modifier.size(48.dp)
-                                .semantics { contentDescription = "Перетащить: ${track.title}" }
+                                .semantics {
+                                    contentDescription = tr(R.string.drag_track, track.title)
+                                }
                                 .pointerInput(id, saving) {
                                     detectDragGesturesAfterLongPress(
                                         onDragStart = {
@@ -607,7 +632,7 @@ fun PlaylistOrderSheet(
             enabled = !saving && dragged == null,
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         ) {
-            Text(if (saving) "Сохраняем…" else "Готово")
+            Text(if (saving) tr(R.string.saving) else tr(R.string.done))
         }
     }
 }

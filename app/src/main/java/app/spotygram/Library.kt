@@ -244,7 +244,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
 
     suspend fun createPlaylist(name: String, tracks: List<String> = emptyList()): Long =
         withContext(Dispatchers.IO) {
-            require(name.isNotBlank()) { "Введите название плейлиста" }
+            require(name.isNotBlank()) { tr(R.string.playlist_name_required) }
             val id = writableDatabase.transaction {
                 val created =
                     insertOrThrow(
@@ -265,7 +265,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                 it.moveToFirst()
             }
         ) {
-            "Плейлист уже удалён"
+            tr(R.string.playlist_deleted)
         }
         var position =
             db.rawQuery(
@@ -317,7 +317,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
 
     suspend fun renamePlaylist(id: Long, name: String) =
         withContext(Dispatchers.IO) {
-            require(name.isNotBlank()) { "Введите название плейлиста" }
+            require(name.isNotBlank()) { tr(R.string.playlist_name_required) }
             writableDatabase.update(
                 "playlists",
                 ContentValues().apply { put("name", name.trim().take(80)) },
