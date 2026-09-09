@@ -1,5 +1,24 @@
 # Verification record
 
+## 0.5.1 — unique local-file view
+
+The reported mismatch was confirmed in source: Settings used `distinctBy(path)` while the On device list counted every message reference. Verification used the existing debug imports in the Android 16 x86-64 emulator. No test files or extra audio files were created; builds and emulator remained sequential and resource-limited.
+
+| Surface | Observation |
+| --- | --- |
+| Debug build | Debug compilation/packaging and Lint passed. |
+| Manual reproduction | With the debug app stopped, one existing catalog row's path was temporarily pointed at another existing import's path. The catalog had three records and two referenced paths; the original files were not changed or deleted. One hidden alias, not the displayed representative, held the favorite flag. |
+| Counts | On device displayed `2 трека`; Settings displayed `2 трека · 8 МБ`. The catalog retained all three records. The size is the referenced-file projection; the temporarily unreferenced original file was deliberately retained for restoration. |
+| Aggregate favorite and Undo | The shared row showed a heart despite its displayed representative being unliked in SQLite. Removing the heart cleared the hidden alias's flag. Undo restored only the original `681640e6…` reference to liked=1; `76a007a7…` and `8e28a8a1…` remained 0. The row did not duplicate or change identity on the toggle. |
+| Playing alias and deletion guard | The active reference was `681640e6…`, while the shared row represented `76a007a7…`. Visual inspection showed the shared row highlighted. Its Remove from device action returned “Сначала переключите текущий трек”; the file/catalog records remained intact. |
+| Selection and queue | Select all showed `Выбрано: 2`. Starting the collection produced two queue IDs referencing two distinct paths, while the catalog still had three rows. |
+| Restoration and boundary | The original path was restored. SQLite reported three records, three distinct paths, one favorite and `integrity_check: ok`; On device again showed three entries. All three imports share a title, demonstrating that title equality alone does not merge different files. |
+| Logs | Inspected AndroidRuntime/ExoPlayerImplInternal error logs were empty. The emulator again showed its unrelated boot-time System UI ANR. |
+| Final build/artifacts | Minified release and release Lint passed. Both ABI signatures and 16 KB zip alignment passed with the existing certificate. Manifest: `app.spotygram`, versionCode 7, versionName 0.5.1, minSdk 26. Installed final x86-64 SHA-256 matched `392d3f398a11090141a1df9580a77aaee068686669310877785bd67a3e7a8859`. |
+| Signed update | Installed over 0.5.0 without clearing data. Night/Road playlists remained visible. Settings showed `2 tracks · 7 MB`; tapping its On device entry opened a list with `2 tracks`, empty search and All sources. Playback from that list reached PLAYING at 11456 ms without logged app/player errors. Playback was paused and the emulator stopped. |
+
+The phone's exact 63/49 dataset was not accessed. This manually reproduced the same shared-path condition without opening a Telegram account. Native remote-file deletion and source-specific alias searches remain source-reviewed rather than authenticated end-to-end checks. Existing explicitly constructed playback queues retain their occurrences; a new queue launched from On device uses unique files.
+
 ## 0.5.0 — Telegram music cache cleanup
 
 Manual inspection used the existing Android 16 x86-64 emulator and local demonstration imports. No unit/integration/smoke files, synthetic cache media or account fixtures were created. Build and emulator runs were sequential under the two-core resource limit.

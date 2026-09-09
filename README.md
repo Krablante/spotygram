@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/banner.svg" alt="spotygram — Your Telegram music. On your terms." width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.5.0 alpha" src="https://img.shields.io/badge/APK-0.5.0%20alpha-1DB954?style=flat-square"></a>
+  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.5.1 alpha" src="https://img.shields.io/badge/APK-0.5.1%20alpha-1DB954?style=flat-square"></a>
   <img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-121212?style=flat-square">
   <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-121212?style=flat-square">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-121212?style=flat-square"></a>
@@ -29,6 +29,8 @@ The player's order button cycles through **in order → shuffle without repeats 
 **Settings → Clear music cache** shows space used by Telegram audio and asks before removing local copies, including explicit offline downloads. Imported audio, favorites, playlists and sign-in remain. Playback/downloads stop for cleanup, and the result reports actual space freed.
 
 See the [cache screen](docs/screenshots/cache-dark.png), captured with local imports excluded from its total.
+
+**On device** shows each local file once, even when several Telegram messages reference it. Settings uses the same file collection for its count and size; active search/source filters can still narrow the visible list. Original message references are retained.
 
 ## A familiar place for your music
 

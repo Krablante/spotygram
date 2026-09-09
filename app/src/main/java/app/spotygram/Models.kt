@@ -58,6 +58,22 @@ data class LibraryState(
     val playlists: List<Playlist> = emptyList(),
 ) {
     val byId by lazy { tracks.associateBy { it.id } }
+    val localGroups by lazy { tracks.filter { it.local }.groupBy { it.path } }
+    val localTracks by lazy { localView(tracks) }
+    val localSize by lazy { localTracks.sumOf { it.size } }
+
+    fun localDisplay(track: Track): Track {
+        val liked = localGroups[track.path]?.any { it.liked } ?: track.liked
+        return if (liked == track.liked) track else track.copy(liked = liked)
+    }
+
+    // Message references remain intact. Only the local-file view groups their shared paths.
+    fun localView(candidates: List<Track>): List<Track> {
+        val seen = HashSet<String>()
+        return candidates.mapNotNull { track ->
+            if (track.local && seen.add(track.path)) localDisplay(track) else null
+        }
+    }
 }
 
 data class AuthState(

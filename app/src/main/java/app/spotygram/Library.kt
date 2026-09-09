@@ -185,28 +185,39 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             )
         }
 
-    suspend fun like(track: Track): Boolean =
+    suspend fun like(track: Track, sameFile: Boolean = false): Pair<Boolean, List<String>> =
         withContext(Dispatchers.IO) {
-            val liked = writableDatabase.transaction {
-                val value =
-                    rawQuery("SELECT liked FROM tracks WHERE id=?", arrayOf(track.id)).use {
-                        it.moveToFirst() && it.getInt(0) == 0
-                    }
+            val column = if (sameFile && track.local) "path" else "id"
+            val key = if (sameFile && track.local) track.path else track.id
+            val change = writableDatabase.transaction {
+                val previous = mutableListOf<String>()
+                rawQuery("SELECT id FROM tracks WHERE $column=? AND liked=1", arrayOf(key)).use { c
+                    ->
+                    while (c.moveToNext()) previous += c.getString(0)
+                }
+                val value = previous.isEmpty()
                 update(
                     "tracks",
                     ContentValues().apply { put("liked", if (value) 1 else 0) },
-                    "id=?",
-                    arrayOf(track.id),
+                    if (value) "id=?" else "$column=?",
+                    arrayOf(if (value) track.id else key),
                 )
-                value
+                value to previous
             }
             reload()
-            liked
+            change
         }
 
-    suspend fun restoreLike(id: String) =
+    suspend fun restoreLikes(ids: List<String>) =
         withContext(Dispatchers.IO) {
-            writableDatabase.execSQL("UPDATE tracks SET liked=1 WHERE id=?", arrayOf(id))
+            writableDatabase.transaction {
+                compileStatement("UPDATE tracks SET liked=1 WHERE id=?").use { statement ->
+                    for (id in ids) {
+                        statement.bindString(1, id)
+                        statement.executeUpdateDelete()
+                    }
+                }
+            }
             reload()
         }
 
@@ -419,8 +430,8 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                 writableDatabase.update(
                     "tracks",
                     ContentValues().apply { put("path", "") },
-                    "file=?",
-                    arrayOf(track.fileId.toString()),
+                    "path=?",
+                    arrayOf(track.path),
                 )
             reload()
         }

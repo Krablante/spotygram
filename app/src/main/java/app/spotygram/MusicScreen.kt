@@ -69,8 +69,16 @@ fun MusicScreen(
         selected = arrayListOf()
         selecting = false
     }
+    fun selectionKey(id: String) =
+        if (offline) library.byId[id]?.path?.takeIf { it.isNotEmpty() } ?: id else id
     fun toggle(track: Track) {
-        selected = ArrayList(if (track.id in selected) selected - track.id else selected + track.id)
+        val key = selectionKey(track.id)
+        selected =
+            ArrayList(
+                if (selected.any { selectionKey(it) == key })
+                    selected.filter { selectionKey(it) != key }
+                else selected + track.id
+            )
     }
     LaunchedEffect(selectionReset) {
         if (selectionReset != lastReset) {
@@ -78,13 +86,16 @@ fun MusicScreen(
             lastReset = selectionReset
         }
     }
-    LaunchedEffect(library.tracks) { selected = ArrayList(selected.filter { it in library.byId }) }
+    LaunchedEffect(library.tracks, offline) {
+        selected = ArrayList(selected.filter { it in library.byId }.distinctBy(::selectionKey))
+    }
     BackHandler(enabled = selecting) { clearSelection() }
-    val selectedSet = remember(selected) { selected.toSet() }
+    val selectedSet =
+        remember(selected, library.tracks, offline) { selected.map(::selectionKey).toSet() }
     val tracks =
         remember(library.tracks, favorites, offline, source, playlist, query, sort) {
             val positions = playlist?.tracks?.withIndex()?.associate { it.value to it.index }
-            val result =
+            val matching =
                 library.tracks.filter { track ->
                     (!favorites || track.liked) &&
                         (!offline || track.local) &&
@@ -94,10 +105,14 @@ fun MusicScreen(
                             "${track.title} ${track.artist} ${track.source}"
                                 .contains(query.trim(), ignoreCase = true))
                 }
+            val result = if (offline) library.localView(matching) else matching
             if (sort) result.sortedBy { it.title.lowercase() }
             else if (positions != null) result.sortedBy { positions[it.id] } else result
         }
     val visibleIds = remember(tracks) { tracks.map { it.id } }
+    val visibleKeys = remember(tracks, offline) { tracks.map { selectionKey(it.id) }.toSet() }
+    val playingPath =
+        if (offline) library.byId[playingId]?.path?.takeIf { it.isNotEmpty() } else null
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp).heightIn(min = 48.dp),
@@ -162,17 +177,17 @@ fun MusicScreen(
             ) {
                 TextButton(
                     onClick = {
-                        val all = visibleIds.all { it in selectedSet }
+                        val all = visibleKeys.all { it in selectedSet }
                         selected =
                             ArrayList(
-                                if (all) selected.filter { it !in visibleIds.toSet() }
-                                else (selected + visibleIds).distinct()
+                                if (all) selected.filter { selectionKey(it) !in visibleKeys }
+                                else (selected + visibleIds).distinctBy(::selectionKey)
                             )
                     },
                     enabled = tracks.isNotEmpty(),
                 ) {
                     Text(
-                        if (tracks.isNotEmpty() && visibleIds.all { it in selectedSet })
+                        if (tracks.isNotEmpty() && visibleKeys.all { it in selectedSet })
                             tr(R.string.deselect_visible)
                         else tr(R.string.select_all)
                     )
@@ -331,9 +346,9 @@ fun MusicScreen(
                 items(tracks, key = { it.id }, contentType = { "track" }) { track ->
                     TrackRow(
                         track,
-                        track.id == playingId,
+                        track.id == playingId || playingPath != null && track.path == playingPath,
                         download.takeIf { it.trackId == track.id },
-                        selected = if (selecting) track.id in selectedSet else null,
+                        selected = if (selecting) selectionKey(track.id) in selectedSet else null,
                         onClick = { if (selecting) toggle(track) else onPlay(track, tracks) },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)

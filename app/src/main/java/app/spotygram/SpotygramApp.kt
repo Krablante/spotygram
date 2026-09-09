@@ -502,7 +502,8 @@ class SpotygramApp : Application() {
     }
 
     suspend fun removeLocal(track: Track) {
-        require(player?.currentMediaItem?.mediaId != track.id) {
+        val current = player?.currentMediaItem?.mediaId?.let { this.track(it) }
+        require(current?.id != track.id && !(track.local && current?.path == track.path)) {
             tr(R.string.switch_track_first)
         }
         if (track.chatId != 0L) telegram.request(json("deleteFile", "file_id" to track.fileId))

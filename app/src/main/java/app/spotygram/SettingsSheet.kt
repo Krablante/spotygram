@@ -76,11 +76,11 @@ fun SettingsSheet(
             Modifier.padding(vertical = 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         )
-        val local = library.tracks.filter { it.local }.distinctBy { it.path }
+        val local = library.localTracks
         ListItem(
             headlineContent = { Text(tr(R.string.on_device)) },
             supportingContent = {
-                Text("${trackCount(local.size)} · ${bytes(local.sumOf {it.size})}")
+                Text("${trackCount(local.size)} · ${bytes(library.localSize)}")
             },
             leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null) },
             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },

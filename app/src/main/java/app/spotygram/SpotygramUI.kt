@@ -46,7 +46,6 @@ fun SpotygramUI(
     val playing =
         observePlayer(player)
             .copy(shuffle = mode.shuffle, random = mode.random, repeat = mode.repeat)
-    val current = library.byId[playing.id]
     var localMode by rememberSaveable { mutableStateOf(app.prefs.getBoolean("local_mode", false)) }
     var connect by rememberSaveable { mutableStateOf(false) }
     val destinationKeys = listOf("music", "favorites", "playlists", "chats")
@@ -81,6 +80,11 @@ fun SpotygramUI(
     val pages = rememberSaveableStateHolder()
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
     val source = library.sources.firstOrNull { it.id == sourceId }
+    val offlineView = tab == 0 && offline
+    val current =
+        library.byId[playing.id]?.let {
+            if (offlineView && it.local) library.localDisplay(it) else it
+        }
     LaunchedEffect(Unit) { app.notices.collect { snackbar.showSnackbar(it) } }
     LaunchedEffect(tab) {
         app.prefs.edit().putString("last_destination", destinationKeys[tab]).apply()
@@ -93,11 +97,12 @@ fun SpotygramUI(
 
     fun like(track: Track) {
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        snackbar.currentSnackbarData?.dismiss()
+        val sameFile = offlineView && track.local
         app.action {
-            val liked = app.library.like(track)
+            val (liked, previousLikes) = app.library.like(track, sameFile)
             if (!liked)
                 scope.launch {
-                    snackbar.currentSnackbarData?.dismiss()
                     if (
                         snackbar.showSnackbar(
                             tr(R.string.removed_favorite),
@@ -105,7 +110,7 @@ fun SpotygramUI(
                             duration = SnackbarDuration.Short,
                         ) == SnackbarResult.ActionPerformed
                     )
-                        app.action { app.library.restoreLike(track.id) }
+                        app.action { app.library.restoreLikes(previousLikes) }
                 }
         }
     }
@@ -517,76 +522,80 @@ fun SpotygramUI(
                             }
                         }
                     "track" ->
-                        library.byId[selectedTrackId]?.let { track ->
-                            Column(
-                                Modifier.navigationBarsPadding()
-                                    .padding(horizontal = 12.dp)
-                                    .verticalScroll(rememberScrollState())
-                            ) {
-                                ListItem(
-                                    headlineContent = { Text(track.title, maxLines = 2) },
-                                    supportingContent = { Text(track.subtitle) },
-                                    leadingContent = { Artwork(track, 48.dp) },
-                                )
-                                ActionRow(
-                                    if (track.liked) Icons.Rounded.Favorite
-                                    else Icons.Rounded.FavoriteBorder,
-                                    if (track.liked) tr(R.string.unlike) else tr(R.string.like),
+                        library.byId[selectedTrackId]
+                            ?.let { if (offlineView && it.local) library.localDisplay(it) else it }
+                            ?.let { track ->
+                                Column(
+                                    Modifier.navigationBarsPadding()
+                                        .padding(horizontal = 12.dp)
+                                        .verticalScroll(rememberScrollState())
                                 ) {
-                                    like(track)
-                                    sheet = ""
-                                }
-                                ActionRow(Icons.Rounded.PlaylistAdd, tr(R.string.to_playlist)) {
-                                    addToPlaylist(listOf(track.id))
-                                }
-                                ActionRow(Icons.Rounded.QueuePlayNext, tr(R.string.play_next)) {
-                                    app.playback?.addNext(track)
-                                    sheet = ""
-                                }
-                                if (track.local)
+                                    ListItem(
+                                        headlineContent = { Text(track.title, maxLines = 2) },
+                                        supportingContent = { Text(track.subtitle) },
+                                        leadingContent = { Artwork(track, 48.dp) },
+                                    )
                                     ActionRow(
-                                        Icons.Rounded.DeleteOutline,
-                                        tr(R.string.remove_from_device),
+                                        if (track.liked) Icons.Rounded.Favorite
+                                        else Icons.Rounded.FavoriteBorder,
+                                        if (track.liked) tr(R.string.unlike) else tr(R.string.like),
                                     ) {
-                                        app.action { app.removeLocal(track) }
+                                        like(track)
                                         sheet = ""
                                     }
-                                else if (track.available)
-                                    ActionRow(
-                                        Icons.Rounded.Download,
-                                        tr(R.string.download_to_device),
-                                    ) {
-                                        onDownload(listOf(track.id))
+                                    ActionRow(Icons.Rounded.PlaylistAdd, tr(R.string.to_playlist)) {
+                                        addToPlaylist(listOf(track.id))
+                                    }
+                                    ActionRow(Icons.Rounded.QueuePlayNext, tr(R.string.play_next)) {
+                                        app.playback?.addNext(track)
                                         sheet = ""
                                     }
-                                playlistId?.let { id ->
-                                    ActionRow(
-                                        Icons.Rounded.PlaylistRemove,
-                                        tr(R.string.remove_from_playlist),
-                                    ) {
-                                        app.action { app.library.removeFromPlaylist(id, track.id) }
-                                        sheet = ""
-                                    }
-                                }
-                                if (track.chatId != 0L && track.available)
-                                    ActionRow(
-                                        Icons.Rounded.OpenInNew,
-                                        tr(R.string.open_in_telegram),
-                                    ) {
-                                        app.action {
-                                            app.startActivity(
-                                                Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse(app.messageLink(track)),
-                                                    )
-                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            )
+                                    if (track.local)
+                                        ActionRow(
+                                            Icons.Rounded.DeleteOutline,
+                                            tr(R.string.remove_from_device),
+                                        ) {
+                                            app.action { app.removeLocal(track) }
+                                            sheet = ""
                                         }
-                                        sheet = ""
+                                    else if (track.available)
+                                        ActionRow(
+                                            Icons.Rounded.Download,
+                                            tr(R.string.download_to_device),
+                                        ) {
+                                            onDownload(listOf(track.id))
+                                            sheet = ""
+                                        }
+                                    playlistId?.let { id ->
+                                        ActionRow(
+                                            Icons.Rounded.PlaylistRemove,
+                                            tr(R.string.remove_from_playlist),
+                                        ) {
+                                            app.action {
+                                                app.library.removeFromPlaylist(id, track.id)
+                                            }
+                                            sheet = ""
+                                        }
                                     }
-                                Spacer(Modifier.height(12.dp))
+                                    if (track.chatId != 0L && track.available)
+                                        ActionRow(
+                                            Icons.Rounded.OpenInNew,
+                                            tr(R.string.open_in_telegram),
+                                        ) {
+                                            app.action {
+                                                app.startActivity(
+                                                    Intent(
+                                                            Intent.ACTION_VIEW,
+                                                            Uri.parse(app.messageLink(track)),
+                                                        )
+                                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                )
+                                            }
+                                            sheet = ""
+                                        }
+                                    Spacer(Modifier.height(12.dp))
+                                }
                             }
-                        }
                 }
             }
         if (rename)
