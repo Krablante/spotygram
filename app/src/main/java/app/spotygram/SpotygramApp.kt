@@ -507,12 +507,26 @@ class SpotygramApp : Application() {
         require(current?.id != track.id && !(track.local && current?.path == track.path)) {
             tr(R.string.switch_track_first)
         }
-        if (track.chatId != 0L) telegram.request(json("deleteFile", "file_id" to track.fileId))
+        if (track.chatId != 0L) telegram.request(json("deleteFile", "file_id" to resolve(track)))
         else playback?.removeTrack(track.id)
         library.removeLocal(track)
     }
 
     suspend fun messageLink(track: Track): String {
+        // Personal chats have no HTTPS message link. Telegram Android handles this URI.
+        if (track.chatId > 0) {
+            val link =
+                Uri.Builder()
+                    .scheme("tg")
+                    .authority("openmessage")
+                    .appendQueryParameter("user_id", track.chatId.toString())
+            val serverId = track.messageId shr 20
+            if (serverId in 1..Int.MAX_VALUE.toLong())
+                link.appendQueryParameter("message_id", serverId.toString())
+            if (AppText.savedChatId > 0)
+                link.appendQueryParameter("account_user_id", AppText.savedChatId.toString())
+            return link.build().toString()
+        }
         return telegram
             .request(
                 json(

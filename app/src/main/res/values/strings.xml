@@ -255,4 +255,7 @@
     <string name="update_view">View release</string>
     <string name="update_dismiss">Do not remind me about this version</string>
     <string name="update_no_browser">No app available to open the release page.</string>
+    <string name="audio_copy_unreadable">Could not read the audio file. Its local copy may be damaged or its format unsupported.</string>
+    <string name="audio_format_unsupported">This device cannot play this audio format.</string>
+    <string name="telegram_app_missing">Install Telegram to open this conversation.</string>
 </resources>

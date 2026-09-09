@@ -83,6 +83,13 @@ data class AuthState(
     val error: String = "",
 )
 
+internal fun validAudioCopy(path: String, expectedSize: Long): Boolean {
+    if (path.isEmpty()) return false
+    val file = java.io.File(path)
+    val length = file.length()
+    return file.isFile && length > 0 && (expectedSize <= 0 || length == expectedSize)
+}
+
 data class FileState(
     val id: Int,
     val path: String,

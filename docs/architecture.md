@@ -37,6 +37,21 @@ are process-local references, so saved messages are resolved again when
 needed after a restart. Several messages may reference the same audio file;
 those message identities are retained in the catalog.
 
+Persisted numeric file bindings are cleared when the catalog opens, before
+TDLib updates can match them. Only messages resolved in the current client
+lifetime establish new bindings. A completed path must match the track's known
+byte size; startup reconciliation and the data source reject mismatched copies
+without deleting the underlying file. This also repairs old catalog paths
+that may have been replaced by a thumbnail after an ID collision. Explicit
+file removal resolves the current ID rather than trusting a persisted one.
+
+Personal-chat navigation uses Telegram Android's `tg://openmessage` URI with
+the user, server message and account IDs; these chats have no HTTPS message
+link. Other chats retain TDLib's link lookup. Transient notices replace older
+pending notices, and playback errors use localized text rather than raw
+extractor exceptions. The app's own diagnostic event records only the playback
+error code.
+
 Discovery pages through the audio and document filters until Telegram returns
 no next cursor. Short pages are not treated as the end. Each filter stores
 both its history cursor and newest-message checkpoint, so interrupted work

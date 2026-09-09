@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.session.MediaController
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -85,7 +86,7 @@ fun SpotygramUI(
         library.byId[playing.id]?.let {
             if (offlineView && it.local) library.localDisplay(it) else it
         }
-    LaunchedEffect(Unit) { app.notices.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(Unit) { app.notices.collectLatest { snackbar.showSnackbar(it) } }
     LaunchedEffect(tab) {
         app.prefs.edit().putString("last_destination", destinationKeys[tab]).apply()
     }
@@ -583,14 +584,20 @@ fun SpotygramUI(
                                             Icons.Rounded.OpenInNew,
                                             tr(R.string.open_in_telegram),
                                         ) {
+                                            snackbar.currentSnackbarData?.dismiss()
                                             app.action {
-                                                app.startActivity(
-                                                    Intent(
-                                                            Intent.ACTION_VIEW,
-                                                            Uri.parse(app.messageLink(track)),
-                                                        )
-                                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                )
+                                                try {
+                                                    app.startActivity(
+                                                        Intent(
+                                                                Intent.ACTION_VIEW,
+                                                                Uri.parse(app.messageLink(track)),
+                                                            )
+                                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    )
+                                                } catch (
+                                                    _: android.content.ActivityNotFoundException) {
+                                                    error(tr(R.string.telegram_app_missing))
+                                                }
                                             }
                                             sheet = ""
                                         }

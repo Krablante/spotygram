@@ -1,5 +1,53 @@
 # Verification record
 
+## 0.6.1 — Telegram file identity and local-copy validation
+
+The supplied MP3 was inspected privately, outside the repository: 8,058,659 bytes,
+MPEG Layer III, 320 kbit/s, 44.1 kHz stereo, duration 196.049 seconds. Full FFmpeg
+audio decoding completed without errors. Importing the unmodified file through
+Android's file picker in both the previous debug and signed 0.6.0 builds produced
+PLAYING with correct metadata (observed positions 6020/6127 ms). The recording
+and its artwork are not source or release assets.
+
+Source inspection found that `Library.file` matched completion updates against
+persisted numeric TDLib IDs, although the native FileManager assigns them from
+its current in-memory ID table. After restart an unrelated completion could
+replace a catalog path. The old copy validation checked existence only.
+
+To reproduce the resulting condition without an account or extra catalog rows,
+the existing debug import's path was temporarily pointed at its own extracted
+cover. Its chat/file fields were temporarily set to a remote-shaped row with
+a stale numeric ID. The original audio remained untouched. Old 0.6.0 kept this
+entry local; playing it through the mini-player emitted
+`UnrecognizedInputFormatException: None of the available extractors ... could
+read the stream`, matching the reported failure class. This demonstrates the
+wrong-path failure, not a captured TDLib collision on the user's phone.
+
+After installing debug 0.6.1 over that state, the stale file ID became 0 and the
+mismatched path became empty. All four catalog rows remained and SQLite integrity
+was `ok`. Restoring the correct audio path retained the local copy; the temporary
+chat/file changes were then restored to their original import values. The temporary
+cover copies in the emulator were removed; the original recording was unchanged.
+
+Debug/release builds and both Lint tasks passed, as did EN/RU key/argument checks
+for 252 resources. ARM64 and x86-64 signatures and 16 KB alignment passed with the
+existing certificate. Final APK SHA-256: ARM64
+`de417541d1f8c532ff891e6e94c17e4ba0c85264bbae5a794db91a42b9a3eee9`, x86-64
+`c82eacc179af48e12ea2ba0c24f3a675684161396c6f3d513a91b3c8249b9bba`.
+The installed signed x86-64 hash matched. The update over 0.6.0 retained Night/Road
+playlists and all three local recordings, including the supplied import. That
+import's SHA-256 matched the original. Playback after seeking reached 162972 ms
+of 196048 ms with three physical media items, without app/player errors. Playback
+was paused and the emulator stopped.
+
+The personal-chat URI parameters were checked against Telegram Android's
+LaunchActivity; server-message conversion was checked against TDLib's
+`MessageId::SERVER_ID_SHIFT`. The personal-chat menu action was exercised with
+the temporary debug row, but actual navigation inside an authenticated Telegram
+client was not verified. Actual TDLib collision delivery, remote redownload,
+the reporting phone's local database and physical ARM64 execution remain outside
+this check. No production Telegram session was accessed and no test suite was added.
+
 ## 0.6.0 — quiet release checks and public distribution
 
 Debug compilation/packaging and Lint passed. On the existing Android 16 x86-64 emulator, Settings showed the Russian automatic-check switch and manual action. The switch persisted across a force-stop/relaunch, and the attempt timestamp stayed unchanged while automatic checks were disabled. A repeated manual press showed the recent-check message without changing the timestamp. A later manual check while automatic checks were disabled made a new attempt and displayed a recoverable GitHub error (the repository was still private); no automatic error banner/snackbar appeared.

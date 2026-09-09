@@ -48,6 +48,13 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
         db.setForeignKeyConstraintsEnabled(true)
     }
 
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        // TDLib file IDs belong to one client lifetime, not to the persisted catalog.
+        // Clear old bindings before any new audio/thumbnail completion can match them.
+        db.execSQL("UPDATE tracks SET file=0 WHERE chat!=0 AND file!=0")
+    }
+
     suspend fun reload() = publishing.withLock {
         withContext(Dispatchers.IO) {
             val db = readableDatabase
@@ -143,7 +150,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                             put("document", if (t.document) 1 else 0)
                             if (t.art.isNotEmpty()) put("art", t.art)
                             if (t.path.isNotEmpty())
-                                put("path", t.path.takeIf { File(it).isFile }.orEmpty())
+                                put("path", t.path.takeIf { validAudioCopy(it, t.size) }.orEmpty())
                         }
                     if (db.update("tracks", v, "id=?", arrayOf(t.id)) == 0) {
                         v.put("id", t.id)
@@ -223,11 +230,15 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
 
     suspend fun file(fileId: Int, path: String) =
         withContext(Dispatchers.IO) {
+            if (fileId <= 0) return@withContext
+            val copy = File(path)
+            val size = copy.length()
+            if (!copy.isFile || size <= 0) return@withContext
             writableDatabase.update(
                 "tracks",
-                ContentValues().apply { put("path", path.takeIf { File(it).isFile }.orEmpty()) },
-                "file=?",
-                arrayOf(fileId.toString()),
+                ContentValues().apply { put("path", path) },
+                "file=? AND (size=0 OR size=?)",
+                arrayOf(fileId.toString(), size.toString()),
             )
             reload()
         }
@@ -438,23 +449,26 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
 
     suspend fun verifyFiles() =
         withContext(Dispatchers.IO) {
-            val missing = mutableListOf<Pair<String, String>>()
-            readableDatabase.rawQuery("SELECT id,path FROM tracks WHERE path!=''", null).use { c ->
+            val missing = mutableListOf<Triple<String, String, Long>>()
+            readableDatabase.rawQuery("SELECT id,path,size FROM tracks WHERE path!=''", null).use {
+                c ->
                 while (c.moveToNext()) {
                     val path = c.getString(1)
-                    if (!File(path).isFile) missing += c.getString(0) to path
+                    if (!validAudioCopy(path, c.getLong(2)))
+                        missing += Triple(c.getString(0), path, c.getLong(2))
                 }
             }
             if (missing.isNotEmpty())
                 writableDatabase.transaction {
-                    compileStatement("UPDATE tracks SET path='' WHERE id=? AND path=?").use {
-                        statement ->
-                        for ((id, path) in missing) {
-                            statement.bindString(1, id)
-                            statement.bindString(2, path)
-                            statement.executeUpdateDelete()
+                    compileStatement("UPDATE tracks SET path='' WHERE id=? AND path=? AND size=?")
+                        .use { statement ->
+                            for ((id, path, size) in missing) {
+                                statement.bindString(1, id)
+                                statement.bindString(2, path)
+                                statement.bindLong(3, size)
+                                statement.executeUpdateDelete()
+                            }
                         }
-                    }
                 }
             reload()
         }

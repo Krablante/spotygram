@@ -250,8 +250,22 @@ class PlaybackService : MediaSessionService() {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    android.util.Log.w(
+                        "SpotygramPlayback",
+                        "Playback failed: ${error.errorCodeName}",
+                    )
                     app.notices.tryEmit(
-                        error.cause?.message?.take(180) ?: tr(R.string.playback_failed)
+                        tr(
+                            when (error.errorCode) {
+                                PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+                                PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ->
+                                    R.string.audio_copy_unreadable
+                                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+                                PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES ->
+                                    R.string.audio_format_unsupported
+                                else -> R.string.playback_failed
+                            }
+                        )
                     )
                 }
             }

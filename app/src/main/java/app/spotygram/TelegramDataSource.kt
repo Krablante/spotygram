@@ -36,7 +36,7 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
             else if (track.size > 0) (track.size - position).coerceAtLeast(0)
             else C.LENGTH_UNSET.toLong()
         try {
-            if (track.local && File(track.path).isFile) {
+            if (track.local && validAudioCopy(track.path, track.size)) {
                 input = RandomAccessFile(track.path, "r")
                 remaining =
                     if (dataSpec.length != C.LENGTH_UNSET.toLong())

@@ -259,4 +259,7 @@
     <string name="update_view">Открыть релиз</string>
     <string name="update_dismiss">Больше не напоминать об этой версии</string>
     <string name="update_no_browser">Нет приложения для открытия страницы релиза.</string>
+    <string name="audio_copy_unreadable">Не удалось прочитать аудиофайл. Локальная копия может быть повреждена, а формат — не поддерживаться.</string>
+    <string name="audio_format_unsupported">Устройство не поддерживает этот аудиоформат.</string>
+    <string name="telegram_app_missing">Установите Telegram, чтобы открыть эту переписку.</string>
 </resources>
