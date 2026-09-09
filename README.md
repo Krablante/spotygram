@@ -34,6 +34,8 @@ See the [cache screen](docs/screenshots/cache-dark.png), captured with local imp
 
 **Quiet update checks.** When you open the app, it checks public GitHub releases at most once a day. A dismissible banner appears only for a newer release; errors and “already up to date” stay silent. Settings lets you turn automatic checks off, check manually, and open the release page. Nothing downloads or installs automatically.
 
+See the [update settings](docs/screenshots/updates-dark.png), captured after a manual check in the signed public release.
+
 ## A familiar place for your music
 
 | Music · dark | Favorites · dark | Playlists · light |

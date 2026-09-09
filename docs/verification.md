@@ -10,6 +10,12 @@ Before visibility change, all 168 reachable Git blob objects were checked for th
 
 Minified release compilation/packaging and release Lint passed. Both ABI signature checks and 16 KB zip alignment passed with the existing certificate. EN/RU keys and format placeholders matched for all 249 resources. ARM64 SHA-256: `fa54b37f24bb03f5d053718ee7a3b35e1f94eaa6e28e80c5e3661fd2adbb87a4`; x86-64: `e7cacb880816cc5f21d8636fce31f0b7ebad51fe5b0da63fe0e86bcc08d7fabe`. GitHub repository visibility was changed to public by owner authorization, verified through an unauthenticated HTTP 200 response, and updated in BURO through its draft workflow.
 
+The final signed x86-64 APK installed over 0.5.1; its installed SHA-256 matched the release asset. Night/Road playlists and two local tracks (7 MB) remained. Local playback reached PLAYING at 25161 ms with two physical media items and no logged app/player errors. Playback was paused afterwards.
+
+Release assets were uploaded to a GitHub draft, checked against local SHA-256 digests, then published as the ordinary latest release `v0.6.0`. The unauthenticated latest endpoint returned HTTP 200 with both uploaded APKs. The installed release's manual check showed “You have the latest version.” and persisted version `0.6.0` and the matching ETag. An independent conditional HTTP request using that ETag returned 304 with no body. A later in-app manual check with the cached ETag also returned the current-version result; an immediate force-stop/relaunch retained the same attempt timestamp. The final dark settings view was visually inspected and captured in `docs/screenshots/updates-dark.png`. Both emulator and build units were stopped.
+
+GitHub 403/429 cooldown, malformed/oversized responses, clock rollback and numeric version boundaries were source-reviewed, not simulated as passed runtime cases. Discovery of a genuinely newer public version and ARM64 physical-device execution were not exercised; the cached newer-version banner check is distinguished above. No account/session, fixture suite or extra audio files were used for update verification.
+
 ## 0.5.1 — unique local-file view
 
 The reported mismatch was confirmed in source: Settings used `distinctBy(path)` while the On device list counted every message reference. Verification used the existing debug imports in the Android 16 x86-64 emulator. No test files or extra audio files were created; builds and emulator remained sequential and resource-limited.
