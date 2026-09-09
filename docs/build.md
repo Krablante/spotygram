@@ -1,8 +1,17 @@
 # Building Spotygram
 
+[Documentation](README.md) · **English** · [Русский](build.ru.md)
+
+For listening, use the signed APK from [Releases](https://github.com/Krablante/spotygram/releases/latest).
+This guide is for building your own copy or maintaining the published app.
+The first build compiles TDLib and OpenSSL; later builds reuse those native libraries.
+
+## Prepare the machine
+
 Use Linux, JDK 21 (a full JDK, not only a JRE), Android SDK platform 36, build tools 36, NDK `28.2.13676358`, CMake, Ninja, gperf, Perl, a C++ compiler, Git, and Make. The Gradle wrapper pins Gradle 8.14.3.
 
-Keep generated data outside the checkout:
+Keep generated data outside the checkout. `SPOTYGRAM_STATE` holds native sources,
+build outputs, caches and private configuration; it is not a second source repository.
 
 Run heavy operations sequentially: finish native compilation before Gradle, and stop the emulator during builds. Native builds default to two workers (`SPOTYGRAM_JOBS`); Gradle defaults to two workers and a 2 GB heap. On shared hosts use an additional CPU/memory limit for the build process.
 
@@ -15,11 +24,26 @@ export SPOTYGRAM_STATE=/path/to/private/spotygram-state
 
 Create `$SPOTYGRAM_STATE/telegram.env` with your own app's `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`, obtained through my.telegram.org. Restrict it to your user. These values identify the app, not an already authorized user account. They are embedded in the APK and must not be considered unrecoverable secrets once an APK is distributed. Never put a user session or bot token here.
 
+Use this format, replacing both placeholders with your own values:
+
+```dotenv
+TELEGRAM_API_ID=YOUR_NUMERIC_API_ID
+TELEGRAM_API_HASH=YOUR_API_HASH
+```
+
+## Build a development APK
+
+Run the script from the repository root:
+
 ```sh
 bash tools/build.sh debug
 ```
 
 The native build downloads official TDLib at `d1085f9cebc5a62379991ae1652673954f229c1f` and OpenSSL `openssl-3.5.6`. It generates JNI libraries for ARM64 and x86-64 with NDK r28c (16 KB page support), keeping all artifacts in state. Subsequent builds reuse them. No native binaries are committed.
+
+Debug APKs are written to `$SPOTYGRAM_STATE/build/app/outputs/apk/debug/`.
+Choose `app-arm64-v8a-debug.apk` for an ARM64 phone, or
+`app-x86_64-debug.apk` for an x86-64 emulator.
 
 ## Signing
 

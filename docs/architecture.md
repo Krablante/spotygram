@@ -1,94 +1,154 @@
 # Architecture
 
-Spotygram is a single-process, single-module Android application. It connects directly to Telegram and plays media locally. There is no backend.
+[Documentation](README.md) · **English** · [Русский](architecture.ru.md)
+
+Spotygram runs in one Android process and one app module. It connects directly
+to Telegram and reads audio from local files. There is no backend or local
+HTTP proxy between the player and its data.
 
 ```text
-Compose screens ── MediaController ── MediaSession / ExoPlayer (≤3 items)
-      │                                      │
-      ├── PlaybackService (logical ID queue) ─┘
-      │                                      │
-      └── SpotygramApp ── SQLite              └── TelegramDataSource
-                  │                                  │
-                  └──────── TDLib / JNI ──────────────┘
-                                  │
-                           Telegram + disk
+Compose UI ── SpotygramApp ── Library / SQLite
+                   │
+                   ├── Telegram / TDLib ── Telegram servers
+                   │
+                   ├── PlaybackService / Media3
+                   │         └── TelegramDataSource ── downloaded file ranges
+                   │
+                   └── AppUpdates ── GitHub releases
 ```
 
-## Responsibilities
+## Where work belongs
 
-- `Telegram` owns one TDLib instance, one blocking receive coroutine, asynchronous JSON requests, authorization, and file state. TDLib's official JSON JNI API avoids committing a large generated Java schema.
-- `Library` owns SQLite. It stores track references and metadata, selected chats, playlist membership, favorite flags, and pending downloads. Media bytes do not go in SQLite. UI reads observable immutable snapshots, not TDLib's private database.
-- `SpotygramApp` coordinates source selection, incremental discovery, metadata updates, file import, and user actions. It never reads other applications' Telegram session files.
-- `PlaybackService` owns the logical ID queue, ExoPlayer and the media session. Queue edits stay in-process; MediaController handles transport controls against a window of at most three items (previous/current/next). Queue and position persist locally; restoration does not autoplay.
-- `TelegramDataSource` reads TDLib's downloaded file ranges directly with random access. Missing ranges wait on TDLib updates, with a bounded timeout. There is no second audio cache or HTTP proxy.
-- `DownloadService` runs explicit offline downloads sequentially as a user-visible foreground data-sync service. The queue persists; interruption can be resumed from settings. Wi-Fi-only applies to explicit downloads, not playback.
+`SpotygramApp` coordinates user actions, discovery and imports. `Telegram`
+owns the TDLib instance, authorization, JSON requests and update stream.
+`Library` owns the music index and publishes immutable snapshots to the UI.
+Screens do not read TDLib's database.
 
-## Library behavior
+`PlaybackService` owns ExoPlayer and the queue. The UI uses MediaController
+for transport controls and the in-process service for full-queue edits.
+`DownloadService` handles explicitly requested downloads sequentially, as
+a visible foreground service. No extra service is needed for updates or
+cache cleanup.
 
-A Telegram track is identified by `(chat_id, message_id)`, not a process-local file ID. Messages discovered or resolved in the current TDLib session supply reusable file IDs; after a process restart they are resolved on demand. Seeking and replay do not resolve the same known message repeatedly. Multiple messages containing the same file may remain separate tracks; file downloads are managed by TDLib.
+## From messages to tracks
 
-The On device view groups those references by their nonempty local file path, using a snapshot-scoped `localGroups` index. Settings takes its count and size from the same unique-file projection. Search/source matching happens before grouping, so a matching alias is still discoverable. No byte hashing, title-based merging, schema migration or catalog deletion is involved; separate physical copies remain separate entries even if their titles match.
+A Telegram track is identified by its chat and message IDs. TDLib file IDs
+are process-local references, so saved messages are resolved again when
+needed after a restart. Several messages may reference the same audio file;
+those message identities are retained in the catalog.
 
-The visible row reflects any favorite flag in its file group. Adding a favorite marks only the chosen reference, not every alias; removing it in On device clears the group's flags. The previous liked IDs are captured inside the same SQLite transaction and Undo restores exactly those IDs. Selection keys and the playing highlight use the file path in this view, while playlist operations still receive real catalog IDs. Starting playback from the view uses its deduplicated collection; existing explicitly built queues are not silently rewritten. Removing a local Telegram copy clears all matching-path offline flags, and the current-file guard recognizes aliases of the currently selected file.
+Discovery pages through the audio and document filters until Telegram returns
+no next cursor. Short pages are not treated as the end. Each filter stores
+both its history cursor and newest-message checkpoint, so interrupted work
+can resume without skipping a gap. Server search also follows all pages.
+Indexing collects metadata; it does not prefetch every audio file.
 
-Source discovery automatically follows every `next_from_message_id` for Telegram's audio and document filters. The API's 100-message page size is not a library cap; short or non-audio document pages do not terminate discovery. Each filter has a durable history cursor and a separate newest-message checkpoint. History resumes after interruption, including existing 0.1.0 cursors. Catch-up advances its newest checkpoint only after all intervening pages have been saved, so an interrupted refresh cannot skip a gap. Schema 3 adds these checkpoints without resetting existing data. Explicit server search likewise retrieves all pages, without changing history checkpoints. Incomplete history remains labelled until it finishes.
+The catalog includes Telegram audio and documents with a supported audio MIME
+type or extension. Voice notes and videos are excluded. Embedded metadata
+can fill in document titles and duration after download. Artwork comes from
+Telegram thumbnails or embedded artwork; absent artwork gets a static tile.
 
-The app refreshes when Telegram becomes ready, including reconnection. Music indexing does not wait for chat-picker loading. The picker loads main and archived chat lists progressively and uses chat metadata already delivered by TDLib rather than requesting every chat again. Android's default-network callback tells TDLib about Wi-Fi/mobile/network loss; there is no network polling loop. Request timeouts surface as errors rather than being swallowed as coroutine cancellation.
+`LibraryState` caches its ID lookup and local-file groups per snapshot.
+**On device** groups nonempty local paths, after search and source filtering;
+Settings uses the same collection for count and size. No file hashing or
+title-based merging is involved. Favorites, the playing highlight and removal
+guards account for multiple references to one file. Undo restores the exact
+previous favorite IDs. A newly launched local collection is deduplicated;
+an explicitly built queue is not silently rewritten.
 
-This version indexes Telegram `messageAudio` and `messageDocument` with an audio MIME type or recognized audio extension (MP3, M4A, FLAC, OGG, Opus, AAC, WAV, AIFF, ALAC). Voice notes and videos are excluded. Duration and embedded title/artist for generic audio documents are read when their download completes; before that, the filename is shown. Local audio can also be imported using the system picker or Android Share. No online recognition, embeddings, external cover search, or transcoding are needed.
+## A large queue, a small media session
 
-Artwork uses Telegram thumbnails or embedded artwork. If absent, a static, deterministic colored music tile is rendered; there is no generated fake album cover in the app.
+The full logical queue stays inside the service. Android's media session sees
+at most three physical items: previous, current and next. Sliding this window
+is posted after Media3's transition callback; mutating it synchronously there
+can expose an inconsistent timeline to controllers.
 
-## Storage and account boundaries
+Queue entries use source indices, not just track IDs, so Play next can add an
+intentional repeat. Shuffle uses a Fisher–Yates permutation. Repeat-all
+prepares another pass without immediately repeating the boundary song.
+At most two passes are retained for backward navigation.
 
-Playback downloads remain on disk; a complete file gains an offline indicator. TDLib's automatic storage optimizer is disabled so it cannot silently evict a track presented as saved. Users remove local audio explicitly. App uninstall removes app-private files. There is no silent export into a public music folder.
+Absolute random draws each next source index independently, including the
+current song. It stores at most 32 past choices, the current choice and one
+prepared next choice. Previous follows that history. Play next overrides the
+prepared draw; repeat-one remains available. Native ExoPlayer shuffle stays
+off because the service owns these ordering rules.
 
-Removing a source hides its remote-only tracks except favorites and playlist members, retaining downloaded tracks and the ability to add the source again. Favorite/playlist metadata remains available after clearing a local copy, even if the source was removed. Removing an individual currently playing local file is refused until the user switches tracks. Permanent Telegram message deletion marks a track unavailable for refetch; an existing local copy is still playable.
+Full queue snapshots are written only on structural changes. Small position,
+mode and cursor updates use separate preferences, linked to the queue by
+a snapshot version. One conflated IO writer persists them. Reopening restores
+the position paused; neither a progress tick nor a random transition rewrites
+the full song list.
 
-Deleting an imported recording removes all of its queued entries before its local catalog record is removed. Deleting only the local copy of a Telegram recording retains its remote reference and queue entry. Explicit download batches use one SQLite transaction to enqueue tracks, preserving unique membership and FIFO order without a separate commit per song.
+## Files and account state
 
-`MusicCache` queries TDLib `getStorageStatistics` only when its screen opens or the user requests refresh. It sums audio/document file statistics, not nominal track sizes or imported files. The app currently does not distinguish streaming copies from explicit offline downloads; the UI states that both are included. Confirmed cleanup uses `optimizeStorage` for those two file types with zero size/count/TTL/immunity limits, and requests deleted-file statistics for the result. It never recursively deletes the TDLib directory, account database, imported audio or artwork.
+`TelegramDataSource` reads available ranges directly from TDLib's downloaded
+file. Missing ranges wait for file updates with a timeout. There is no second
+media cache. Fully downloaded files remain available offline; TDLib's
+automatic storage optimizer is disabled.
 
-Cleanup first blocks new playback/download actions, releases the player's physical media window, waits for the download job to cancel, clears its pending queue and cancels active TDLib downloads. Media-session commands are rejected while cleanup is active. The logical playback queue and position remain available; the window is restored paused afterwards, dropping catalog references that are no longer accessible. File-presence reconciliation clears obsolete offline indicators, and late completed-file updates validate the path before publishing it. Favorites and playlist rows are not deleted; schema remains 3. Native-operation errors remain visible, and remaining size is refreshed even after an error. This is an app-scope user action, not a periodic cleaner or a new service.
+The app deliberately does not distinguish a playback copy from an explicit
+offline download. `MusicCache` queries storage only when its screen opens or
+the user refreshes it. Confirmed cleanup asks TDLib to optimize audio/document
+storage, excluding imports. It first stops playback and downloads, then
+reconciles missing paths in one SQLite transaction. Favorites, playlists and
+sign-in remain. The logical queue is restored paused, without inaccessible
+entries. Late download updates validate file presence before marking a file
+offline again.
 
-Reconciliation reads current nonempty paths directly from SQLite, checks them off the main thread, and clears missing paths through one prepared statement inside one transaction. It publishes one library snapshot afterwards. Size-query completion always releases its loading state, including a TDLib-side request cancellation, so retry does not become permanently disabled.
+Removing an imported file removes its queued occurrences before deleting the
+catalog entry. Removing a Telegram copy retains its message reference.
+Removing a source hides remote-only tracks except favorites and playlist
+members. An inaccessible original cannot restore a deleted local copy.
 
-The TDLib database key is random and wrapped by Android Keystore AES-GCM. Backups are disabled. Audio and the app's metadata database use Android's private file boundary, not a claim of separate per-file encryption. Network and TDLib payloads are not logged. Account logout clears Telegram catalog records and playlist references; imported local music remains.
+TDLib's database key is random and wrapped by Android Keystore AES-GCM.
+Android backups are disabled. Audio and catalog data use app-private storage,
+not separate per-file encryption. Logout removes Telegram catalog records and
+their playlist references; imports remain. No other app's session is used,
+and network payloads are not logged.
 
-## UI and performance
+## UI and resource use
 
-Four destinations, left to right: chats, favorites, playlists and music. The last destination persists by stable name, independently of button order. `SpotygramUI` coordinates navigation and shared actions; `MusicScreen` renders music, favorites and playlist contents using the same track rows. `PlaylistScreens` owns playlist browsing, creation, batch-add and ordering. `PlayerState` observes the existing MediaController. No additional module, backend or navigation framework is introduced. Light, dark and system modes share the same components.
+Compose renders four destinations with a saved last destination. English and
+Russian use Android resources; Android 13+ supports per-app language selection.
+Playlist edits and batch operations use transactions. Track lists are lazy,
+and artwork requests have two concurrent slots with low TDLib priority.
 
-Android resources provide English defaults, Russian translations and native quantity plurals. The app follows system locale selection; Android 13+ also exposes a per-app language picker through `localeConfig`. `AppText` is a small application-resource accessor for screen callbacks and background notices, not a separate localization engine. Saved Messages is recognized by the current user's chat ID, not by a translated name.
-
-Long-press selects a track with platform haptic feedback; while selecting, taps toggle selection rather than start playback. An explicit Select button exposes the same action. Selection and search are saveable per page and survive rotation; changing destinations clears selection. Search does not discard selected hidden matches. Back first exits selection. Hearts are visible in rows, and removing a favorite offers Undo; favorites are independent of the music screen's offline filter.
-
-Playlist creation and adding tracks use a focused editor with optional initial membership, including empty playlists. Batch additions and removals, create-with-members, deletion and reorder each use a SQLite transaction and publish one library snapshot. Repeated adds cannot duplicate membership. Reordering uses a dedicated long-press drag handle with edge scrolling; up/down buttons provide an alternative. A drag persists on release, not on every move; cancellation restores the starting order. Reorder merges with current DB membership instead of deleting tracks added concurrently. None of these operations modify audio files or Telegram messages. Schema remains version 3.
-
-The compact landscape layout removes the brand row and combines music controls; the editor puts name and search side by side. While typing, keyboard insets reduce the content area and the main bottom navigation/player hide instead of sitting behind the keyboard. Opening a sheet clears the underlying search focus so closing it does not reopen the keyboard. The mini-player otherwise opens the existing full player. Queue, track actions, source picker and settings remain bottom sheets. Playlist covers use existing artwork or a plain icon, not generated artwork.
-
-Lazy lists display metadata; thumbnails are decoded by Coil. Artwork is requested for displayed items only, with two concurrent waiters and low TDLib download priority, instead of downloading every cover while indexing. Playback progress updates only while the activity is visible. SQLite and media import run off the main thread; page parsing also runs off the UI thread. Metadata discovery is sequential and cancellable, without artificial per-page sleeps; catalog snapshots publish at most twice per second during a page loop, plus completion. Audio is not prefetched during indexing. Track lookup uses a snapshot-scoped ID map, and playlist filtering uses indexed membership. Load control targets 15–30 seconds of buffered audio with a one-second startup threshold and two-second rebuffer threshold; actual buffer occupancy and startup depend on format, loader granularity and network. No continuous polling job keeps the application alive after playback and downloads finish.
-
-Shuffle uses Fisher–Yates over compact source indices with Android's `SecureRandom`, including an unbiased bounded draw for the first track. The selected/current entry anchors a pass; every other queue entry appears once in random order. Repeat-all prepares another pass at the boundary and avoids immediately repeating the last entry. At most two index passes are retained for backward navigation. Explicit play-next inserts an occurrence after the current entry, including in shuffle mode.
-
-The full queue never becomes a Media3 timeline or a Binder payload. Transitions slide the three-item window while retaining the current media source. Only the open queue sheet observes queue revisions and resolves visible rows through the library ID map. Half-second position updates are scoped to the mini-player/full player, not the whole navigation screen.
-
-`PlaybackOrder` distinguishes ordered, shuffled and absolute-random playback. Random playback samples one source index with `SecureRandom.nextInt(size)`, without excluding the current or previous entries. It retains at most 32 previous selections, current and next (34 indices), and does not build a full permutation. Back/forward can retrace that retained history; new future entries are independent draws. Repeat-all is unnecessary and normalized to off on entering random mode; the repeat button switches between off and repeat-one. Explicit play-next overrides the pending draw. The queue sheet labels the full list as a selection pool, shows the actual next entry, and caches source indices instead of rebuilding them on every transition.
-
-Immutable queue snapshots are serialized by one conflated IO writer. The ID list and path use `playback_queue` preferences; small cursor/position/mode updates use `playback_position`, linked by snapshot version. Position ticks run only during playback and never rewrite the large list. Restoration migrates the former `settings` queue keys, filters missing tracks and remains paused; neither the catalog nor account data is reset.
-
-The stable order name is saved alongside the former shuffle flag; older saved queues map to ordered/shuffled without losing their pass. Random history lives in the small position snapshot, so each random transition saves at most 34 indices rather than rewriting the source list. Its cursor identifies a history occurrence, allowing the same source index to occur repeatedly.
-
-The full player's scroll content has a minimum height equal to the safe viewport. Remaining space is distributed between content blocks, keeping bottom actions near the bottom on tall phones. On smaller heights or larger text, natural content height takes over and the screen scrolls. Artwork stays bounded; there is no screen-size polling, device-specific offset or custom layout engine.
+SQLite work, import and page parsing run off the UI thread. During indexing,
+library snapshots publish at most twice per second plus completion. Progress
+timers belong to visible player components, not the entire app screen.
+Android's network callback informs TDLib of connectivity changes; there is
+no network polling loop. Playback buffers target 15–30 seconds, with a
+one-second start and two-second rebuffer threshold. These are configuration
+values, not measured promises about a phone or connection.
 
 ## Release checks
 
-`AppUpdates` owns a small StateFlow and separate `updates` preferences. Activity `onStart` asks for a check; no Application-start check, timer, WorkManager task, service, network callback or periodic job is added. The automatic attempt interval is 24 hours, shared with manual attempts. Manual requests have a 60-second floor and respect a persisted GitHub rate-limit cooldown. One main-thread reservation suppresses overlapping requests. The attempt timestamp is committed on IO before making the request, so failures and process restarts cannot cause immediate automatic retries. A backward wall-clock change rebases the attempt and suppresses that check.
+`AppUpdates` owns a small StateFlow and separate preferences. Activity
+`onStart` may trigger one unauthenticated request to the fixed GitHub latest
+release endpoint. Automatic attempts have a persisted 24-hour interval;
+manual attempts have a one-minute floor and respect a saved rate-limit
+cooldown. The timestamp is committed on IO before the request. One main-thread
+reservation prevents overlap, and failures do not trigger retries. A backward
+clock change rebases the timestamp and suppresses that attempt.
 
-One unauthenticated HTTPS request goes to GitHub's fixed `/repos/Krablante/spotygram/releases/latest` endpoint, with an ETag when available. HTTP 304 reuses persisted metadata. Connect/read timeouts are 5/8 seconds, response size is capped at 256 KiB, redirects are rejected, and there are no automatic retries. No GitHub token, Telegram account data, analytics or device identifiers are sent. GitHub sees the connection IP and app version in User-Agent. The response must describe an ordinary non-draft release tagged `vMAJOR.MINOR.PATCH` with an uploaded nonempty APK for the device ABI. Versions compare numerically, not lexically. The release URL is constructed under the fixed repository rather than accepting an arbitrary server-provided URL.
+ETag/304 reuses saved release metadata. Connect/read timeouts are 5/8 seconds,
+the response is limited to 256 KiB, and redirects are rejected. Accepted
+releases must be non-draft, non-prerelease, tagged `vMAJOR.MINOR.PATCH`, with
+an uploaded APK for the device ABI. Version comparison is numeric. Release
+links are constructed under the fixed repository, not taken from arbitrary
+response URLs. The naming contract is in the [build guide](build.md).
 
-Only a newer version produces a nonmodal banner in the main library UI; its dismissal persists for that version. Disabling automatic checks also hides the banner. Settings always allows a manual check and access to a cached newer release, including a dismissed one. Automatic failures/no-update results never emit a snackbar or notification. No APK downloader, installer permission or background wakeup is introduced: the user opens the release in their browser and chooses the APK/install action. Installing an equal or newer version naturally removes the old offer. Prereleases are excluded; normal releases constitute this app's update channel.
+A newer version produces a dismissible library banner; dismissal persists for
+that version. Settings can still open it. Automatic failures and no-update
+results stay silent. There is no scheduler, background wakeup, APK downloader
+or installer permission. GitHub receives the connection IP and app version,
+not Telegram account data or the music library.
 
-## Deliberate limits
+## Verification and limits
 
-One Telegram account, no secret chats, no chat editor, no YouTube integration, no desktop runtime, no playlist sync, no 32-bit ARM package. Platform decoders determine supported formats. Network availability and device-specific Android background policies still affect playback; actual checked scenarios live in `verification.md`.
+The [verification record](verification.md) keeps concrete observations and
+untested cases separately. Source review does not substitute for a successful
+account login, a real remote download or a physical-device measurement.
+The app currently supports one Telegram account and two Android ABIs;
+secret chats, voice notes and playlist sync are outside its scope.
