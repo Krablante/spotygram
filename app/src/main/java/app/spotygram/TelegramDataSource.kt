@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
     private var uri: Uri? = null
     private var input: RandomAccessFile? = null
+    private var lease: ListeningCache.Lease? = null
     private var fileId = 0
     private var position = 0L
     private var remaining = C.LENGTH_UNSET.toLong()
@@ -36,17 +37,19 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
             else if (track.size > 0) (track.size - position).coerceAtLeast(0)
             else C.LENGTH_UNSET.toLong()
         try {
-            if (track.local && validAudioCopy(track.path, track.size)) {
-                input = RandomAccessFile(track.path, "r")
+            runBlocking(Dispatchers.IO) {
+                lease = app.listeningCache.acquire(track)
+                val acquired = checkNotNull(lease)
+                fileId = acquired.fileId
+                if (fileId != 0) app.telegram.download(fileId, position, 32)
+            }
+            val localPath = checkNotNull(lease).path
+            if (fileId == 0) {
+                input = RandomAccessFile(localPath, "r")
                 remaining =
                     if (dataSpec.length != C.LENGTH_UNSET.toLong())
                         minOf(dataSpec.length, (input!!.length() - position).coerceAtLeast(0))
                     else (input!!.length() - position).coerceAtLeast(0)
-                fileId = 0
-            } else {
-                if (!track.available) throw IOException(tr(R.string.message_deleted_no_copy))
-                fileId = runBlocking(Dispatchers.IO) { app.resolve(track) }
-                runBlocking(Dispatchers.IO) { app.telegram.download(fileId, position, 32) }
             }
             opened = true
             transferStarted(dataSpec)
@@ -102,8 +105,13 @@ class TelegramDataSource(private val app: SpotygramApp) : BaseDataSource(true) {
 
     override fun close() {
         closed = true
-        input?.close()
-        input = null
+        try {
+            input?.close()
+        } finally {
+            input = null
+            lease?.release()
+            lease = null
+        }
         uri = null
         if (opened) {
             opened = false

@@ -560,6 +560,14 @@ fun SpotygramUI(
                                         app.playback?.addNext(track)
                                         sheet = ""
                                     }
+                                    if (track.local && track.temporary)
+                                        ActionRow(
+                                            Icons.Rounded.Download,
+                                            tr(R.string.keep_on_device),
+                                        ) {
+                                            onDownload(listOf(track.id))
+                                            sheet = ""
+                                        }
                                     if (track.local)
                                         ActionRow(
                                             Icons.Rounded.DeleteOutline,

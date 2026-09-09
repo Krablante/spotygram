@@ -116,7 +116,7 @@
     <string name="like_named">"Add to favorites: %1$s"</string>
     <string name="loading_history">"Loading full history…"</string>
     <string name="loading_stopped">"Loading stopped"</string>
-    <string name="local_storage_help">"Downloaded audio stays on your device. Remove a local copy from the track menu."</string>
+    <string name="local_storage_help">"Saved audio appears here; temporary playback files do not. Remove a saved copy from the track menu."</string>
     <string name="logout_help">"Telegram tracks and their playlist entries will be removed from your library. Imported files will stay."</string>
     <string name="logout_telegram">"Log out of Telegram"</string>
     <string name="logout_title">"Log out of Telegram?"</string>
@@ -271,4 +271,13 @@
     <string name="update_permission_needed">Allow installation from Spotygram, then tap Install update again.</string>
     <string name="update_installer_failed">Could not open the Android installer. You can try again or open the release on GitHub.</string>
     <string name="update_check_first">Check for updates again to refresh the download information.</string>
+    <string name="discard_listened">Do not keep played tracks</string>
+    <string name="discard_listened_help">Keep a temporary playback buffer instead of adding every song to On device. Previously stored files, explicit downloads and imports stay.</string>
+    <string name="discard_listened_limits">Current, previous and prepared next files stay available while needed by the player. Older songs may need downloading again. Turning this off keeps the remaining copies.</string>
+    <string name="temporary_audio">Temporary audio copy</string>
+    <string name="keep_on_device">Save on device</string>
+    <string name="saved_on_device">Saved on device.</string>
+    <string name="temporary_cleanup_deferred">Some temporary files could not be cleared yet. Playback can continue.</string>
+    <string name="retry_temporary_cleanup">Retry cleanup</string>
+    <string name="audio_in_use">This file is still needed by the player. Switch the playback collection before removing it.</string>
 </resources>

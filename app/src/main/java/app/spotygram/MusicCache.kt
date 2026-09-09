@@ -78,8 +78,10 @@ class MusicCache(private val app: SpotygramApp) {
                 check(app.telegram.auth.value.type == "authorizationStateReady") {
                     tr(R.string.telegram_required)
                 }
+                app.listeningCache.awaitCleanup()
                 app.playback?.pauseForCacheCleanup()
                 app.downloadService?.cancelForCacheCleanup()
+                app.listeningCache.awaitReaders()
                 app.library.clearDownloads()
                 // Playback and explicit downloads can leave an active TDLib range download behind.
                 val active = app.telegram.files.filterValues { it.active }.keys.toList()
@@ -117,6 +119,7 @@ class MusicCache(private val app: SpotygramApp) {
                 } finally {
                     state.value = state.value.copy(clearing = false)
                     app.playback?.finishCacheCleanup()
+                    app.listeningCache.signal()
                 }
             }
         }

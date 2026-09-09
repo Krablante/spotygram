@@ -64,7 +64,7 @@ can fill in document titles and duration after download. Artwork comes from
 Telegram thumbnails or embedded artwork; absent artwork gets a static tile.
 
 `LibraryState` caches its ID lookup and local-file groups per snapshot.
-**On device** groups nonempty local paths, after search and source filtering;
+**On device** groups retained, nonempty local paths, after search and source filtering;
 Settings uses the same collection for count and size. No file hashing or
 title-based merging is involved. Favorites, the playing highlight and removal
 guards account for multiple references to one file. Undo restores the exact
@@ -99,13 +99,38 @@ the full song list.
 
 `TelegramDataSource` reads available ranges directly from TDLib's downloaded
 file. Missing ranges wait for file updates with a timeout. There is no second
-media cache. Fully downloaded files remain available offline; TDLib's
-automatic storage optimizer is disabled.
+media cache. By default, fully downloaded files remain available offline;
+TDLib's automatic storage optimizer is disabled.
 
-The app deliberately does not distinguish a playback copy from an explicit
-offline download. `MusicCache` queries storage only when its screen opens or
-the user refreshes it. Confirmed cleanup asks TDLib to optimize audio/document
-storage, excluding imports. It first stops playback and downloads, then
+The optional **Do not keep played tracks** setting makes new playback copies
+temporary. `ListeningCache` owns their lifecycle. SQLite schema 4 stores retained
+intent on tracks and a `temporary_audio` journal keyed by TDLib's stable remote
+unique ID, with the remote ID needed to resolve a current native file ID after
+restart. Migration retains existing local paths, imports and queued downloads.
+Previously unowned bytes are conservatively retained, not adopted for deletion.
+
+The previous/current/prepared-next window and reference-counted data-source
+leases protect shared files, including repeated queue entries. Per-file mutexes
+serialize opening with deletion. Explicit Download pins all known aliases and
+removes temporary ownership; temporary copies do not count as **On device**.
+Turning the setting off retains remaining journal-owned copies. It does not
+restore files already removed.
+
+Cleanup is event-driven after queue restoration, file completion, reader close
+or account/connectivity changes. It resolves and verifies stable identity, checks
+protection again, records the actual path before deletion, cancels active downloads
+and deletes through TDLib, then verifies native state and absence of the file
+before retiring journal ownership. The path remains journaled if TDLib loses its
+location but unlink fails. No directory scanner, timer
+or extra service is used. Work is bounded to four eligible files per pass. Failed
+files remain journaled, with a one-minute retry floor on subsequent events and a
+manual Retry action in Settings. TDLib still uses disk: this is a bounded working
+set policy, not RAM-only streaming or a fixed byte quota.
+
+`MusicCache` queries storage only when its screen opens or the user refreshes it.
+Confirmed global cleanup still includes explicitly saved Telegram audio/document
+copies, excluding imports. It waits for automatic cleanup, stops playback and
+downloads, and waits for open readers, then
 reconciles missing paths in one SQLite transaction. Favorites, playlists and
 sign-in remain. The logical queue is restored paused, without inaccessible
 entries. Late download updates validate file presence before marking a file

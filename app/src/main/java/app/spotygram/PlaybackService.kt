@@ -250,6 +250,7 @@ class PlaybackService : MediaSessionService() {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    if (app.musicCache.state.value.clearing) return
                     android.util.Log.w(
                         "SpotygramPlayback",
                         "Playback failed: ${error.errorCodeName}",
@@ -284,6 +285,7 @@ class PlaybackService : MediaSessionService() {
             }
             restoring = false
             changed()
+            app.listeningCache.ready()
         }
     }
 
@@ -332,6 +334,7 @@ class PlaybackService : MediaSessionService() {
     private fun window(preserve: Boolean = false, position: Long = 0) {
         handler.removeCallbacks(slide)
         if (ids.isEmpty()) {
+            app.listeningCache.setWindow(emptyList())
             editing = true
             exo.clearMediaItems()
             editing = false
@@ -369,6 +372,7 @@ class PlaybackService : MediaSessionService() {
                 path.getOrNull(cursor + 1)?.let { app.track(ids[it])?.mediaItem() }
             else null
         val item = app.track(ids[current])?.mediaItem() ?: return
+        app.listeningCache.setWindow(listOfNotNull(previous, item, next).map { it.mediaId })
         editing = true
         try {
             exo.repeatMode =
@@ -662,6 +666,8 @@ class PlaybackService : MediaSessionService() {
         app.playback = null
         session.release()
         exo.release()
+        app.listeningCache.setWindow(emptyList())
+        app.listeningCache.ready()
         super.onDestroy()
     }
 }

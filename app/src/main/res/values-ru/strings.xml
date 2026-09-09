@@ -118,7 +118,7 @@
     <string name="like_named">"В любимые: %1$s"</string>
     <string name="loading_history">"Загружаем всю историю…"</string>
     <string name="loading_stopped">"Загрузка остановлена"</string>
-    <string name="local_storage_help">"Загруженные аудиофайлы остаются на устройстве. Удалить копию можно в меню трека."</string>
+    <string name="local_storage_help">"Здесь учитываются сохранённые аудиофайлы, без временного буфера. Удалить копию можно в меню трека."</string>
     <string name="logout_help">"Telegram-треки и их связи с плейлистами будут удалены из медиатеки. Импортированные файлы останутся."</string>
     <string name="logout_telegram">"Выйти из Telegram"</string>
     <string name="logout_title">"Выйти из Telegram?"</string>
@@ -275,4 +275,13 @@
     <string name="update_permission_needed">Разрешите установку из Spotygram и снова нажмите «Установить обновление».</string>
     <string name="update_installer_failed">Не удалось открыть установщик Android. Можно повторить попытку или открыть релиз на GitHub.</string>
     <string name="update_check_first">Проверьте обновления ещё раз, чтобы получить данные для скачивания.</string>
+    <string name="discard_listened">Не сохранять прослушанное</string>
+    <string name="discard_listened_help">Оставлять временный буфер, не добавляя каждую песню в «На телефоне». Старые файлы, явные скачивания и импорт сохраняются.</string>
+    <string name="discard_listened_limits">Текущий, предыдущий и подготовленный следующий файлы остаются, пока нужны плееру. Более старые песни может потребоваться скачать заново. Отключение режима сохраняет оставшиеся копии.</string>
+    <string name="temporary_audio">Временная копия аудио</string>
+    <string name="keep_on_device">Сохранить на устройстве</string>
+    <string name="saved_on_device">Сохранено на устройстве.</string>
+    <string name="temporary_cleanup_deferred">Часть временных файлов пока не удалось очистить. Прослушивание можно продолжать.</string>
+    <string name="retry_temporary_cleanup">Повторить очистку</string>
+    <string name="audio_in_use">Этот файл ещё нужен плееру. Переключите подборку перед удалением.</string>
 </resources>

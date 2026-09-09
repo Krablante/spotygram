@@ -247,6 +247,8 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                 local.optLong("downloaded_prefix_size"),
                 local.optBoolean("is_downloading_completed"),
                 local.optBoolean("is_downloading_active"),
+                file.optJSONObject("remote")?.optString("unique_id").orEmpty(),
+                file.optJSONObject("remote")?.optString("id").orEmpty(),
             )
         val previous = files.put(f.id, f)
         fileRevision.value = sequence.incrementAndGet()

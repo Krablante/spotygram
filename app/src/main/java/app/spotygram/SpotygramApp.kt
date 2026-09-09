@@ -37,6 +37,7 @@ class SpotygramApp : Application() {
     var playback: PlaybackService? = null
     var downloadService: DownloadService? = null
     val musicCache by lazy { MusicCache(this) }
+    val listeningCache by lazy { ListeningCache(this) }
     val updates by lazy { AppUpdates(this) }
     val playbackMode = MutableStateFlow(PlaybackMode())
     val queueRevision = MutableStateFlow(0L)
@@ -66,6 +67,7 @@ class SpotygramApp : Application() {
                 }
                 .distinctUntilChanged()
                 .collectLatest { connected ->
+                    listeningCache.signal()
                     if (!connected) scanJob?.cancelAndJoin()
                     else {
                         try {
@@ -359,6 +361,8 @@ class SpotygramApp : Application() {
             if (local?.optBoolean("is_downloading_completed") == true) local.optString("path")
             else "",
             document = document,
+            fileKey = file.optJSONObject("remote")?.optString("unique_id").orEmpty(),
+            remoteId = file.optJSONObject("remote")?.optString("id").orEmpty(),
         )
     }
 
@@ -371,6 +375,7 @@ class SpotygramApp : Application() {
                 if (artwork != null) artwork.forEach { library.art(it, path) }
                 else if (library.state.value.tracks.any { it.fileId == id }) {
                     library.file(id, path)
+                    listeningCache.signal()
                     withContext(Dispatchers.IO) {
                         val tracks =
                             library.state.value.tracks.filter {
@@ -496,8 +501,13 @@ class SpotygramApp : Application() {
 
     suspend fun download(ids: List<String>) {
         check(!musicCache.state.value.clearing) { tr(R.string.cache_clearing) }
+        val wasTemporary = ids.any { track(it)?.temporary == true }
+        listeningCache.retain(ids)
         val valid = ids.filter { track(it)?.let { t -> !t.local && t.available } == true }
-        if (valid.isEmpty()) return
+        if (valid.isEmpty()) {
+            if (wasTemporary) notices.emit(tr(R.string.saved_on_device))
+            return
+        }
         library.enqueue(valid)
         ContextCompat.startForegroundService(this, Intent(this, DownloadService::class.java))
     }
@@ -507,9 +517,11 @@ class SpotygramApp : Application() {
         require(current?.id != track.id && !(track.local && current?.path == track.path)) {
             tr(R.string.switch_track_first)
         }
-        if (track.chatId != 0L) telegram.request(json("deleteFile", "file_id" to resolve(track)))
-        else playback?.removeTrack(track.id)
-        library.removeLocal(track)
+        if (track.chatId != 0L) listeningCache.removeCopy(track)
+        else {
+            playback?.removeTrack(track.id)
+            library.removeLocal(track)
+        }
     }
 
     suspend fun messageLink(track: Track): String {
@@ -608,15 +620,17 @@ class SpotygramApp : Application() {
         }
 
     suspend fun logout() {
-        scanJob?.cancelAndJoin()
-        playback?.clear()
-        stopService(Intent(this, DownloadService::class.java))
-        telegram.request(json("logOut"))
-        prefs.edit().putBoolean("telegram_connected", false).apply()
-        library.clearTelegram()
-        resolvedFiles.clear()
-        thumbnails.clear()
-        artworkFiles.clear()
-        chatChoices.value = emptyList()
+        listeningCache.exclusive {
+            scanJob?.cancelAndJoin()
+            playback?.clear()
+            stopService(Intent(this, DownloadService::class.java))
+            telegram.request(json("logOut"))
+            prefs.edit().putBoolean("telegram_connected", false).apply()
+            library.clearTelegram()
+            resolvedFiles.clear()
+            thumbnails.clear()
+            artworkFiles.clear()
+            chatChoices.value = emptyList()
+        }
     }
 }

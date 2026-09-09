@@ -68,6 +68,12 @@ until you stop it; Previous retraces your recent listening history.
 Downloaded songs are available under **On device**. The interface comes in
 English and Russian, with light, dark and system themes.
 
+Prefer not to keep every song? Turn on **Do not keep played tracks** in Settings.
+The player keeps a temporary working set and removes older playback copies.
+Existing files, explicit downloads and imports stay saved; **Save on device**
+keeps a temporary copy. The mode is off by default and still uses temporary
+disk space. Returning to older songs may require another download.
+
 ## Your files and your account
 
 Music, playlists and the Telegram session live on the device. Spotygram has no

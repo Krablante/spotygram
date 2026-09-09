@@ -74,7 +74,9 @@ class MainActivity : ComponentActivity() {
                     controller,
                     onImport = { picker.launch(arrayOf("audio/*")) },
                     onDownload = { ids ->
-                        if (Build.VERSION.SDK_INT >= 33)
+                        if (
+                            Build.VERSION.SDK_INT >= 33 && ids.any { app.track(it)?.local == false }
+                        )
                             permission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         app.action { app.download(ids) }
                     },

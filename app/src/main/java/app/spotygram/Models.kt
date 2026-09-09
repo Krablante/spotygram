@@ -18,6 +18,10 @@ data class Track(
     val liked: Boolean = false,
     val available: Boolean = true,
     val document: Boolean = false,
+    val fileKey: String = "",
+    val remoteId: String = "",
+    val saved: Boolean = chatId == 0L,
+    val temporary: Boolean = false,
 ) {
     val local
         get() = path.isNotEmpty()
@@ -58,7 +62,7 @@ data class LibraryState(
     val playlists: List<Playlist> = emptyList(),
 ) {
     val byId by lazy { tracks.associateBy { it.id } }
-    val localGroups by lazy { tracks.filter { it.local }.groupBy { it.path } }
+    val localGroups by lazy { tracks.filter { it.local && !it.temporary }.groupBy { it.path } }
     val localTracks by lazy { localView(tracks) }
     val localSize by lazy { localTracks.sumOf { it.size } }
 
@@ -71,7 +75,8 @@ data class LibraryState(
     fun localView(candidates: List<Track>): List<Track> {
         val seen = HashSet<String>()
         return candidates.mapNotNull { track ->
-            if (track.local && seen.add(track.path)) localDisplay(track) else null
+            if (track.local && !track.temporary && seen.add(track.path)) localDisplay(track)
+            else null
         }
     }
 }
@@ -99,6 +104,8 @@ data class FileState(
     val prefix: Long,
     val complete: Boolean,
     val active: Boolean,
+    val key: String = "",
+    val remote: String = "",
 )
 
 data class DownloadState(val trackId: String = "", val progress: Float = 0f, val queued: Int = 0)

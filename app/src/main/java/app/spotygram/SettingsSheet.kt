@@ -92,6 +92,39 @@ fun SettingsSheet(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        val listening by app.listeningCache.state.collectAsStateWithLifecycle()
+        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(tr(R.string.discard_listened))
+                Text(
+                    tr(R.string.discard_listened_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = listening.enabled,
+                onCheckedChange = { app.listeningCache.setEnabled(it) },
+                enabled = !listening.changing,
+            )
+        }
+        Text(
+            tr(R.string.discard_listened_limits),
+            Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (listening.changing) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (listening.deferred) {
+            Text(
+                tr(R.string.temporary_cleanup_deferred),
+                Modifier.padding(horizontal = 12.dp),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = { app.listeningCache.retry() }) {
+                Text(tr(R.string.retry_temporary_cleanup))
+            }
+        }
         ListItem(
             headlineContent = { Text(tr(R.string.clear_music_cache)) },
             supportingContent = { Text(tr(R.string.cache_settings_help)) },

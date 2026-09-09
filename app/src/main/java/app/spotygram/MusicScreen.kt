@@ -98,7 +98,7 @@ fun MusicScreen(
             val matching =
                 library.tracks.filter { track ->
                     (!favorites || track.liked) &&
-                        (!offline || track.local) &&
+                        (!offline || (track.local && !track.temporary)) &&
                         (source == null || track.chatId == source.id) &&
                         (positions == null || track.id in positions) &&
                         (query.isBlank() ||
@@ -544,8 +544,9 @@ fun TrackRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (track.local)
                     Icon(
-                        Icons.Rounded.DownloadForOffline,
-                        tr(R.string.on_device),
+                        if (track.temporary) Icons.Rounded.Schedule
+                        else Icons.Rounded.DownloadForOffline,
+                        tr(if (track.temporary) R.string.temporary_audio else R.string.on_device),
                         Modifier.padding(end = 3.dp).size(13.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )

@@ -78,25 +78,40 @@ the playlist does not delete the audio files.
 
 ## Listen offline
 
-A fully downloaded song gains an offline icon and stays on the device. Use
+By default, a fully downloaded song gains an offline icon and stays on the device. Use
 **Download** on a song or collection to save music in advance. Settings lets
 you restrict these downloads to Wi-Fi and resume interrupted downloads.
 The Wi-Fi restriction does not apply to ordinary playback.
 
-**On device** shows available local files. When several messages reference one
+**On device** shows retained local files, excluding temporary playback copies. When several messages reference one
 file, it appears once. Separate copies with the same title are not merged.
 Search and source filters may narrow the list further.
+
+## Listen without keeping every song
+
+Enable **Settings → Do not keep played tracks** to use temporary playback copies.
+It is off by default. Previously saved files, explicit downloads and imported
+audio remain saved. Temporary copies have a clock icon; **Save on device** in
+the player or song menu keeps a copy without downloading it again.
+
+The current, previous and prepared next files remain while the player needs
+them. Older temporary copies are removed when no reader uses them. Going
+further back may require another download and internet access. Telegram still
+uses temporary disk files; this is not RAM-only playback or a strict storage cap.
+If cleanup is deferred, Settings offers Retry. Turning the mode off keeps the
+remaining copies; it cannot restore those already deleted.
 
 ## Free up space
 
 **Remove from device** in a song's menu removes its local copy, not the Telegram
-message. Switch away from the current song before removing it.
+message. Files still in the player's working window or being read cannot be removed.
 
 **Settings → Clear music cache** shows space occupied by downloaded Telegram
 audio. Imported files are excluded from that total.
 
 **Cleanup also removes songs you explicitly saved with Download.** Playback
-cache and explicit downloads are the same local copies. The confirmation
+copies and explicit downloads share Telegram's storage. This manual action has
+a broader scope than automatic removal of temporary copies. The confirmation
 asks to stop playback and clear them; playback and downloads stop, and the
 result reports the space freed.
 

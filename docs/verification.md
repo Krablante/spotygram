@@ -1,5 +1,67 @@
 # Verification record
 
+## 0.8.0 — temporary playback copies
+
+Initial debug assembly and Lint passed. Manual checks used the existing Android
+16 x86-64 emulator and its debug catalog, without clearing app data. Migration
+from SQLite 3 to 4 retained all four imported recordings and marked each saved;
+the new journal was empty and the setting was off by default.
+
+For UI/state checks only, two existing public-domain demonstration rows were
+temporarily given one shared local path, remote-shaped identity and journal
+entry. No audio was copied into source, and no test files or fixture suite were
+created. Cold launch kept the enabled preference and journal. Both rows showed
+the temporary clock marker; **On device** and Settings excluded them (two retained
+files, rather than four catalog rows). **Save on device** marked both aliases
+saved, removed the journal entry and left the download queue empty.
+
+Recreating that temporary state exercised local-file playback through the new
+lease path. Media session reached PLAYING at 32573 ms with two physical items.
+Turning the mode off during playback marked both aliases saved and emptied the
+journal; playback continued at 92450 ms. Inspected AndroidRuntime/player logs
+contained no errors. The original debug database was restored afterwards and
+the mode left off. This is local UI/state evidence, not a native remote-transfer
+or deletion test.
+
+Source review added a post-journal-write pin/mode check, disabled-mode recovery
+for a process death during that transition, a shared registration barrier before
+manual cleanup waits for readers, and continued batching after deferred files.
+The pinned TDLib source drops its local location before unlink and ignores the
+unlink error in `FileLoadManager`; cleanup therefore persists the resolved path
+before deletion and checks actual file absence before forgetting ownership.
+Active leases retain stable identity, local path and runtime file ID so legacy
+local readers remain protected even when a later message resolution learns a key.
+Deletion/read exclusion,
+queue-window protection, repeated-file aliases, deferred retry and global
+cleanup coordination were reviewed in source. Authenticated cancel/delete,
+redownload after eviction, network loss during streaming, process death during
+native deletion and physical-device resource use remain unverified. An isolated
+in-memory Telethon session reached official test DC 2 but the documented test
+phone/code combination returned `PHONE_CODE_INVALID`; no real account or existing
+session was opened and no media was uploaded.
+
+Final debug/release assembly and both Lint tasks passed after the native-source
+audit. EN/RU keys and format arguments matched for 274 resources; documentation
+links resolved. Both signed APKs passed signature and 16 KB alignment checks with
+the existing certificate. Manifest: `app.spotygram`, versionCode 11, versionName
+0.8.0, minSdk 26. SHA-256: ARM64
+`cb842ef4b7a26168e58767dc789233a473840a7bf28de5b8a81bdfc405d29b7c`, x86-64
+`db032ed6a5af19f60e4554fbe17357bfc97b087411304bbed7d9c22b1115292f`.
+The final signed x86-64 APK installed over 0.7.0; its installed hash matched.
+All three recordings and Night/Road playlists remained, schema was 4, integrity
+was `ok`, and the setting was initially off. The final English dark Settings
+screen was visually inspected; local playback with the mode enabled reached
+PLAYING at 10508 ms with three physical media items.
+Seeking reached 170546 ms, Next changed recordings, and Previous retraced
+absolute-random history to the demonstration recording. The window remained
+three items, with no inspected app/player errors. Playback was paused and the
+setting turned off afterwards. The emulator's recurring boot-time System UI ANR
+was handled separately before installation; no Spotygram ANR was observed.
+The final debug APK also recovered a manually journaled existing demonstration
+row on cold launch with the mode off: saved became true, the local path remained
+and the journal emptied. Restoring the original debug database left four imports,
+four saved flags, an empty journal and integrity `ok`. The emulator was stopped.
+
 ## 0.7.0 — in-app download and installation
 
 Debug/release builds and both Lint tasks passed after correcting an initial

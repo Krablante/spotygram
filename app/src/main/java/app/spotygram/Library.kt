@@ -12,13 +12,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 3) {
+class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 4) {
     val state = MutableStateFlow(LibraryState())
     private val publishing = Mutex()
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
-            "CREATE TABLE tracks(id TEXT PRIMARY KEY,chat INTEGER,message INTEGER,file INTEGER,title TEXT,artist TEXT,duration INTEGER,size INTEGER,source TEXT,date INTEGER,art TEXT DEFAULT '',path TEXT DEFAULT '',liked INTEGER DEFAULT 0,available INTEGER DEFAULT 1,document INTEGER DEFAULT 0)"
+            "CREATE TABLE tracks(id TEXT PRIMARY KEY,chat INTEGER,message INTEGER,file INTEGER,title TEXT,artist TEXT,duration INTEGER,size INTEGER,source TEXT,date INTEGER,art TEXT DEFAULT '',path TEXT DEFAULT '',liked INTEGER DEFAULT 0,available INTEGER DEFAULT 1,document INTEGER DEFAULT 0,file_key TEXT DEFAULT '',remote_id TEXT DEFAULT '',saved INTEGER DEFAULT 0)"
         )
         db.execSQL("CREATE INDEX tracks_file ON tracks(file)")
         db.execSQL("CREATE INDEX tracks_chat ON tracks(chat)")
@@ -30,9 +30,19 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             "CREATE TABLE playlist_tracks(playlist INTEGER,track TEXT,position INTEGER,PRIMARY KEY(playlist,track))"
         )
         db.execSQL("CREATE TABLE downloads(track TEXT PRIMARY KEY,position INTEGER)")
+        createTemporaryStorage(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 4) {
+            db.execSQL("ALTER TABLE tracks ADD COLUMN file_key TEXT DEFAULT ''")
+            db.execSQL("ALTER TABLE tracks ADD COLUMN remote_id TEXT DEFAULT ''")
+            db.execSQL("ALTER TABLE tracks ADD COLUMN saved INTEGER DEFAULT 0")
+            db.execSQL(
+                "UPDATE tracks SET saved=1 WHERE chat=0 OR path!='' OR id IN (SELECT track FROM downloads)"
+            )
+            createTemporaryStorage(db)
+        }
         if (oldVersion < 3) {
             db.execSQL("ALTER TABLE sources ADD COLUMN newest INTEGER DEFAULT 0")
             db.execSQL("ALTER TABLE sources ADD COLUMN document_newest INTEGER DEFAULT 0")
@@ -42,6 +52,14 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             db.execSQL("ALTER TABLE sources ADD COLUMN document_cursor INTEGER DEFAULT 0")
             db.execSQL("ALTER TABLE sources ADD COLUMN documents_complete INTEGER DEFAULT 0")
         }
+    }
+
+    private fun createTemporaryStorage(db: SQLiteDatabase) {
+        db.execSQL("CREATE INDEX tracks_key ON tracks(file_key)")
+        db.execSQL("CREATE INDEX tracks_path ON tracks(path)")
+        db.execSQL(
+            "CREATE TABLE temporary_audio(file_key TEXT PRIMARY KEY,remote_id TEXT NOT NULL,path TEXT NOT NULL)"
+        )
     }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -78,7 +96,7 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                 }
             val tracks = mutableListOf<Track>()
             db.rawQuery(
-                    "SELECT * FROM tracks WHERE chat=0 OR path!='' OR liked=1 OR id IN (SELECT track FROM playlist_tracks) OR chat IN (SELECT id FROM sources) ORDER BY date DESC,id DESC",
+                    "SELECT tracks.*,CASE WHEN temporary_audio.file_key IS NULL THEN 0 ELSE 1 END FROM tracks LEFT JOIN temporary_audio ON tracks.file_key=temporary_audio.file_key WHERE chat=0 OR tracks.path!='' OR liked=1 OR id IN (SELECT track FROM playlist_tracks) OR chat IN (SELECT id FROM sources) ORDER BY date DESC,id DESC",
                     null,
                 )
                 .use { c ->
@@ -99,6 +117,10 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                             c.getInt(12) == 1,
                             c.getInt(13) == 1,
                             c.getInt(14) == 1,
+                            c.getString(15),
+                            c.getString(16),
+                            c.getInt(17) == 1,
+                            c.getInt(18) == 1,
                         )
                 }
             val lists = mutableListOf<Playlist>()
@@ -135,6 +157,11 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             db.beginTransaction()
             try {
                 tracks.forEach { t ->
+                    if (t.fileKey.isNotEmpty())
+                        db.execSQL(
+                            "UPDATE tracks SET path='' WHERE id=? AND file_key!='' AND file_key!=?",
+                            arrayOf(t.id, t.fileKey),
+                        )
                     val v =
                         ContentValues().apply {
                             put("chat", t.chatId)
@@ -148,12 +175,15 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                             put("date", t.date)
                             put("available", if (t.available) 1 else 0)
                             put("document", if (t.document) 1 else 0)
+                            if (t.fileKey.isNotEmpty()) put("file_key", t.fileKey)
+                            if (t.remoteId.isNotEmpty()) put("remote_id", t.remoteId)
                             if (t.art.isNotEmpty()) put("art", t.art)
                             if (t.path.isNotEmpty())
                                 put("path", t.path.takeIf { validAudioCopy(it, t.size) }.orEmpty())
                         }
                     if (db.update("tracks", v, "id=?", arrayOf(t.id)) == 0) {
                         v.put("id", t.id)
+                        v.put("saved", if (t.saved) 1 else 0)
                         db.insertOrThrow("tracks", null, v)
                     }
                 }
@@ -438,12 +468,18 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
                 writableDatabase.delete("tracks", "id=?", arrayOf(track.id))
                 writableDatabase.delete("playlist_tracks", "track=?", arrayOf(track.id))
             } else
-                writableDatabase.update(
-                    "tracks",
-                    ContentValues().apply { put("path", "") },
-                    "path=?",
-                    arrayOf(track.path),
-                )
+                writableDatabase.transaction {
+                    update(
+                        "tracks",
+                        ContentValues().apply {
+                            put("path", "")
+                            put("saved", 0)
+                        },
+                        "(path!='' AND path=?) OR (file_key!='' AND file_key=?)",
+                        arrayOf(track.path, track.fileKey),
+                    )
+                    delete("temporary_audio", "file_key=?", arrayOf(track.fileKey))
+                }
             reload()
         }
 
@@ -481,6 +517,107 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             writableDatabase.execSQL("DELETE FROM tracks WHERE chat!=0")
             writableDatabase.delete("sources", null, null)
             writableDatabase.delete("downloads", null, null)
+            writableDatabase.delete("temporary_audio", null, null)
             reload()
+        }
+
+    suspend fun temporaryFiles(): List<TemporaryAudio> =
+        withContext(Dispatchers.IO) {
+            val result = mutableListOf<TemporaryAudio>()
+            readableDatabase
+                .rawQuery("SELECT file_key,remote_id,path FROM temporary_audio", null)
+                .use { c ->
+                    while (c.moveToNext()) result +=
+                        TemporaryAudio(c.getString(0), c.getString(1), c.getString(2))
+                }
+            result
+        }
+
+    suspend fun ownsTemporary(key: String): Boolean =
+        withContext(Dispatchers.IO) {
+            readableDatabase
+                .rawQuery("SELECT 1 FROM temporary_audio WHERE file_key=?", arrayOf(key))
+                .use { it.moveToFirst() }
+        }
+
+    suspend fun savedCopy(key: String, path: String): Boolean =
+        withContext(Dispatchers.IO) {
+            readableDatabase
+                .rawQuery(
+                    "SELECT 1 FROM tracks WHERE saved=1 AND ((file_key!='' AND file_key=?) OR (path!='' AND path=?)) LIMIT 1",
+                    arrayOf(key, path),
+                )
+                .use { it.moveToFirst() }
+        }
+
+    suspend fun claimTemporary(file: TemporaryAudio) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.insertWithOnConflict(
+                "temporary_audio",
+                null,
+                ContentValues().apply {
+                    put("file_key", file.key)
+                    put("remote_id", file.remote)
+                    put("path", file.path)
+                },
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+            Unit
+        }
+
+    suspend fun retainTracks(ids: List<String>) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                compileStatement(
+                        "UPDATE tracks SET saved=1 WHERE id=? OR (file_key!='' AND file_key=(SELECT file_key FROM tracks WHERE id=?)) OR (path!='' AND path=(SELECT path FROM tracks WHERE id=?))"
+                    )
+                    .use { save ->
+                        compileStatement(
+                                "DELETE FROM temporary_audio WHERE EXISTS (SELECT 1 FROM tracks WHERE tracks.file_key=temporary_audio.file_key AND saved=1)"
+                            )
+                            .use { remove ->
+                                for (id in ids.distinct()) {
+                                    for (i in 1..3) save.bindString(i, id)
+                                    save.executeUpdateDelete()
+                                }
+                                remove.executeUpdateDelete()
+                            }
+                    }
+            }
+        }
+
+    suspend fun rememberTemporaryPath(key: String, path: String) =
+        withContext(Dispatchers.IO) {
+            if (path.isNotEmpty())
+                writableDatabase.update(
+                    "temporary_audio",
+                    ContentValues().apply { put("path", path) },
+                    "file_key=?",
+                    arrayOf(key),
+                )
+            Unit
+        }
+
+    suspend fun retainTemporaryFiles() =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                execSQL(
+                    "UPDATE tracks SET saved=1 WHERE file_key IN (SELECT file_key FROM temporary_audio)"
+                )
+                delete("temporary_audio", null, null)
+            }
+        }
+
+    suspend fun forgetTemporary(file: TemporaryAudio, path: String) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                delete("temporary_audio", "file_key=?", arrayOf(file.key))
+                update(
+                    "tracks",
+                    ContentValues().apply { put("path", "") },
+                    "file_key=? OR (path!='' AND path=?)",
+                    arrayOf(file.key, path),
+                )
+            }
         }
 }

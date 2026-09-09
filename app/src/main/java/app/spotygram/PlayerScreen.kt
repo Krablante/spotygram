@@ -233,15 +233,21 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDownload, enabled = !track.local) {
+                TextButton(onClick = onDownload, enabled = !track.local || track.temporary) {
                     Icon(
-                        if (track.local) Icons.Rounded.DownloadForOffline
+                        if (track.local && !track.temporary) Icons.Rounded.DownloadForOffline
                         else Icons.Rounded.Download,
                         null,
                         Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(if (track.local) tr(R.string.on_device) else tr(R.string.download))
+                    Text(
+                        when {
+                            track.temporary -> tr(R.string.keep_on_device)
+                            track.local -> tr(R.string.on_device)
+                            else -> tr(R.string.download)
+                        }
+                    )
                 }
                 TextButton(onClick = onQueue) {
                     Icon(Icons.Rounded.QueueMusic, null, Modifier.size(20.dp))

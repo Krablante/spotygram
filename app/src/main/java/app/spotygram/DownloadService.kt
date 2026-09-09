@@ -138,11 +138,7 @@ class DownloadService : Service() {
                     if (e !is CancellationException) app.notices.emit(friendly(e))
                 } finally {
                     val fid = activeFile
-                    if (
-                        fid != 0 &&
-                            app.track(app.player?.currentMediaItem?.mediaId.orEmpty())?.fileId !=
-                                fid
-                    )
+                    if (fid != 0 && !app.listeningCache.protectsFile(fid))
                         withContext(NonCancellable) {
                             runCatching {
                                 app.telegram.request(
