@@ -65,11 +65,30 @@ Telegram thumbnails or embedded artwork; absent artwork gets a static tile.
 
 `LibraryState` caches its ID lookup and local-file groups per snapshot.
 **On device** groups retained, nonempty local paths, after search and source filtering;
-Settings uses the same collection for count and size. No file hashing or
-title-based merging is involved. Favorites, the playing highlight and removal
+Settings derives its count and size from that collection, with the optional
+recording projection described below. No file hashing or title-only matching
+is involved. Favorites, the playing highlight and removal
 guards account for multiple references to one file. Undo restores the exact
 previous favorite IDs. A newly launched local collection is deduplicated;
 an explicitly built queue is not silently rewritten.
+
+The default-on `hide_duplicates` preference adds a reversible recording view
+over Music, Favorites and On device. `TrackDuplicates` is built lazily once per
+library snapshot, joining stable TDLib file keys, shared paths and exact
+normalized title/artist/duration/byte-size signatures. Duration and size must
+be known for metadata matching. It uses no hashing, file reads, network calls
+or quadratic pairwise comparisons. This is a metadata heuristic, not proof of
+identical audio content.
+
+Filtering happens before choosing representatives; retained local, temporary
+local and available remote copies are preferred in that order. Group favorites
+and playing/download highlights account for hidden aliases. Unliking clears
+existing marks in the group with exact Undo; destructive file actions still
+target the selected physical copy. Lists and their new queues use the same
+projection. Existing playlists and queues retain their explicit entries.
+Settings uses the projected local count but keeps total physical storage size,
+because hidden copies are not deleted. Disabling the preference restores raw
+message rows; On device still groups references to one physical path.
 
 ## A large queue, a small media session
 

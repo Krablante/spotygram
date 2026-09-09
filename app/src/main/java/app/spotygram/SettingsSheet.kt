@@ -3,6 +3,7 @@ package app.spotygram
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -26,6 +28,7 @@ fun SettingsSheet(
     onCache: () -> Unit,
 ) {
     val theme by app.theme.collectAsStateWithLifecycle()
+    val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
     var wifi by remember { mutableStateOf(app.prefs.getBoolean("wifi_only", false)) }
     val download by app.downloading.collectAsStateWithLifecycle()
     Column(
@@ -76,7 +79,31 @@ fun SettingsSheet(
             Modifier.padding(vertical = 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         )
-        val local = library.localTracks
+        Row(
+            Modifier.fillMaxWidth()
+                .toggleable(
+                    value = hideDuplicates,
+                    role = Role.Switch,
+                    onValueChange = app::changeHideDuplicates,
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(tr(R.string.hide_duplicates))
+                Text(
+                    tr(R.string.hide_duplicates_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = hideDuplicates, onCheckedChange = null)
+        }
+        val local =
+            remember(library, hideDuplicates) {
+                if (hideDuplicates) library.duplicates.view(library.localTracks)
+                else library.localTracks
+            }
         ListItem(
             headlineContent = { Text(tr(R.string.on_device)) },
             supportingContent = {

@@ -1,5 +1,47 @@
 # Verification record
 
+## 0.9.0 — reversible duplicate hiding
+
+Debug/release assembly and both Lint tasks passed. EN/RU keys and format
+arguments matched for 276 resources; documentation links resolved. Manual checks
+used the existing Android 16 emulator and its four-row debug library, including
+three separate imports of the same public-domain demonstration recording.
+
+- On first launch, the default-on setting produced two songs from four records.
+  The retained representative displayed the favorite mark from another alias.
+- Unliking removed the group mark. After re-adding a favorite, removing it and
+  pressing Undo restored exactly that previous track ID, not every duplicate.
+  The emulator's interactive accessibility timeout was temporarily extended to
+  make the snackbar action inspectable, then returned to its default.
+- Turning the switch off showed all four records. Force-stop/cold launch retained
+  the false preference and four rows. Re-enabling grouped them again. On device
+  and Settings both showed two songs; total retained storage remained 20 MB.
+- Play all from the grouped local list produced two logical queue IDs and
+  PLAYING at 5610 ms with two physical media items. The existing playlist kept
+  its three memberships.
+- In a temporary edit of an existing demonstration row, changing duration from
+  213 to 214 seconds kept that row separate (three visible songs). Giving two
+  existing rows the same diagnostic stable file key joined them despite that
+  metadata difference (two songs). Searching for the demonstration title then
+  showed one song. These are local grouping checks, not real TDLib identity
+  delivery or an authenticated source-chat test.
+- The original database was restored: four imports, no diagnostic file keys,
+  the original favorite, three playlist memberships, integrity `ok`. Audio files
+  were unchanged. The Russian light Settings screen was visually inspected.
+
+The signed x86-64 APK installed over 0.8.1 without clearing data. Its hash matched;
+all three distinct recordings and Night/Road playlists remained with integrity
+`ok`. English Settings showed Hide duplicates enabled by default. No inspected
+Spotygram/player error was observed; the emulator did exhibit its boot-time
+System UI ANR and a separate Nexus Launcher crash. The emulator was stopped.
+Both APKs passed signature and 16 KB alignment checks with the existing key.
+SHA-256: ARM64
+`f5cc2e286cc6c2d4002f88c680e3a01aac616f6263b4720f634e134ab7c6f3bf`, x86-64
+`9a4960f9ac598918a082c05d779b781c427c8df39585d2452c6ccdbdb38a3714`.
+No test files or fixture suite were added. Metadata equality remains a heuristic;
+physical-device and authenticated Telegram source-filter behavior were not
+verified in this cycle.
+
 ## 0.8.1 — mini-player previous button
 
 Release assembly and Lint passed. The signed x86-64 APK installed over 0.8.0

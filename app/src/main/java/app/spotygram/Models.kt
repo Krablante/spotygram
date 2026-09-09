@@ -62,6 +62,7 @@ data class LibraryState(
     val playlists: List<Playlist> = emptyList(),
 ) {
     val byId by lazy { tracks.associateBy { it.id } }
+    val duplicates by lazy { TrackDuplicates(tracks) }
     val localGroups by lazy { tracks.filter { it.local && !it.temporary }.groupBy { it.path } }
     val localTracks by lazy { localView(tracks) }
     val localSize by lazy { localTracks.sumOf { it.size } }

@@ -26,6 +26,8 @@ class SpotygramApp : Application() {
     val chatChoices = MutableStateFlow<List<ChatChoice>>(emptyList())
     val downloading = MutableStateFlow(DownloadState())
     val theme = MutableStateFlow("system")
+    val hideDuplicates by lazy { MutableStateFlow(prefs.getBoolean("hide_duplicates", true)) }
+
     private val scanning = Mutex()
     private var scanJob: Job? = null
     private lateinit var libraryReady: Job
@@ -94,6 +96,11 @@ class SpotygramApp : Application() {
     fun changeTheme(value: String) {
         prefs.edit().putString("theme", value).apply()
         theme.value = value
+    }
+
+    fun changeHideDuplicates(value: Boolean) {
+        prefs.edit().putBoolean("hide_duplicates", value).apply()
+        hideDuplicates.value = value
     }
 
     fun localMode() {

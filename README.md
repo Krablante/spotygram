@@ -68,6 +68,9 @@ until you stop it; Previous retraces your recent listening history.
 Downloaded songs are available under **On device**. The interface comes in
 English and Russian, with light, dark and system themes.
 
+Repeated recordings are hidden by default. Turn **Settings → Hide duplicates**
+off to see separate entries again. This only changes the lists; nothing is deleted.
+
 Prefer not to keep every song? Turn on **Do not keep played tracks** in Settings.
 The player keeps a temporary working set and removes older playback copies.
 Existing files, explicit downloads and imports stay saved; **Save on device**

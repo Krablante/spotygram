@@ -36,6 +36,21 @@ from the music library.
 
 ## Listen
 
+**Settings → Hide duplicates** is on by default. Music, Favorites and On device
+show one entry per matching recording. Turn it off to see separate entries
+again; nothing is deleted.
+
+Tracks match by Telegram file identity, a shared local path, or equal title,
+artist, duration and file size. Case and extra whitespace are ignored; a title
+alone is insufficient. File contents are not compared, so this is not acoustic
+recognition. Search and source filters run first; a retained local copy is
+preferred among matching candidates.
+
+The heart reflects favorites across the group. Removing it clears those marks
+together; Undo restores the exact previous marks. New queues launched from the
+list get one representative per group. Existing playlists and the current queue
+are not rewritten; independent draws in absolute random can still repeat.
+
 The four bottom destinations are **Chats**, **Favorites**, **Playlists** and
 **Music**. Your last destination is remembered. Tap a song to play; the small
 bottom player opens the full player. Lock-screen controls work too.
@@ -87,7 +102,9 @@ you restrict these downloads to Wi-Fi and resume interrupted downloads.
 The Wi-Fi restriction does not apply to ordinary playback.
 
 **On device** shows retained local files, excluding temporary playback copies. When several messages reference one
-file, it appears once. Separate copies with the same title are not merged.
+physical file, it always appears once. With Hide duplicates enabled, matching
+separate copies are grouped too. Storage size in Settings still includes all
+retained files, including hidden copies: hiding rows does not free space.
 Search and source filters may narrow the list further.
 
 ## Listen without keeping every song

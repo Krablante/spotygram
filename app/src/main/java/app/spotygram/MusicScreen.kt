@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MusicScreen(
+    hideDuplicates: Boolean,
     library: LibraryState,
     playingId: String,
     shuffle: Boolean,
@@ -70,7 +71,8 @@ fun MusicScreen(
         selecting = false
     }
     fun selectionKey(id: String) =
-        if (offline) library.byId[id]?.path?.takeIf { it.isNotEmpty() } ?: id else id
+        if (hideDuplicates) library.duplicates.key(id)
+        else if (offline) library.byId[id]?.path?.takeIf { it.isNotEmpty() } ?: id else id
     fun toggle(track: Track) {
         val key = selectionKey(track.id)
         selected =
@@ -86,14 +88,25 @@ fun MusicScreen(
             lastReset = selectionReset
         }
     }
-    LaunchedEffect(library.tracks, offline) {
+    LaunchedEffect(library.tracks, offline, hideDuplicates) {
         selected = ArrayList(selected.filter { it in library.byId }.distinctBy(::selectionKey))
     }
     BackHandler(enabled = selecting) { clearSelection() }
     val selectedSet =
-        remember(selected, library.tracks, offline) { selected.map(::selectionKey).toSet() }
+        remember(selected, library.tracks, offline, hideDuplicates) {
+            selected.map(::selectionKey).toSet()
+        }
     val tracks =
-        remember(library.tracks, favorites, offline, source, playlist, query, sort) {
+        remember(
+            library.tracks,
+            favorites,
+            offline,
+            source,
+            playlist,
+            query,
+            sort,
+            hideDuplicates,
+        ) {
             val positions = playlist?.tracks?.withIndex()?.associate { it.value to it.index }
             val matching =
                 library.tracks.filter { track ->
@@ -105,12 +118,16 @@ fun MusicScreen(
                             "${track.title} ${track.artist} ${track.source}"
                                 .contains(query.trim(), ignoreCase = true))
                 }
-            val result = if (offline) library.localView(matching) else matching
+            val local = if (offline) library.localView(matching) else matching
+            val result = if (hideDuplicates) library.duplicates.view(local) else local
             if (sort) result.sortedBy { it.title.lowercase() }
             else if (positions != null) result.sortedBy { positions[it.id] } else result
         }
     val visibleIds = remember(tracks) { tracks.map { it.id } }
-    val visibleKeys = remember(tracks, offline) { tracks.map { selectionKey(it.id) }.toSet() }
+    val visibleKeys =
+        remember(tracks, library.tracks, offline, hideDuplicates) {
+            tracks.map { selectionKey(it.id) }.toSet()
+        }
     val playingPath =
         if (offline) library.byId[playingId]?.path?.takeIf { it.isNotEmpty() } else null
     Column(Modifier.fillMaxSize()) {
@@ -346,8 +363,17 @@ fun MusicScreen(
                 items(tracks, key = { it.id }, contentType = { "track" }) { track ->
                     TrackRow(
                         track,
-                        track.id == playingId || playingPath != null && track.path == playingPath,
-                        download.takeIf { it.trackId == track.id },
+                        track.id == playingId ||
+                            playingPath != null && track.path == playingPath ||
+                            hideDuplicates &&
+                                library.duplicates.key(track.id) ==
+                                    library.duplicates.key(playingId),
+                        download.takeIf {
+                            it.trackId == track.id ||
+                                hideDuplicates &&
+                                    library.duplicates.key(it.trackId) ==
+                                        library.duplicates.key(track.id)
+                        },
                         selected = if (selecting) selectionKey(track.id) in selectedSet else null,
                         onClick = { if (selecting) toggle(track) else onPlay(track, tracks) },
                         onLongClick = {

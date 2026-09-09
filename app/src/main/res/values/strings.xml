@@ -280,4 +280,6 @@
     <string name="temporary_cleanup_deferred">Some temporary files could not be cleared yet. Playback can continue.</string>
     <string name="retry_temporary_cleanup">Retry cleanup</string>
     <string name="audio_in_use">This file is still needed by the player. Switch the playback collection before removing it.</string>
+    <string name="hide_duplicates">Hide duplicates</string>
+    <string name="hide_duplicates_help">Show one entry per recording in Music, Favorites and On device. Nothing is deleted. Existing playlists and the current queue stay unchanged.</string>
 </resources>

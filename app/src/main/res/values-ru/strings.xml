@@ -284,4 +284,6 @@
     <string name="temporary_cleanup_deferred">Часть временных файлов пока не удалось очистить. Прослушивание можно продолжать.</string>
     <string name="retry_temporary_cleanup">Повторить очистку</string>
     <string name="audio_in_use">Этот файл ещё нужен плееру. Переключите подборку перед удалением.</string>
+    <string name="hide_duplicates">Скрывать дубли</string>
+    <string name="hide_duplicates_help">Одна строка на песню в «Музыке», «Любимых» и «На телефоне». Ничего не удаляется. Готовые плейлисты и текущая очередь не меняются.</string>
 </resources>

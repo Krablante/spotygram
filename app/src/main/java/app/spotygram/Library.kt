@@ -222,23 +222,41 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             )
         }
 
-    suspend fun like(track: Track, sameFile: Boolean = false): Pair<Boolean, List<String>> =
+    suspend fun like(
+        track: Track,
+        sameFile: Boolean = false,
+        aliases: List<String> = emptyList(),
+    ): Pair<Boolean, List<String>> =
         withContext(Dispatchers.IO) {
-            val column = if (sameFile && track.local) "path" else "id"
-            val key = if (sameFile && track.local) track.path else track.id
+            val ids =
+                when {
+                        aliases.isNotEmpty() -> aliases
+                        sameFile && track.local ->
+                            state.value.localGroups[track.path].orEmpty().map { it.id }
+                        else -> listOf(track.id)
+                    }
+                    .ifEmpty { listOf(track.id) }
+                    .distinct()
             val change = writableDatabase.transaction {
                 val previous = mutableListOf<String>()
-                rawQuery("SELECT id FROM tracks WHERE $column=? AND liked=1", arrayOf(key)).use { c
-                    ->
-                    while (c.moveToNext()) previous += c.getString(0)
+                for (chunk in ids.chunked(400)) {
+                    val placeholders = chunk.joinToString(",") { "?" }
+                    rawQuery(
+                            "SELECT id FROM tracks WHERE id IN ($placeholders) AND liked=1",
+                            chunk.toTypedArray(),
+                        )
+                        .use { c ->
+                            while (c.moveToNext()) previous += c.getString(0)
+                        }
                 }
                 val value = previous.isEmpty()
-                update(
-                    "tracks",
-                    ContentValues().apply { put("liked", if (value) 1 else 0) },
-                    if (value) "id=?" else "$column=?",
-                    arrayOf(if (value) track.id else key),
-                )
+                compileStatement("UPDATE tracks SET liked=? WHERE id=?").use { statement ->
+                    for (id in if (value) listOf(track.id) else previous) {
+                        statement.bindLong(1, if (value) 1L else 0L)
+                        statement.bindString(2, id)
+                        statement.executeUpdateDelete()
+                    }
+                }
                 value to previous
             }
             reload()

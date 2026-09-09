@@ -43,6 +43,7 @@ fun SpotygramUI(
     val connection by app.telegram.connection.collectAsStateWithLifecycle()
     val download by app.downloading.collectAsStateWithLifecycle()
     val mode by app.playbackMode.collectAsStateWithLifecycle()
+    val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
     val cache by app.musicCache.state.collectAsStateWithLifecycle()
     val playing =
         observePlayer(player)
@@ -82,9 +83,11 @@ fun SpotygramUI(
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
     val source = library.sources.firstOrNull { it.id == sourceId }
     val offlineView = tab == 0 && offline
+    val groupedView = hideDuplicates && playlist == null && tab in 0..1
     val current =
         library.byId[playing.id]?.let {
-            if (offlineView && it.local) library.localDisplay(it) else it
+            if (groupedView) library.duplicates.display(it)
+            else if (offlineView && it.local) library.localDisplay(it) else it
         }
     LaunchedEffect(Unit) { app.notices.collectLatest { snackbar.showSnackbar(it) } }
     LaunchedEffect(Unit) {
@@ -109,7 +112,9 @@ fun SpotygramUI(
         snackbar.currentSnackbarData?.dismiss()
         val sameFile = offlineView && track.local
         app.action {
-            val (liked, previousLikes) = app.library.like(track, sameFile)
+            val aliases =
+                if (groupedView) library.duplicates.aliases(track.id).map { it.id } else emptyList()
+            val (liked, previousLikes) = app.library.like(track, sameFile, aliases)
             if (!liked)
                 scope.launch {
                     if (
@@ -326,6 +331,7 @@ fun SpotygramUI(
                             when {
                                 tab == 0 || tab == 1 || tab == 2 && playlist != null ->
                                     MusicScreen(
+                                        hideDuplicates = groupedView,
                                         library,
                                         playing.id,
                                         playing.shuffle,
@@ -534,7 +540,10 @@ fun SpotygramUI(
                         }
                     "track" ->
                         library.byId[selectedTrackId]
-                            ?.let { if (offlineView && it.local) library.localDisplay(it) else it }
+                            ?.let {
+                                if (groupedView) library.duplicates.display(it)
+                                else if (offlineView && it.local) library.localDisplay(it) else it
+                            }
                             ?.let { track ->
                                 Column(
                                     Modifier.navigationBarsPadding()
