@@ -20,6 +20,44 @@ release asset. This arrangement lets a real older installed version download
 and install the final newer APK instead of pretending a same-version install
 is a self-update. No test files or fixture suite were added to the project.
 
+The complete APKs were first published as a prerelease, which stayed out of the
+ordinary latest endpoint. Its real asset metadata was temporarily placed in the
+bridge's existing update preferences to exercise download/installation without
+announcing the release to other clients. The actual checks on Android 16 x86-64:
+
+- The library banner offered **Download and install**. With network disabled,
+  one DownloadManager request was created. Force-stop/relaunch retained the same
+  ID (33); cancellation removed that system row and left no APK behind.
+- For the next request, only the expected hash in private pending-download
+  preferences was changed to zeros. The real APK downloaded, failed verification,
+  and was deleted along with the DownloadManager record (34). No installer opened.
+- Retrying with the real metadata verified the APK and opened Android's
+  unknown-source permission screen. Back without enabling permission returned
+  to **Install update** with guidance, not another permission prompt.
+- After explicitly retrying and enabling permission, returning opened Android's
+  **Do you want to update this app?** dialog. Cancel, Home and return did not
+  reopen it. The private ready APK still matched the final release SHA-256 and
+  could be reused without downloading.
+- The release was then made ordinary/latest. Clearing only the bridge's cached
+  release-check result and attempt timestamp caused a real automatic GitHub
+  check on launch. It saved the new ETag and exact 0.7.0 asset metadata and
+  offered **Install update** for the ready APK.
+- Accepting the system **Update** action produced **App installed**. This final
+  transition used the in-app FileProvider/Android installer, not `adb install`.
+  On opening 0.7.0, the installed SHA-256 matched the published x86-64 APK, pending
+  installation preferences were empty, and the private update cache was empty.
+- All three local tracks and Night/Road playlists remained; SQLite integrity was
+  `ok`. Local playback reached PLAYING at 194419 ms with three physical media
+  items and no inspected app/player errors. Manual checking in the installed
+  0.7.0 showed the current-version result. The final Settings view was visually
+  inspected, playback paused, network restored and emulator stopped.
+
+Wrong-package/certificate rejection and download-notification click routing were
+source-reviewed, not separately simulated. Physical ARM64 installation, Android
+8–15 permission screens, system reboot during transfer and real-account Telegram
+flows were not exercised. No private bridge APK, user media or account state was
+published; the 0.7.0 release contains only the final builds.
+
 ## 0.6.1 — Telegram file identity and local-copy validation
 
 The supplied MP3 was inspected privately, outside the repository: 8,058,659 bytes,
