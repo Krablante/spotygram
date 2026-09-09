@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/banner.svg" alt="spotygram — Your Telegram music. On your terms." width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/Krablante/spotygram/releases"><img alt="APK · 0.5.1 alpha" src="https://img.shields.io/badge/APK-0.5.1%20alpha-1DB954?style=flat-square"></a>
+  <a href="https://github.com/Krablante/spotygram/releases/latest"><img alt="APK · 0.6.0" src="https://img.shields.io/badge/APK-0.6.0-1DB954?style=flat-square"></a>
   <img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-121212?style=flat-square">
   <img alt="Kotlin · Compose" src="https://img.shields.io/badge/Kotlin-Compose-121212?style=flat-square">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-121212?style=flat-square"></a>
@@ -10,7 +10,7 @@
 **A small, native music player for the audio files in your Telegram chats.**
 Connect your account, choose your sources, and listen. Downloaded songs stay on your phone. No separate account, media server, subscription, or analytics.
 
-> Private development repository. Source visibility stays private until the owner explicitly changes it.
+> Early public release. See the verification record for checked behavior and remaining limitations.
 
 <p align="center"><a href="https://github.com/Krablante/spotygram/releases">Download APK</a> · <a href="docs/usage.md">Как пользоваться</a> · <a href="docs/build.md">Build from source</a> · <a href="docs/architecture.md">Architecture</a></p>
 
@@ -31,6 +31,8 @@ The player's order button cycles through **in order → shuffle without repeats 
 See the [cache screen](docs/screenshots/cache-dark.png), captured with local imports excluded from its total.
 
 **On device** shows each local file once, even when several Telegram messages reference it. Settings uses the same file collection for its count and size; active search/source filters can still narrow the visible list. Original message references are retained.
+
+**Quiet update checks.** When you open the app, it checks public GitHub releases at most once a day. A dismissible banner appears only for a newer release; errors and “already up to date” stay silent. Settings lets you turn automatic checks off, check manually, and open the release page. Nothing downloads or installs automatically.
 
 ## A familiar place for your music
 
@@ -64,6 +66,7 @@ TDLib and OpenSSL are built from pinned upstream sources. The release APK includ
 
 - Audio stays in app-private storage. Uninstalling the app removes it; an APK update signed with the same key preserves it.
 - Telegram access is a full account session. Selecting chats controls this app's music index, not Telegram's session permissions.
+- Update checks contact GitHub directly, exposing your connection IP and app version to GitHub, not your Telegram account or music library. Automatic checks can be disabled in Settings.
 - All accessible music history loads automatically in pages, with no per-chat track cap. Tracks appear as they are indexed; interrupted history resumes from its saved cursor. **«Поискать в выбранных чатах»** also pages through all server matches.
 - No secret chats, voice-message library, YouTube downloader, or cross-device playlist sync.
 - Source-specific limitations and actual verification results are recorded in [the release notes](docs/verification.md), not hidden behind a claim of universal compatibility.
@@ -72,4 +75,4 @@ TDLib and OpenSSL are built from pinned upstream sources. The release APK includ
 
 See [build instructions](docs/build.md), [architecture](docs/architecture.md), and [third-party notices](docs/third-party.md). Verification is manual and log-based; no unit, integration, or smoke-test files are maintained in this project.
 
-Spotygram is an unofficial application using the Telegram API. It is not affiliated with Telegram or Spotify. The code is MIT-licensed; dependencies retain their own licenses. A private alpha does not establish compliance for a later public app-store release.
+Spotygram is an unofficial application using the Telegram API. It is not affiliated with Telegram or Spotify. The code is MIT-licensed; dependencies retain their own licenses.

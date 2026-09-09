@@ -36,7 +36,11 @@ Create private `$SPOTYGRAM_STATE/signing.properties` containing `storePassword=Y
 bash tools/build.sh release
 ```
 
-The phone APK is at `$SPOTYGRAM_STATE/build/app/outputs/apk/release/app-arm64-v8a-release.apk`. A separate `app-x86_64-release.apk` is built for x86-64 Android environments. This avoids making every phone carry an unused second native architecture. Verify with Android SDK `apksigner verify --verbose`, compute SHA-256, and upload the signed APKs to a GitHub release. Never publish the keystore or signing configuration. Releases remain private while the repository is private.
+The phone APK is at `$SPOTYGRAM_STATE/build/app/outputs/apk/release/app-arm64-v8a-release.apk`. A separate `app-x86_64-release.apk` is built for x86-64 Android environments. This avoids making every phone carry an unused second native architecture. Verify with Android SDK `apksigner verify --verbose`, compute SHA-256, and upload the signed APKs to a GitHub release. Never publish the keystore or signing configuration.
+
+## Publishing updates
+
+The repository and release APKs are public. Keep API configuration, sessions and the signing key outside Git; do not embed a GitHub access token. For each update, increase Android `versionCode` and numeric `versionName` together. Publish an ordinary (not prerelease) GitHub release tagged `vMAJOR.MINOR.PATCH`, mark it latest, and attach `spotygram-MAJOR.MINOR.PATCH-arm64.apk`, `spotygram-MAJOR.MINOR.PATCH-x86_64.apk` and `SHA256SUMS`. Prepare/upload assets in a draft before publication, so the update endpoint never advertises a half-uploaded release. Preserve the existing Android signing key and application ID. The app checks `/releases/latest` without authentication and offers only a numerically newer version with a compatible APK. GitHub prereleases are deliberately excluded.
 
 ## Manual development
 

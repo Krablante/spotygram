@@ -81,6 +81,14 @@ The stable order name is saved alongside the former shuffle flag; older saved qu
 
 The full player's scroll content has a minimum height equal to the safe viewport. Remaining space is distributed between content blocks, keeping bottom actions near the bottom on tall phones. On smaller heights or larger text, natural content height takes over and the screen scrolls. Artwork stays bounded; there is no screen-size polling, device-specific offset or custom layout engine.
 
+## Release checks
+
+`AppUpdates` owns a small StateFlow and separate `updates` preferences. Activity `onStart` asks for a check; no Application-start check, timer, WorkManager task, service, network callback or periodic job is added. The automatic attempt interval is 24 hours, shared with manual attempts. Manual requests have a 60-second floor and respect a persisted GitHub rate-limit cooldown. One main-thread reservation suppresses overlapping requests. The attempt timestamp is committed on IO before making the request, so failures and process restarts cannot cause immediate automatic retries. A backward wall-clock change rebases the attempt and suppresses that check.
+
+One unauthenticated HTTPS request goes to GitHub's fixed `/repos/Krablante/spotygram/releases/latest` endpoint, with an ETag when available. HTTP 304 reuses persisted metadata. Connect/read timeouts are 5/8 seconds, response size is capped at 256 KiB, redirects are rejected, and there are no automatic retries. No GitHub token, Telegram account data, analytics or device identifiers are sent. GitHub sees the connection IP and app version in User-Agent. The response must describe an ordinary non-draft release tagged `vMAJOR.MINOR.PATCH` with an uploaded nonempty APK for the device ABI. Versions compare numerically, not lexically. The release URL is constructed under the fixed repository rather than accepting an arbitrary server-provided URL.
+
+Only a newer version produces a nonmodal banner in the main library UI; its dismissal persists for that version. Disabling automatic checks also hides the banner. Settings always allows a manual check and access to a cached newer release, including a dismissed one. Automatic failures/no-update results never emit a snackbar or notification. No APK downloader, installer permission or background wakeup is introduced: the user opens the release in their browser and chooses the APK/install action. Installing an equal or newer version naturally removes the old offer. Prereleases are excluded; normal releases constitute this app's update channel.
+
 ## Deliberate limits
 
 One Telegram account, no secret chats, no chat editor, no YouTube integration, no desktop runtime, no playlist sync, no 32-bit ARM package. Platform decoders determine supported formats. Network availability and device-specific Android background policies still affect playback; actual checked scenarios live in `verification.md`.

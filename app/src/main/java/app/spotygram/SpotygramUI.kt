@@ -263,6 +263,7 @@ fun SpotygramUI(
                     },
                 ) { padding ->
                     Column(Modifier.padding(padding).fillMaxSize()) {
+                        UpdateBanner(app)
                         if (cache.clearing) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Text(

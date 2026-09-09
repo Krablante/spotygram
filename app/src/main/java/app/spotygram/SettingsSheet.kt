@@ -142,6 +142,7 @@ fun SettingsSheet(
             if (connected) tr(R.string.logout_telegram) else tr(R.string.connect_telegram),
             if (connected) onLogout else onConnect,
         )
+        UpdateSettings(app)
         Text(
             "Spotygram ${BuildConfig.VERSION_NAME}",
             Modifier.padding(top = 20.dp),

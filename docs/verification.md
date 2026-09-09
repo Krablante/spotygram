@@ -1,5 +1,15 @@
 # Verification record
 
+## 0.6.0 — quiet release checks and public distribution
+
+Debug compilation/packaging and Lint passed. On the existing Android 16 x86-64 emulator, Settings showed the Russian automatic-check switch and manual action. The switch persisted across a force-stop/relaunch, and the attempt timestamp stayed unchanged while automatic checks were disabled. A repeated manual press showed the recent-check message without changing the timestamp. A later manual check while automatic checks were disabled made a new attempt and displayed a recoverable GitHub error (the repository was still private); no automatic error banner/snackbar appeared.
+
+For the newer-release UI only, the existing debug update preferences temporarily held version `0.6.1`; no remote release, fixture file or music data was created. The banner was visually inspected. Its close action stored dismissal for that version; after force-stop/relaunch the banner remained absent and the attempt timestamp was unchanged. The cached offer remained accessible in settings. Temporary version/dismissal values were removed afterwards. This checks cached-offer UI, not discovery of a real newer release. Runtime app/player error logs were empty.
+
+Before visibility change, all 168 reachable Git blob objects were checked for the current Telegram API credentials and common private-key/token patterns, with no matches. Sensitive session/signing filenames were absent. GitHub had no issues/PRs, Actions runs or Actions artifacts. Existing APKs contain the app's API credentials by design; account sessions and signing private keys are not release assets. This is a scoped publication check, not a claim of exhaustive secret detection.
+
+Minified release compilation/packaging and release Lint passed. Both ABI signature checks and 16 KB zip alignment passed with the existing certificate. EN/RU keys and format placeholders matched for all 249 resources. ARM64 SHA-256: `fa54b37f24bb03f5d053718ee7a3b35e1f94eaa6e28e80c5e3661fd2adbb87a4`; x86-64: `e7cacb880816cc5f21d8636fce31f0b7ebad51fe5b0da63fe0e86bcc08d7fabe`. GitHub repository visibility was changed to public by owner authorization, verified through an unauthenticated HTTP 200 response, and updated in BURO through its draft workflow.
+
 ## 0.5.1 — unique local-file view
 
 The reported mismatch was confirmed in source: Settings used `distinctBy(path)` while the On device list counted every message reference. Verification used the existing debug imports in the Android 16 x86-64 emulator. No test files or extra audio files were created; builds and emulator remained sequential and resource-limited.

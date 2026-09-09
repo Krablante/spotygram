@@ -83,6 +83,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        app.updates.check()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         receiveShared(intent)

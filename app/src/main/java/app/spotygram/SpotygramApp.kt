@@ -37,6 +37,7 @@ class SpotygramApp : Application() {
     var playback: PlaybackService? = null
     var downloadService: DownloadService? = null
     val musicCache by lazy { MusicCache(this) }
+    val updates by lazy { AppUpdates(this) }
     val playbackMode = MutableStateFlow(PlaybackMode())
     val queueRevision = MutableStateFlow(0L)
 
