@@ -20,11 +20,14 @@ data class Playing(
 
 @Composable
 fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
-    var state by remember { mutableStateOf(Playing()) }
+    var state by remember(player) { mutableStateOf(Playing()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(player) {
         fun snapshot() {
-            if (player == null) return
+            if (player == null) {
+                state = Playing()
+                return
+            }
             state =
                 Playing(
                     player.currentMediaItem?.mediaId.orEmpty(),

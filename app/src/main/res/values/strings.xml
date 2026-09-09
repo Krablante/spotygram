@@ -154,7 +154,7 @@
     <string name="play_next">"Play next"</string>
     <string name="playback_failed">"Could not play this track. Tap play to try again."</string>
     <string name="player_connecting">"Connecting to player…"</string>
-    <string name="player_start_failed">"The player could not start. Restart the app."</string>
+    <string name="player_start_failed">"Could not connect to the player. Tap a song to try again."</string>
     <string name="playing_from">"PLAYING FROM"</string>
     <string name="playlist_actions">"Playlist actions"</string>
     <string name="playlist_actions_named">"Actions: %1$s"</string>

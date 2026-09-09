@@ -1,5 +1,60 @@
 # Verification record
 
+## 0.9.1 — foreground player connection and stale row callbacks
+
+Before changing code, the published 0.9.0 was reproduced with a working
+mini-player and a **Connecting to player…** notice when another row was tapped.
+Switching tabs restored row actions. Debug bytecode showed the local `::play`
+reference storing its captured controller, while lazy-item caches used equality
+that did not include those captured fields. This was a UI callback defect,
+independent of remote audio delivery.
+
+Final debug/release assembly and both Lint tasks passed. EN/RU keys and format
+arguments matched for 276 resources; documentation links resolved. Signed
+x86-64 0.9.1 installed over 0.9.0 without clearing data. Its installed hash
+matched, all three recordings and Night/Road playlists remained, and SQLite
+integrity was `ok`.
+
+Manual Android 16 emulator observations:
+
+- Cold launch restored one recording paused. One tap on a different Music row
+  started it (PLAYING at 11671 ms), without switching tabs or using transport
+  buttons to refresh the list first.
+- Home left playback running in the same service process (position 37250 ms).
+  Returning and tapping another row switched recordings (PLAYING at 11752 ms).
+- Changing display density from 192 to 240 forced Activity configuration
+  recreation while playback continued. Selecting a different row still worked
+  (PLAYING at 11657 ms), with the service process unchanged. Density was restored.
+- Only the debug PlaybackService component was temporarily disabled. Initial
+  connection made two attempts and stopped. Each of two explicit song taps
+  initiated another pair, with no intervening retry loop. The final Russian
+  message said to tap a song to retry; it did not remain in the connecting state.
+  Restoring the component to its default state caused Android to terminate that
+  debug process; reopening and choosing another recording reached PLAYING at
+  6207 ms. This was not a same-process hot-enable recovery test.
+- With the debug app backgrounded and paused, `am stopservice` removed its
+  PlaybackService (the service dump showed none). Returning/reopening and
+  choosing a song recreated the service and reached PLAYING at 8826 ms.
+- After changing duplicate mode in the UI, grouped unlike cleared two marked
+  aliases and Undo restored exactly both. Switching back to separate entries
+  and removing the extra mark restored the original favorite. Debug integrity
+  remained `ok`, and Hide duplicates was left enabled.
+
+The service component override, diagnostic accessibility timeout and the
+Activity-finish developer setting left from diagnosis were cleared. Playback
+was paused and the emulator stopped. Inspected logs contained only the six
+intentional debug connection failures; no app/player crash was observed. The
+emulator's recurring boot System UI ANR was handled separately. The ten-second
+timeout, stale-future rejection, latest-pending-selection replacement and its
+cancellation on exit were source-reviewed, not forced with delayed Binder
+responses. Physical-device overnight/OEM battery behavior and authenticated
+Telegram playback were not measured. No test files or fixture suite were added.
+
+Both APKs passed signing and 16 KB alignment with the existing certificate.
+VersionCode 14 / versionName 0.9.1. SHA-256: ARM64
+`dec65717b4e28cc04835453ebcd6949fa9d7f0af19ad1343a56dfdee6951e587`, x86-64
+`259deb176f0a1ae9ed6e503dfadfe8a956fc21b519b3159248704e6e6fff7ede`.
+
 ## 0.9.0 — reversible duplicate hiding
 
 Debug/release assembly and both Lint tasks passed. EN/RU keys and format

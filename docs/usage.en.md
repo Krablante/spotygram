@@ -58,6 +58,11 @@ bottom player opens the full player. Lock-screen controls work too.
 The mini-player has previous, play/pause and next buttons. Previous switches
 directly to the previous song without opening the full player.
 
+If the player is still connecting after you return, the selected song starts
+when it is ready. Repeated taps keep the latest selection. If connection fails,
+the message asks you to tap a song to retry; restarting the app is not required.
+Leaving the app cancels a waiting start, but does not stop music already playing.
+
 The full player has seeking, a queue and repeat controls. The order button to
 the left of Previous cycles through three modes:
 

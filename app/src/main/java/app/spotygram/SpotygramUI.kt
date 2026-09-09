@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 fun SpotygramUI(
     app: SpotygramApp,
     player: MediaController?,
+    playerConnecting: Boolean,
+    onStartPlayback: (List<Track>, Int, PlaybackOrder?) -> Unit,
     onImport: () -> Unit,
     onDownload: (List<String>) -> Unit,
 ) {
@@ -90,6 +92,13 @@ fun SpotygramUI(
             else if (offlineView && it.local) library.localDisplay(it) else it
         }
     LaunchedEffect(Unit) { app.notices.collectLatest { snackbar.showSnackbar(it) } }
+    LaunchedEffect(playerConnecting) {
+        if (playerConnecting)
+            snackbar.showSnackbar(
+                tr(R.string.player_connecting),
+                duration = SnackbarDuration.Indefinite,
+            )
+    }
     LaunchedEffect(Unit) {
         app.updates.showSettings.collect { show ->
             if (show) {
@@ -129,17 +138,13 @@ fun SpotygramUI(
         }
     }
     fun play(track: Track, tracks: List<Track>) {
-        if (player == null) {
-            app.notices.tryEmit(tr(R.string.player_connecting))
-            return
-        }
         val available = tracks.filter { it.local || it.available }
         val index = available.indexOfFirst { it.id == track.id }
         if (index < 0) {
             app.notices.tryEmit(tr(R.string.no_local_copy))
             return
         }
-        app.playback?.start(available, index)
+        onStartPlayback(available, index, null)
     }
     fun addToPlaylist(ids: List<String>) {
         playlistTracks = ArrayList(ids)
@@ -349,8 +354,8 @@ fun SpotygramUI(
                                             playlistId = null
                                             sourceId = null
                                         },
-                                        onPlay = ::play,
-                                        onLike = ::like,
+                                        onPlay = { track, tracks -> play(track, tracks) },
+                                        onLike = { like(it) },
                                         onMore = {
                                             selectedTrackId = it.id
                                             sheet = "track"
@@ -363,17 +368,16 @@ fun SpotygramUI(
                                                 val available = tracks.filter { t ->
                                                     t.local || t.available
                                                 }
-                                                app.playback?.start(
+                                                onStartPlayback(
                                                     available,
                                                     available.indexOf(it),
-                                                    order =
-                                                        if (mode.random) PlaybackOrder.RANDOM
-                                                        else PlaybackOrder.SHUFFLE,
+                                                    if (mode.random) PlaybackOrder.RANDOM
+                                                    else PlaybackOrder.SHUFFLE,
                                                 )
                                             }
                                         },
                                         onDownload = onDownload,
-                                        onAddToPlaylist = ::addToPlaylist,
+                                        onAddToPlaylist = { addToPlaylist(it) },
                                         onSearchChats = { q -> app.action { app.searchMusic(q) } },
                                         onAddTracks = { editPlaylist(playlistId) },
                                         onPlaylistMenu = {

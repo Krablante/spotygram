@@ -1,7 +1,6 @@
 package app.spotygram
 
 import android.Manifest
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -12,15 +11,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
 
 class MainActivity : ComponentActivity() {
     private val app
         get() = application as SpotygramApp
+
+    private val playerConnection by lazy { PlayerConnection(this, app) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,28 +33,8 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = !dark
                 }
             }
-            var controller by remember { mutableStateOf<MediaController?>(null) }
-            DisposableEffect(Unit) {
-                val future =
-                    MediaController.Builder(
-                            this@MainActivity,
-                            SessionToken(
-                                this@MainActivity,
-                                ComponentName(this@MainActivity, PlaybackService::class.java),
-                            ),
-                        )
-                        .buildAsync()
-                future.addListener(
-                    {
-                        runCatching { controller = future.get() }
-                            .onFailure {
-                                app.notices.tryEmit(tr(R.string.player_start_failed))
-                            }
-                    },
-                    ContextCompat.getMainExecutor(this@MainActivity),
-                )
-                onDispose { MediaController.releaseFuture(future) }
-            }
+            val controller by playerConnection.controller.collectAsStateWithLifecycle()
+            val waitingForPlayer by playerConnection.waiting.collectAsStateWithLifecycle()
             val picker =
                 rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenMultipleDocuments()
@@ -72,6 +50,10 @@ class MainActivity : ComponentActivity() {
                 SpotygramUI(
                     app,
                     controller,
+                    playerConnecting = waitingForPlayer,
+                    onStartPlayback = { tracks, index, order ->
+                        playerConnection.play(tracks, index, order)
+                    },
                     onImport = { picker.launch(arrayOf("audio/*")) },
                     onDownload = { ids ->
                         if (
@@ -87,7 +69,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        playerConnection.start()
         app.updates.check()
+    }
+
+    override fun onStop() {
+        playerConnection.stop()
+        super.onStop()
     }
 
     override fun onResume() {

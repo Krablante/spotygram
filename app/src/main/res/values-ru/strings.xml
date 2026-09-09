@@ -156,7 +156,7 @@
     <string name="play_next">"Слушать следующим"</string>
     <string name="playback_failed">"Не удалось воспроизвести трек. Нажмите воспроизведение ещё раз."</string>
     <string name="player_connecting">"Плеер подключается…"</string>
-    <string name="player_start_failed">"Плеер не запустился. Перезапустите приложение."</string>
+    <string name="player_start_failed">"Не удалось подключить плеер. Нажмите на песню, чтобы повторить."</string>
     <string name="playing_from">"ИГРАЕТ ИЗ"</string>
     <string name="playlist_actions">"Действия с плейлистом"</string>
     <string name="playlist_actions_named">"Действия: %1$s"</string>

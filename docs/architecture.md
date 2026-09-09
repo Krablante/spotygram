@@ -26,6 +26,27 @@ Screens do not read TDLib's database.
 
 `PlaybackService` owns ExoPlayer and the queue. The UI uses MediaController
 for transport controls and the in-process service for full-queue edits.
+`PlayerConnection` owns the Activity's controller from `onStart` to `onStop`;
+releasing this UI connection does not pause background playback. It handles
+disconnects, bounds each connection attempt to ten seconds and permits one
+automatic retry per foreground entry or explicit playback request. No background
+reconnect loop runs. Generation checks discard obsolete callbacks and release
+old futures. A later foreground entry or song tap can retry a failed connection.
+
+Song and random-play requests go through this owner rather than a captured
+nullable controller. During connection, only the latest selected queue/track is
+retained; it runs once after readiness using current catalog records. Leaving
+the Activity clears an unfulfilled request. The connecting snackbar follows
+that real pending state and disappears when it settles. Player observations
+reset on controller replacement instead of retaining a stale playing snapshot.
+
+Local UI function references capturing changing values are passed as ordinary
+lambdas. In the previous build, `::play` captured the initial null controller;
+generated lazy-item caches compared function references by equality, which did
+not include their captured values. This could keep a dead row handler even
+while the mini-player was connected. The same correction covers group-aware
+favorite actions and the add-to-playlist callback.
+
 `DownloadService` handles explicitly requested downloads sequentially, as
 a visible foreground service. No extra service is needed for updates or
 cache cleanup.
