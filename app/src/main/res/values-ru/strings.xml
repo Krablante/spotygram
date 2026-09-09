@@ -262,4 +262,17 @@
     <string name="audio_copy_unreadable">Не удалось прочитать аудиофайл. Локальная копия может быть повреждена, а формат — не поддерживаться.</string>
     <string name="audio_format_unsupported">Устройство не поддерживает этот аудиоформат.</string>
     <string name="telegram_app_missing">Установите Telegram, чтобы открыть эту переписку.</string>
+    <string name="update_download_install">Скачать и установить</string>
+    <string name="update_install">Установить обновление</string>
+    <string name="update_downloading">Скачивание обновления приложения</string>
+    <string name="update_download_progress">Скачивание: %1$s / %2$s</string>
+    <string name="update_cancel_download">Отменить загрузку</string>
+    <string name="update_delete_download">Удалить скачанный APK</string>
+    <string name="update_verifying">Проверяем APK…</string>
+    <string name="update_cancelling">Отменяем…</string>
+    <string name="update_download_failed">Не удалось скачать обновление. Проверьте соединение и свободное место, затем повторите попытку.</string>
+    <string name="update_verification_failed">APK не прошёл проверку или больше недоступен. Скачайте его заново.</string>
+    <string name="update_permission_needed">Разрешите установку из Spotygram и снова нажмите «Установить обновление».</string>
+    <string name="update_installer_failed">Не удалось открыть установщик Android. Можно повторить попытку или открыть релиз на GitHub.</string>
+    <string name="update_check_first">Проверьте обновления ещё раз, чтобы получить данные для скачивания.</string>
 </resources>

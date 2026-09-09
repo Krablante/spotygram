@@ -49,8 +49,10 @@ and choose **Settings → Import audio files**.
 Install future APKs over the existing app to keep your library. Spotygram checks
 for new releases when you open it, at most once a day. It stays quiet unless
 there is an update. You can dismiss that version's reminder, turn automatic
-checks off, or check manually in Settings. Downloads and installation are
-always your choice.
+checks off, or check manually in Settings. **Download and install** is available
+in both the update banner and Settings: it downloads the right APK, verifies it
+and opens Android's installation confirmation. There is no need to find the
+file on GitHub. Nothing downloads until you choose it.
 
 ## While you listen
 

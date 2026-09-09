@@ -154,11 +154,35 @@ an uploaded APK for the device ABI. Version comparison is numeric. Release
 links are constructed under the fixed repository, not taken from arbitrary
 response URLs. The naming contract is in the [build guide](build.md).
 
-A newer version produces a dismissible library banner; dismissal persists for
-that version. Settings can still open it. Automatic failures and no-update
-results stay silent. There is no scheduler, background wakeup, APK downloader
-or installer permission. GitHub receives the connection IP and app version,
-not Telegram account data or the music library.
+A newer version produces a dismissible library banner with Download and install;
+the same action is in Settings. Dismissal persists for that version. Automatic
+failures and no-update results stay silent. Release metadata retains the selected
+APK's size and GitHub SHA-256 digest; download URLs are constructed under the
+fixed repository. GitHub receives the connection IP and app version, not
+Telegram account data or the music library.
+
+`UpdateInstaller` delegates user-requested transfers to Android DownloadManager.
+It persists one download ID and an immutable copy of the selected asset metadata.
+Only a resumed Activity polls progress, once per second while that download is
+active. Leaving the app stops polling, not the system transfer. Cold launch
+restores the download or ready APK without automatically opening the installer.
+A permission-protected receiver routes a system download-notification click
+back to the update settings. There is no additional foreground service or
+periodic release-check job.
+
+Completed bytes are copied into the app's private update cache and verified on
+IO: exact size and SHA-256, matching package/version, increasing Android version
+code, and the same current signing certificate set as the installed app. Debug
+builds intentionally reject the production package. Android's installer performs
+its own final package/signature validation. A non-exported FileProvider grants
+temporary read access to the verified APK, not to the music or session directories.
+
+Installation uses Android's normal unknown-source permission and installer UI.
+Returning from the permission screen continues the explicit request once; denial
+or installer cancellation does not reopen it in a loop. Ready APKs can be retried
+without downloading, with verification repeated before handoff. Cancel joins
+in-flight work before removing the DownloadManager entry and private files.
+After a successful app update, the next launch clears the old APK and metadata.
 
 ## Verification and limits
 

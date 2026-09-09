@@ -20,6 +20,11 @@ data class UpdateState(
 /** One foreground-triggered request, with a durable attempt budget; no scheduled work. */
 class AppUpdates(private val app: SpotygramApp) {
     private val prefs = app.getSharedPreferences("updates", android.content.Context.MODE_PRIVATE)
+    val installer by lazy { UpdateInstaller(app) }
+    val showSettings = MutableStateFlow(false)
+    var asset: UpdateAsset? = UpdateAsset.fromJson(prefs.getString("asset", null))
+        private set
+
     val state =
         MutableStateFlow(
             UpdateState(
@@ -34,8 +39,7 @@ class AppUpdates(private val app: SpotygramApp) {
         state.value = state.value.copy(automatic = enabled)
     }
 
-    fun dismiss() {
-        val version = state.value.version
+    fun dismiss(version: String = state.value.version) {
         prefs.edit().putString("dismissed", version).apply()
         state.value = state.value.copy(dismissed = version)
     }
@@ -106,9 +110,12 @@ class AppUpdates(private val app: SpotygramApp) {
             connection.setRequestProperty("Accept", "application/vnd.github+json")
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             connection.setRequestProperty("User-Agent", "Spotygram/${BuildConfig.VERSION_NAME}")
-            prefs.getString("etag", null)?.let {
-                connection.setRequestProperty("If-None-Match", it)
-            }
+            prefs
+                .getString("etag", null)
+                ?.takeIf { asset != null }
+                ?.let {
+                    connection.setRequestProperty("If-None-Match", it)
+                }
             val code = connection.responseCode
             if (code == 304) return prefs.getString("version", "").orEmpty()
             if (code == 403 || code == 429) {
@@ -144,22 +151,33 @@ class AppUpdates(private val app: SpotygramApp) {
             val suffix = if (abi == "arm64-v8a") "arm64" else "x86_64"
             kotlin.check(abi != null)
             val assets = release.getJSONArray("assets")
-            kotlin.check(
-                (0 until assets.length()).any {
-                    val asset = assets.getJSONObject(it)
-                    asset.optString("name") == "spotygram-$version-$suffix.apk" &&
-                        asset.optString("state") == "uploaded" &&
-                        asset.optLong("size") > 0
-                }
-            )
+            val selected =
+                (0 until assets.length())
+                    .map { assets.getJSONObject(it) }
+                    .firstOrNull {
+                        it.optString("name") == "spotygram-$version-$suffix.apk" &&
+                            it.optString("state") == "uploaded" &&
+                            it.optLong("size") > 0
+                    }
+            kotlin.check(selected != null)
+            val candidate =
+                UpdateAsset(
+                    version,
+                    selected.getLong("size"),
+                    selected.getString("digest").removePrefix("sha256:"),
+                    suffix,
+                )
+            kotlin.check(candidate.valid())
             kotlin.check(
                 prefs
                     .edit()
                     .putString("version", version)
+                    .putString("asset", candidate.toJson())
                     .putString("etag", connection.getHeaderField("ETag"))
                     .putLong("retry_after", 0)
                     .commit()
             )
+            asset = candidate
             return version
         } finally {
             connection.disconnect()

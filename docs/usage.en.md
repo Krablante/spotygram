@@ -120,13 +120,29 @@ Automatic checks are enabled by default. They happen only when opening or
 returning to the app, at most once a day. Failed checks count as attempts.
 When there is no newer version, the app stays silent.
 
-The update banner opens the GitHub release page. Its close button dismisses
-that version permanently; the link remains in Settings. Settings also lets
-you disable automatic checks or **Check for updates** manually. Repeated
+The update banner offers **Download and install**, also available in Settings.
+Its close button dismisses that version; the offer remains in Settings.
+Settings also lets you disable automatic checks or **Check for updates** manually. Repeated
 manual attempts have a one-minute minimum interval, longer if GitHub limits
 requests. Prereleases are excluded.
 
-You choose when to download and install the APK. Installing a new official APK
+After you tap the button, Android's DownloadManager fetches the APK for your
+device. The app shows progress and cancellation; the transfer can continue
+while Spotygram is closed. Reopening picks up its current state.
+
+Before installation, the app checks size, SHA-256, package, version and signing
+certificate. If Android asks to allow installation from Spotygram, enable it
+and return; the app continues to the installer. Denying permission does not
+cause repeated prompts. **Install update** lets you try again later. Android
+still requires your confirmation to install.
+
+A ready APK can be installed again without another download, or deleted in
+Settings. Cancellation removes temporary files; a successful update cleans up
+the APK on the next launch. **View release** remains available for reading the
+changes on GitHub. Automatic checks only offer updates: they never start a
+download or installer by themselves.
+
+Installing a new official APK
 over the old one preserves data. **Uninstalling the app removes its library
 and settings.** Playlists are not synced to the cloud.
 

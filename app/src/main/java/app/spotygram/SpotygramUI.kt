@@ -87,6 +87,14 @@ fun SpotygramUI(
             if (offlineView && it.local) library.localDisplay(it) else it
         }
     LaunchedEffect(Unit) { app.notices.collectLatest { snackbar.showSnackbar(it) } }
+    LaunchedEffect(Unit) {
+        app.updates.showSettings.collect { show ->
+            if (show) {
+                sheet = "settings"
+                app.updates.showSettings.value = false
+            }
+        }
+    }
     LaunchedEffect(tab) {
         app.prefs.edit().putString("last_destination", destinationKeys[tab]).apply()
     }

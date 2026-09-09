@@ -88,12 +88,23 @@ class MainActivity : ComponentActivity() {
         app.updates.check()
     }
 
+    override fun onResume() {
+        super.onResume()
+        app.updates.installer.resume(this)
+    }
+
+    override fun onPause() {
+        app.updates.installer.pause(this)
+        super.onPause()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         receiveShared(intent)
     }
 
     private fun receiveShared(intent: Intent?) {
+        if (intent?.action == "app.spotygram.SHOW_UPDATES") app.updates.showSettings.value = true
         if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("audio/") == true) {
             @Suppress("DEPRECATION")
             val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)

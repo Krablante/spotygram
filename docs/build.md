@@ -66,6 +66,13 @@ The phone APK is at `$SPOTYGRAM_STATE/build/app/outputs/apk/release/app-arm64-v8
 
 The repository and release APKs are public. Keep API configuration, sessions and the signing key outside Git; do not embed a GitHub access token. For each update, increase Android `versionCode` and numeric `versionName` together. Publish an ordinary (not prerelease) GitHub release tagged `vMAJOR.MINOR.PATCH`, mark it latest, and attach `spotygram-MAJOR.MINOR.PATCH-arm64.apk`, `spotygram-MAJOR.MINOR.PATCH-x86_64.apk` and `SHA256SUMS`. Prepare/upload assets in a draft before publication, so the update endpoint never advertises a half-uploaded release. Preserve the existing Android signing key and application ID. The app checks `/releases/latest` without authentication and offers only a numerically newer version with a compatible APK. GitHub prereleases are deliberately excluded.
 
+The in-app installer requires GitHub's asset `digest` (SHA-256) and exact size,
+and checks the APK's package, version and current signing certificate set before
+handoff to Android. Check uploaded asset digests against the local APKs before
+publishing. Builds with another signing key, including debug, intentionally
+cannot install the official release as an update. The app grants the installer
+read access only to its private cached APK; no storage-wide permission is needed.
+
 ## Manual development
 
 Debug builds use the application ID `app.spotygram.dev`; release builds use `app.spotygram`, so they cannot accidentally share account state. Debug builds can opt into Telegram's official sandbox with `-PtelegramTestDc=true`; release builds always use production. Do not switch an existing debug installation between environments without clearing that debug installation's data.

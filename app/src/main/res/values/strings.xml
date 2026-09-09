@@ -258,4 +258,17 @@
     <string name="audio_copy_unreadable">Could not read the audio file. Its local copy may be damaged or its format unsupported.</string>
     <string name="audio_format_unsupported">This device cannot play this audio format.</string>
     <string name="telegram_app_missing">Install Telegram to open this conversation.</string>
+    <string name="update_download_install">Download and install</string>
+    <string name="update_install">Install update</string>
+    <string name="update_downloading">Downloading app update</string>
+    <string name="update_download_progress">Downloading: %1$s / %2$s</string>
+    <string name="update_cancel_download">Cancel download</string>
+    <string name="update_delete_download">Delete downloaded APK</string>
+    <string name="update_verifying">Checking the APK…</string>
+    <string name="update_cancelling">Cancelling…</string>
+    <string name="update_download_failed">Could not download the update. Check your connection and free space, then try again.</string>
+    <string name="update_verification_failed">The APK did not pass verification or is no longer available. Download it again.</string>
+    <string name="update_permission_needed">Allow installation from Spotygram, then tap Install update again.</string>
+    <string name="update_installer_failed">Could not open the Android installer. You can try again or open the release on GitHub.</string>
+    <string name="update_check_first">Check for updates again to refresh the download information.</string>
 </resources>

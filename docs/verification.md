@@ -1,5 +1,25 @@
 # Verification record
 
+## 0.7.0 — in-app download and installation
+
+Debug/release builds and both Lint tasks passed after correcting an initial
+Intent builder compilation error. EN/RU resource keys and format arguments
+matched for 265 resources. Both release APKs passed signing and 16 KB alignment
+with the existing certificate. Manifest: `app.spotygram`, versionCode 10,
+versionName 0.7.0, minSdk 26, with `REQUEST_INSTALL_PACKAGES` and a non-exported
+update FileProvider. Final APK hashes: ARM64
+`d2e3160adfdced8314664a76d5e40feb29b9c668b32927b8b81c50e07015ec61`, x86-64
+`495bb02f1c5a304acd720087a11e431b0909f8b008b9d2daaea7cee92b2e6e2a`.
+
+For the self-update check, the same installer source was also built privately
+with versionCode 9/versionName 0.6.1 and the existing release key. This temporary
+version change was restored before committing. The private x86-64 bridge APK
+(`2a7dfe5990f7604cd76dc8cc61f0a30a503874e9caacc57d87732f546595864a`)
+installed over the emulator's existing 0.6.1 without clearing data. It is not a
+release asset. This arrangement lets a real older installed version download
+and install the final newer APK instead of pretending a same-version install
+is a self-update. No test files or fixture suite were added to the project.
+
 ## 0.6.1 — Telegram file identity and local-copy validation
 
 The supplied MP3 was inspected privately, outside the repository: 8,058,659 bytes,
