@@ -224,6 +224,7 @@ fun SpotygramUI(
                                         player,
                                         onOpen = { fullPlayer = true },
                                         onToggle = { togglePlayback(player) },
+                                        onPrevious = { player?.seekToPreviousMediaItem() },
                                         onNext = { player?.seekToNextMediaItem() },
                                     )
                                 NavigationBar(
@@ -721,6 +722,7 @@ private fun MiniPlayer(
     player: MediaController?,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
+    onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
     val state = observePlayer(player, positionUpdates = true)
@@ -749,6 +751,9 @@ private fun MiniPlayer(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Rounded.SkipPrevious, tr(R.string.previous_track))
             }
             IconButton(onClick = onToggle) {
                 if (state.loading)

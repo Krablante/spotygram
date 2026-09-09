@@ -40,6 +40,9 @@ The four bottom destinations are **Chats**, **Favorites**, **Playlists** and
 **Music**. Your last destination is remembered. Tap a song to play; the small
 bottom player opens the full player. Lock-screen controls work too.
 
+The mini-player has previous, play/pause and next buttons. Previous switches
+directly to the previous song without opening the full player.
+
 The full player has seeking, a queue and repeat controls. The order button to
 the left of Previous cycles through three modes:
 

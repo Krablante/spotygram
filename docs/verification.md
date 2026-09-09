@@ -1,5 +1,25 @@
 # Verification record
 
+## 0.8.1 — mini-player previous button
+
+Release assembly and Lint passed. The signed x86-64 APK installed over 0.8.0
+without clearing data; all three recordings and Night/Road playlists remained,
+SQLite integrity was `ok`, and the installed APK hash matched the release copy.
+In the bottom mini-player, Next moved from the demonstration recording to
+another song (PLAYING at 8766 ms). A single tap on the new Previous button
+returned to the demonstration recording through absolute-random history
+(PLAYING at 5784 ms), rather than merely restarting the current song. The media
+session kept three physical items. No inspected app/player errors were logged.
+
+The mini-player was visually inspected at 320 dp width with font scale 1.3:
+all three controls remained separate, and the long title ellipsized. Display
+settings were restored, playback paused and the emulator stopped. Both APKs
+passed signature and 16 KB alignment checks with the existing key. SHA-256:
+ARM64 `2706c6b3c1f57c04a599fe930fec4f05ddbfaddc42f81d79bba256cda2e0b5f6`,
+x86-64 `7361d908fd176bed2068e5055c9ec92a4bc77ab94f49cc50a126caca24e232e5`.
+No test files were added. Physical-device and authenticated Telegram behavior
+were not re-tested for this UI-only change.
+
 ## 0.8.0 — temporary playback copies
 
 Initial debug assembly and Lint passed. Manual checks used the existing Android
