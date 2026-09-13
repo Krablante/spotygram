@@ -1,5 +1,75 @@
 # Verification record
 
+## 0.9.2 — local-first chat discovery
+
+The picker previously used only `searchChatsOnServer` for a nonempty query and
+replaced its whole list with that response. Typing also cancelled directory
+loading. The native TDLib checkout matched the pinned build revision; its
+offline `searchChats` API and chat-list update contracts were reviewed before
+the change. Private channels are not explicitly filtered out by Spotygram.
+
+Manual Android 16 debug checks used temporary known-chat entries in memory and
+debugger-completed request futures. They exercised the actual picker, Kotlin
+request/merge code and SQLite source selection, not real Telegram discovery:
+
+- The main/archive loading path completed separately from local list reads.
+  After the final event deduplication change, an unchanged revision did not
+  cause a second initial local read.
+- A local match stayed visible after the online search returned no IDs. With
+  the keyboard open, the row, clear-search control and Done remained usable.
+- Overlapping local/server IDs produced one row per ID. Advancing the native
+  revision with an additional diagnostic entry updated the open query without
+  another keystroke; all three distinct results appeared.
+- Two rows could be selected and deselected, with the updated selected-count
+  label. The temporary selections were removed again.
+- A supplied online error kept the local row visible alongside Retry. An empty
+  local and online result displayed the new explanatory empty state.
+- RU/light and EN/dark layouts were inspected. At 320 dp width and font scale
+  1.3, the keyboard left too little space while the permissions explanation was
+  fixed above Done; that explanation was moved into the scrolling list. The
+  final build was inspected at that size with the keyboard open: the entire
+  diagnostic chat row and checkbox were visible, with Done above the keyboard.
+
+Final debug/release assembly and both Lint tasks passed. EN/RU keys and format
+arguments matched for 284 strings; documentation links resolved. Both release
+APKs passed signature and 16 KB ZIP alignment checks with the existing signing
+certificate. Manifest: `app.spotygram`, versionCode 15 / versionName 0.9.2.
+
+The signed x86-64 APK was installed over 0.9.1 without clearing data. After the
+layout iteration, the emulator was returned to the same signed 0.9.1 with a
+data-preserving downgrade, and the final 0.9.2 was installed over it again.
+The installed final APK hash matched the release artifact; all three recordings,
+two playlists and three memberships remained, with SQLite integrity `ok`.
+Final local playback reached PLAYING at 28695 ms while the Activity was in the
+background. Returning kept the same installation; playback was left paused at
+28978 ms. No AndroidRuntime or ExoPlayer error was found in the final inspected
+logs.
+
+The debug catalog ended with its original four recordings, one playlist and
+three memberships, no diagnostic sources, and integrity `ok`. Temporary
+auth/chat state was removed by process exit; the diagnostic Saved Messages
+preference was removed, theme and last destination restored, and density, font
+scale and locale returned to their prior values. Debug-app selection and the
+JDWP port forward were cleared. The emulator was stopped.
+
+Final SHA-256: ARM64
+`51bf87f6b52e561a4e862d41e006d0c73093d5f6ad112e4d1db8e28707e01e85`,
+x86-64 `dad1626c1ca9d465e2e81acfbfbbdba143ad4b11a54a8157cb17584d74bdc864`.
+
+Typing cancellation, lifecycle-scoped stop/restart, late-result isolation,
+secret-chat exclusion, real offline TDLib lookup and native new-channel delivery
+were source-reviewed; delayed authenticated responses were not forced. The
+debugger's early main-thread pauses caused diagnostic input ANRs, and the
+emulator also showed its recurring boot System UI ANR. These are separate from
+the ordinary signed-app playback checks.
+
+An isolated in-memory Telegram sandbox client confirmed test mode on DC 2,
+but the documented five-digit code returned `PHONE_CODE_INVALID`. No production
+account or another application's session was used. Authenticated private-channel
+search, physical-device behavior and battery measurements remain unverified.
+No test files, test dependencies or persistent test harness were added to the
+project; debugger data and screenshots stayed outside source.
+
 ## 0.9.1 — foreground player connection and stale row callbacks
 
 Before changing code, the published 0.9.0 was reproduced with a working

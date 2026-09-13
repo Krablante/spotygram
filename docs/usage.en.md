@@ -25,6 +25,14 @@ Open **Chats → Add chats**, choose Saved Messages, groups or channels, then
 confirm your selection. An accessible public channel can also be added by
 `@username`. Spotygram does not automatically subscribe you to it.
 
+Private channels accessible to the connected account can be selected by name;
+they do not need a public username. The picker searches loaded chats immediately
+and adds online matches when available. Typing does not stop the chat list from
+loading, and newly received chats can appear while the picker stays open.
+Use the refresh icon **inside Add chats** to retry directory loading and search.
+Offline, already loaded chats remain selectable. The refresh button on the
+main Chats screen updates music in sources you have already selected.
+
 History loads progressively: you can listen to the first songs while more
 appear. The app scans all accessible history, not just the last hundred
 messages. Interrupted loading resumes from its saved position. Use refresh

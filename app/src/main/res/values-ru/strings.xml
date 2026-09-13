@@ -54,6 +54,16 @@
     <string name="channel_name_required">"Укажите @имя публичного канала"</string>
     <string name="chat_search_complete">"Поиск в выбранных чатах завершён"</string>
     <string name="chat_search_hint">"Название чата или @канал"</string>
+    <string name="refresh_chats">Обновить список чатов</string>
+    <string name="clear_chat_search">Очистить поиск</string>
+    <string name="loading_chats">Загружаем чаты…</string>
+    <string name="searching_chats">Ищем в Telegram…</string>
+    <string name="chat_picker_offline">Нет сети. Уже загруженные чаты можно выбрать.</string>
+    <string name="chat_list_failed">Не удалось загрузить все чаты. Доступные чаты показаны ниже.</string>
+    <string name="chat_search_failed">Не удалось завершить поиск в сети. Локальные результаты сохранены.</string>
+    <string name="retry_chat_loading">Повторить</string>
+    <string name="chat_list_empty">Чаты ещё не загружены. Попробуйте обновить список.</string>
+    <string name="chat_search_empty">Чаты не найдены. Попробуйте другое название или обновите список чатов.</string>
     <string name="chats">"Чаты"</string>
     <string name="choose_chats">"Выбрать чаты"</string>
     <string name="choose_sources_help">"Выбирай, откуда собирать музыку."</string>
@@ -85,7 +95,7 @@
     <string name="discard_help">"Название и выбранные песни не будут сохранены."</string>
     <string name="discard_title">"Выйти без сохранения?"</string>
     <string name="done">"Готово"</string>
-    <string name="done_chats">"Готово · %1$s чатов"</string>
+    <string name="done_chats">"Готово · выбрано: %1$s"</string>
     <string name="download">"Скачать"</string>
     <string name="download_channel">"Сохранение музыки"</string>
     <string name="download_notification_title">"Spotygram · На телефон"</string>

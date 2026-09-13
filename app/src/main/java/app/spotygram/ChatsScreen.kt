@@ -13,8 +13,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.sample
 
 @Composable
 fun ChatsScreen(
@@ -65,7 +74,7 @@ fun ChatsScreen(
                 }
                 IconButton(onClick = onRefresh, enabled = !busy) {
                     if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Rounded.Refresh, tr(R.string.refresh))
+                    else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
                 }
             }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 12.dp)) {
@@ -139,27 +148,107 @@ fun ChatsScreen(
     }
 }
 
+@OptIn(FlowPreview::class)
 @Composable
 fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
-    val chats by app.chatChoices.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val auth by app.telegram.auth.collectAsStateWithLifecycle()
+    val connection by app.telegram.connection.collectAsStateWithLifecycle()
+    val ready = auth.type == "authorizationStateReady"
+    val online = ready && connection.isEmpty()
     var query by rememberSaveable { mutableStateOf("") }
-    var searching by remember { mutableStateOf(false) }
-    LaunchedEffect(query) {
-        if (query.isNotBlank()) delay(350)
-        searching = true
-        try {
-            app.searchChats(query)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            app.notices.tryEmit(friendly(e))
-        } finally {
-            searching = false
+    val search = query.trim()
+    var refresh by remember { mutableIntStateOf(0) }
+    var loading by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var local by remember(search) { mutableStateOf<List<ChatChoice>>(emptyList()) }
+    var remote by remember(search) { mutableStateOf<List<ChatChoice>>(emptyList()) }
+    var localLoading by remember(search) { mutableStateOf(true) }
+    var searching by remember(search) { mutableStateOf(false) }
+    var localError by remember(search) { mutableStateOf<String?>(null) }
+    var searchError by remember(search) { mutableStateOf<String?>(null) }
+
+    // Loading the directory belongs to the open picker, not to a particular query.
+    LaunchedEffect(online, refresh, lifecycle) {
+        if (!online) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            loading = true
+            loadError = null
+            try {
+                app.loadChats()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                loadError = friendly(e)
+            } finally {
+                loading = false
+            }
         }
     }
+    LaunchedEffect(search, ready, refresh, lifecycle) {
+        if (!ready) {
+            local = emptyList()
+            remote = emptyList()
+            localLoading = false
+            return@LaunchedEffect
+        }
+        // Coalesce native chat updates; no polling or observer survives the picker.
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            app.telegram.chatRevision
+                .sample(200)
+                .onStart { emit(app.telegram.chatRevision.value) }
+                .distinctUntilChanged()
+                .collectLatest {
+                    try {
+                        local = app.searchChats(search)
+                        localError = null
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        localError = friendly(e)
+                    } finally {
+                        localLoading = false
+                    }
+                }
+        }
+    }
+    LaunchedEffect(search, online, refresh, lifecycle) {
+        if (search.isEmpty() || !online) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            searching = true
+            searchError = null
+            try {
+                delay(350)
+                remote = app.searchChats(search, onServer = true)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                searchError = friendly(e)
+            } finally {
+                searching = false
+            }
+        }
+    }
+    val chats =
+        remember(local, remote) {
+            (local + remote)
+                .distinctBy { it.id }
+                .sortedWith(
+                    compareBy<ChatChoice> { it.id != AppText.savedChatId }
+                        .thenBy { it.displayTitle.lowercase() }
+                )
+        }
+    val error = localError ?: loadError ?: searchError
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().imePadding()
     ) {
-        Text(tr(R.string.add_chats), style = MaterialTheme.typography.headlineMedium)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                tr(R.string.add_chats),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            IconButton(onClick = { refresh++ }, enabled = online && !loading && !searching) {
+                Icon(Icons.Rounded.Refresh, tr(R.string.refresh_chats))
+            }
+        }
         OutlinedTextField(
             query,
             { query = it },
@@ -167,20 +256,70 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
             placeholder = { Text(tr(R.string.chat_search_hint)) },
             singleLine = true,
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty())
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Rounded.Close, tr(R.string.clear_chat_search))
+                    }
+            },
         )
-        if (searching) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (query.startsWith("@") || query.contains("t.me/"))
+        if (loading || searching || localLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (search.startsWith("@") || search.contains("t.me/"))
             TextButton(
                 onClick = {
                     app.action {
-                        app.addPublicChat(query)
+                        app.addPublicChat(search)
                         onDone()
                     }
                 }
             ) {
-                Text(tr(R.string.add_query, query))
+                Text(tr(R.string.add_query, search))
             }
-        LazyColumn(Modifier.heightIn(max = 400.dp)) {
+        LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 400.dp)) {
+            if (!online)
+                item {
+                    Text(
+                        tr(if (ready) R.string.chat_picker_offline else R.string.telegram_required),
+                        Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            if (error != null && online)
+                item {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Text(
+                            tr(
+                                if (localError != null || loadError != null)
+                                    R.string.chat_list_failed
+                                else R.string.chat_search_failed
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            error,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        TextButton(onClick = { refresh++ }, enabled = !loading && !searching) {
+                            Text(tr(R.string.retry_chat_loading))
+                        }
+                    }
+                }
+            if (chats.isEmpty() && online && error == null)
+                item {
+                    Text(
+                        tr(
+                            when {
+                                loading || localLoading -> R.string.loading_chats
+                                searching -> R.string.searching_chats
+                                search.isEmpty() -> R.string.chat_list_empty
+                                else -> R.string.chat_search_empty
+                            }
+                        ),
+                        Modifier.padding(vertical = 20.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             items(chats, key = { it.id }) { chat ->
                 val selected = library.sources.any { it.id == chat.id }
                 Row(
@@ -204,13 +343,15 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
                     Checkbox(selected, { app.action { app.library.source(chat, it) } })
                 }
             }
+            item {
+                Text(
+                    tr(R.string.telegram_access_help),
+                    Modifier.padding(vertical = 12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        Text(
-            tr(R.string.telegram_access_help),
-            Modifier.padding(vertical = 12.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(52.dp)) {
             Text(tr(R.string.done_chats, library.sources.size))
         }

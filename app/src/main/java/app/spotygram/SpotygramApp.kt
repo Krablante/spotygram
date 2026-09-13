@@ -23,7 +23,6 @@ class SpotygramApp : Application() {
     val prefs by lazy { getSharedPreferences("settings", MODE_PRIVATE) }
     val notices = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val busy = MutableStateFlow(false)
-    val chatChoices = MutableStateFlow<List<ChatChoice>>(emptyList())
     val downloading = MutableStateFlow(DownloadState())
     val theme = MutableStateFlow("system")
     val hideDuplicates by lazy { MutableStateFlow(prefs.getBoolean("hide_duplicates", true)) }
@@ -110,75 +109,67 @@ class SpotygramApp : Application() {
     fun track(id: String) = library.state.value.byId[id]
 
     suspend fun loadChats() {
-        val choices = mutableMapOf<Long, String>()
-        fun publish() {
-            chatChoices.value =
-                choices
-                    .map { ChatChoice(it.key, it.value) }
-                    .sortedWith(
-                        compareBy<ChatChoice> { it.id != AppText.savedChatId }
-                            .thenBy { it.title.lowercase() }
-                    )
-        }
+        // Populate TDLib's own index. Typing in the picker must not cancel this job.
         for (list in listOf("chatListMain", "chatListArchive")) {
-            var complete = false
-            do {
+            while (true) {
                 try {
                     telegram.request(json("loadChats", "chat_list" to json(list), "limit" to 100))
                 } catch (e: TelegramException) {
                     if (e.code != 404) throw e
-                    complete = true
+                    break
                 }
-                val ids =
-                    telegram
-                        .request(
-                            json("getChats", "chat_list" to json(list), "limit" to Int.MAX_VALUE)
-                        )
-                        .getJSONArray("chat_ids")
-                for (i in 0 until ids.length()) {
-                    val cached = telegram.chats[ids.getLong(i)]
-                    if (cached != null) {
-                        choices[cached.id] = cached.title
-                        continue
-                    }
-                    val chat = telegram.request(json("getChat", "chat_id" to ids.getLong(i)))
-                    if (chat.optJSONObject("type")?.kind() != "chatTypeSecret")
-                        choices[chat.getLong("id")] = chat.getString("title")
-                }
-                publish()
-            } while (!complete)
+                currentCoroutineContext().ensureActive()
+            }
         }
         val me = telegram.request(json("getMe"))
         val saved =
             telegram.request(
                 json("createPrivateChat", "user_id" to me.getLong("id"), "force" to false)
             )
-        choices[saved.getLong("id")] = tr(R.string.saved_messages)
         AppText.rememberSavedChat(saved.getLong("id"))
-        publish()
+        telegram.chatRevision.update { it + 1 }
     }
 
-    suspend fun searchChats(query: String) {
-        if (query.isBlank()) {
-            loadChats()
-            return
+    suspend fun searchChats(query: String, onServer: Boolean = false): List<ChatChoice> {
+        val ids = linkedSetOf<Long>()
+        val requests =
+            if (query.isBlank())
+                listOf("chatListMain", "chatListArchive").map {
+                    json("getChats", "chat_list" to json(it), "limit" to Int.MAX_VALUE)
+                }
+            else
+                listOf(
+                    json(
+                        if (onServer) "searchChatsOnServer" else "searchChats",
+                        "query" to query,
+                        "limit" to if (onServer) 100 else Int.MAX_VALUE,
+                    )
+                )
+        for (request in requests) {
+            val result = telegram.request(request, timeout = 8_000).getJSONArray("chat_ids")
+            for (i in 0 until result.length()) ids += result.getLong(i)
         }
-        val ids =
-            telegram
-                .request(json("searchChatsOnServer", "query" to query, "limit" to 100))
-                .getJSONArray("chat_ids")
+        val savedId = AppText.savedChatId
+        if (
+            !onServer &&
+                savedId != 0L &&
+                telegram.chats.containsKey(savedId) &&
+                (query.isBlank() || tr(R.string.saved_messages).contains(query, ignoreCase = true))
+        )
+            ids += savedId
         val choices = mutableListOf<ChatChoice>()
-        for (i in 0 until ids.length()) {
-            val cached = telegram.chats[ids.getLong(i)]
+        for (id in ids) {
+            currentCoroutineContext().ensureActive()
+            val cached = telegram.chats[id]
             if (cached != null) {
                 choices += cached
                 continue
             }
-            val chat = telegram.request(json("getChat", "chat_id" to ids.getLong(i)))
+            val chat = telegram.request(json("getChat", "chat_id" to id))
             if (chat.optJSONObject("type")?.kind() != "chatTypeSecret")
                 choices += ChatChoice(chat.getLong("id"), chat.getString("title"))
         }
-        chatChoices.value = choices
+        return choices
     }
 
     suspend fun addPublicChat(value: String) {
@@ -637,7 +628,6 @@ class SpotygramApp : Application() {
             resolvedFiles.clear()
             thumbnails.clear()
             artworkFiles.clear()
-            chatChoices.value = emptyList()
         }
     }
 }

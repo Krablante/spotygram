@@ -53,6 +53,23 @@ cache cleanup.
 
 ## From messages to tracks
 
+The chat picker loads the main and archive lists independently of its query.
+TDLib remains the directory owner; Spotygram does not persist another chat index.
+Local `searchChats` results are shown without waiting for the debounced server
+search. Server matches supplement, rather than replace, the local results;
+the merged list is unique by chat ID. A blank query reads the loaded main/archive
+lists, with Saved Messages included. Secret chats remain excluded.
+
+Native new-chat, title and position/list updates advance a small revision flow.
+The visible picker coalesces those events over 200 ms and rereads the local
+index; this is not network polling. Each query owns its results and cancels its
+obsolete requests. Directory loading is independent of typing. All picker jobs
+stop below Activity STARTED or when the sheet closes and restart on foreground
+entry. Reconnection or the picker's refresh action retries loading/search once;
+errors do not start retry loops. Loaded results remain selectable on network
+failure. The refresh control outside the picker still updates music in selected
+sources, not the account's chat directory.
+
 A Telegram track is identified by its chat and message IDs. TDLib file IDs
 are process-local references, so saved messages are resolved again when
 needed after a restart. Several messages may reference the same audio file;

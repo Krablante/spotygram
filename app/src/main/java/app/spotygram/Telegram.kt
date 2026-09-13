@@ -19,6 +19,7 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import org.drinkless.tdlib.JsonClient
 import org.json.JSONObject
 
@@ -27,6 +28,7 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
     val connection = MutableStateFlow("")
     val files = ConcurrentHashMap<Int, FileState>()
     val chats = ConcurrentHashMap<Long, ChatChoice>()
+    val chatRevision = MutableStateFlow(0L)
     val fileRevision = MutableStateFlow(0L)
     val updates = Channel<JSONObject>(Channel.UNLIMITED)
     private val requests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
@@ -99,6 +101,15 @@ class Telegram(private val context: Context, private val scope: CoroutineScope) 
                             }
                         }
                         else -> if (obj.kind().startsWith("update")) updates.send(obj)
+                    }
+                    when (obj.kind()) {
+                        "updateNewChat",
+                        "updateChatTitle",
+                        "updateChatPosition",
+                        "updateChatLastMessage",
+                        "updateChatDraftMessage",
+                        "updateChatAddedToList",
+                        "updateChatRemovedFromList" -> chatRevision.update { it + 1 }
                     }
                 }
             }

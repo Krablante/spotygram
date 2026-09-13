@@ -52,6 +52,16 @@
     <string name="channel_name_required">"Enter the @username of a public channel"</string>
     <string name="chat_search_complete">"Search in selected chats completed"</string>
     <string name="chat_search_hint">"Chat name or @channel"</string>
+    <string name="refresh_chats">Refresh chat list</string>
+    <string name="clear_chat_search">Clear search</string>
+    <string name="loading_chats">Loading chats…</string>
+    <string name="searching_chats">Searching Telegram…</string>
+    <string name="chat_picker_offline">Offline. You can still select loaded chats.</string>
+    <string name="chat_list_failed">Could not load all chats. Available chats are shown below.</string>
+    <string name="chat_search_failed">Could not complete the online search. Local results are kept.</string>
+    <string name="retry_chat_loading">Try again</string>
+    <string name="chat_list_empty">No chats loaded. Refresh the list to try again.</string>
+    <string name="chat_search_empty">No matching chats. Try another name or refresh the chat list.</string>
     <string name="chats">"Chats"</string>
     <string name="choose_chats">"Choose chats"</string>
     <string name="choose_sources_help">"Choose where to collect your music."</string>
@@ -83,7 +93,7 @@
     <string name="discard_help">"The name and selected songs will not be saved."</string>
     <string name="discard_title">"Discard changes?"</string>
     <string name="done">"Done"</string>
-    <string name="done_chats">"Done · chats: %1$s"</string>
+    <string name="done_chats">"Done · selected: %1$s"</string>
     <string name="download">"Download"</string>
     <string name="download_channel">"Music downloads"</string>
     <string name="download_notification_title">"Spotygram · Downloads"</string>
