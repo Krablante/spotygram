@@ -264,14 +264,12 @@ fun SpotygramUI(
                                     destinations.forEach { (index, destination) ->
                                         val (label, icon) = destination
                                         val selected = tab == index
-                                        val accent = spectrumAccent(index)
+                                        val accent = glassAccent()
                                         Column(
                                             Modifier.weight(1f).height(56.dp)
                                                 .clip(RoundedCornerShape(22.dp))
-                                                .then(if (selected) Modifier.background(
-                                                    Brush.horizontalGradient(Spectrum.map {
-                                                        it.copy(alpha = 0.20f)
-                                                    })) else Modifier)
+                                                 .then(if (selected) Modifier.liquidGlass(22.dp, selected = true)
+                                                     else Modifier)
                                                 .clickable { navigate(index) },
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center,
@@ -309,7 +307,9 @@ fun SpotygramUI(
                                 Box(
                                     Modifier.size(28.dp)
                                         .clip(CircleShape)
-                                        .background(Brush.linearGradient(Spectrum)),
+                                         .background(Brush.linearGradient(
+                                             listOf(MaterialTheme.colorScheme.secondary,
+                                                 MaterialTheme.colorScheme.primary))),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
