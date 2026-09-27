@@ -211,13 +211,11 @@ Russian use Android resources; Android 13+ supports per-app language selection.
 Playlist edits and batch operations use transactions. Track lists are lazy,
 and artwork requests have two concurrent slots with low TDLib priority.
 
-The light appearance uses a pale neutral ground; the dark appearance uses a
-near-black one. Two faint static tonal washes give the glass some depth without
-passing a graphic through text. Search, source controls, navigation, mini-player,
-player cover/transport and collection rows use translucent layered fills,
-reflective edges and a stronger core where text needs contrast. Color lives
-mainly in artwork and selected controls; individual music rows do not run a
-blur or shader.
+The light and dark appearances share a neutral base with distributed color
+fields, a restrained grid and two full-spectrum light bands. Search, source
+controls, navigation, mini-player, player cover/transport and collection rows
+use translucent surfaces. Their neutral fills and reflective edges draw behind
+content; individual music rows do not run a blur or shader.
 The default appearance follows Android until the user chooses light or dark.
 Settings sheets use a denser surface so text beneath them cannot bleed through.
 Wide layouts keep the music column and bottom controls within 720 dp.

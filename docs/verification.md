@@ -1,43 +1,5 @@
 # Verification record
 
-## 0.10.2 — quiet background and readable glass
-
-Debug and minified release assemblies, debug/release Lint and release lintVital
-passed. The ARM64 and x86-64 APKs passed `apksigner verify` with the existing
-certificate `b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`
-and 16 KB ZIP alignment. Both report `app.spotygram`, versionCode 18 /
-versionName 0.10.2. SHA-256: ARM64
-`7e4a387772bbfa0941ba9ca5d63e18c1f7d32df4717acb244aa7b793a01bb202`,
-x86-64 `d29bb951d0f0ded371521fe6fc0ce37b5d4ca1403ef65927a9a6e902fdd60098`.
-
-Manual Android 16 x86-64 checks used the existing local recordings and playlists:
-
-- The signed APK installed over 0.10.1 without clearing data. The installed
-  `base.apk` SHA-256 matched the final x86-64 asset; three local songs and the
-  Night/Road playlists remained. Local playback reached MediaSession `PLAYING`
-  with advancing position, then `PAUSED` from the full player.
-- Light library, player and playlists; dark library, player, favorites, selection
-  and settings were inspected at 480×1040/192 dpi, including the Russian dark
-  player. The rainbow bands no longer cross headings, tracks or controls.
-  Reflective glass edges and selected tabs
-  remain distinct over both neutral grounds. Changing appearance in the open
-  settings sheet kept text readable.
-- At 480×1040/240 dpi (320 dp) and font scale 1.3, the mini-player title wrapped
-  within its panel, transport controls stayed separate, and the full player
-  scrolled to its lower action. The inactive local-download control was removed;
-  **Queue** stayed on one line at the right and opened its sheet.
-- The SVG banner was rendered in Chromium and visually inspected. The README
-  screenshots were refreshed from the installed release with local recordings.
-
-The emulator repeatedly showed cold-boot System UI/Pixel Launcher ANRs. In one
-run its system process restarted after a BluetoothManagerService exception;
-other emulator processes exited with a QEMU segmentation fault after boot or
-longer use. The final app screens above were responsive after dismissing the
-system dialogs. No `app.spotygram` AndroidRuntime crash was found in inspected
-logs. These checks do not establish physical ARM64 behavior, authenticated
-Telegram playback, large-catalog performance or device power use. No test files
-or fixtures were added.
-
 ## 0.10.1 — balanced RGB palette
 
 Debug and minified release assemblies, full debug/release Lint and release

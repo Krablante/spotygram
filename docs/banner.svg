@@ -1,17 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480" role="img" aria-labelledby="title desc">
   <title id="title">Spotygram</title>
-  <desc id="desc">Spotygram lettering and a music mark on softly lit glass over a pale ground.</desc>
+  <desc id="desc">Dark lettering and clear glass over a cyan, blue, violet, red, amber, yellow and green spectrum.</desc>
   <defs>
-    <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".96"/><stop offset=".5" stop-color="#fff" stop-opacity=".69"/><stop offset="1" stop-color="#fff" stop-opacity=".84"/></linearGradient>
+    <linearGradient id="rainbow"><stop stop-color="#58c9d2"/><stop offset=".18" stop-color="#5e9deb"/><stop offset=".35" stop-color="#a08ce4"/><stop offset=".51" stop-color="#f07175"/><stop offset=".68" stop-color="#f6af58"/><stop offset=".84" stop-color="#e9d96c"/><stop offset="1" stop-color="#72c987"/></linearGradient>
+    <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".74"/><stop offset=".5" stop-color="#fff" stop-opacity=".29"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient>
     <linearGradient id="edge" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#9edce7"/><stop offset=".72" stop-color="#f6bd9c"/><stop offset="1" stop-color="#fff"/></linearGradient>
-    <radialGradient id="sea"><stop stop-color="#70cfc5" stop-opacity=".16"/><stop offset="1" stop-color="#70cfc5" stop-opacity="0"/></radialGradient>
-    <radialGradient id="warm"><stop stop-color="#d9b695" stop-opacity=".12"/><stop offset="1" stop-color="#d9b695" stop-opacity="0"/></radialGradient>
+    <radialGradient id="blue"><stop stop-color="#84bedc" stop-opacity=".38"/><stop offset="1" stop-color="#84bedc" stop-opacity="0"/></radialGradient>
+    <radialGradient id="warm"><stop stop-color="#f1b991" stop-opacity=".43"/><stop offset="1" stop-color="#f1b991" stop-opacity="0"/></radialGradient>
+    <radialGradient id="green"><stop stop-color="#a1d8aa" stop-opacity=".42"/><stop offset="1" stop-color="#a1d8aa" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#4e747b" stroke-opacity=".12"/></pattern>
     <clipPath id="frame"><rect width="1280" height="480" rx="28"/></clipPath>
   </defs>
   <g clip-path="url(#frame)">
-    <rect width="1280" height="480" fill="#eff1f2"/>
-    <ellipse cx="1090" cy="40" rx="540" ry="380" fill="url(#sea)"/>
-    <ellipse cx="50" cy="480" rx="480" ry="300" fill="url(#warm)"/>
+    <rect width="1280" height="480" fill="#edf2f0"/>
+    <ellipse cx="110" cy="90" rx="450" ry="350" fill="url(#blue)"/>
+    <ellipse cx="1020" cy="110" rx="530" ry="370" fill="url(#warm)"/>
+    <ellipse cx="740" cy="450" rx="570" ry="370" fill="url(#green)"/>
+    <rect width="1280" height="480" fill="url(#grid)"/>
+    <path d="M-100 319C283 88 656 377 999 148S1311 201 1410 80" fill="none" stroke="url(#rainbow)" stroke-opacity=".28" stroke-width="109"/>
+    <path d="M-100 319C283 88 656 377 999 148S1311 201 1410 80" fill="none" stroke="url(#rainbow)" stroke-opacity=".89" stroke-width="29"/>
+    <path d="M-100 319C283 88 656 377 999 148S1311 201 1410 80" fill="none" stroke="#fff" stroke-opacity=".68" stroke-width="3"/>
     <rect x="52" y="83" width="1176" height="314" rx="64" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
     <path d="M115 91h1035" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2"/>
     <rect x="93" y="129" width="176" height="176" rx="56" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
