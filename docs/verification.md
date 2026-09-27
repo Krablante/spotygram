@@ -1,5 +1,32 @@
 # Verification record
 
+## 0.10.3 — restore the 0.10.1 appearance
+
+The source and documentation from the withdrawn 0.10.2 redesign were reverted.
+Compared with the 0.10.1 source tree, the app changes only versionCode 17 → 19
+and versionName 0.10.1 → 0.10.3. This higher version permits a data-preserving
+update over an installed 0.10.2; Android does not accept a normal downgrade to
+the original 0.10.1 APK.
+
+The minified release assembly and release lintVital passed. Both signed APKs
+passed `apksigner verify` with the established certificate
+`b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`
+and 16 KB ZIP alignment. Manifest: `app.spotygram`, versionCode 19 /
+versionName 0.10.3. SHA-256: ARM64
+`8289285cc362fdccaf231953c4634344964d83531d86571ff5bc5f4fbaa3223d`,
+x86-64 `97df1737e7c25859f7569d87d228713efe4244dc3dd143124c55b94e291fd6cd`.
+
+The signed x86-64 APK installed over the emulator's 0.10.2 without clearing
+data. The installed `base.apk` hash matched the release artifact. The prior
+rainbow/glass library, favorites and playlists appeared again; three local
+recordings and the Night/Road playlists remained. A local recording reached
+MediaSession `PLAYING` with advancing position and then `PAUSED`. No
+`app.spotygram` AndroidRuntime crash appeared in the inspected logs. The
+emulator showed its recurring System UI and launcher ANRs during cold boot;
+these were dismissed before the checks. Playback from an authenticated
+Telegram chat and installation on a physical ARM64 phone were not checked.
+No test files or fixtures were added.
+
 ## 0.10.1 — balanced RGB palette
 
 Debug and minified release assemblies, full debug/release Lint and release
