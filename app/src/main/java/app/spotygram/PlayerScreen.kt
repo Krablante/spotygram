@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -36,10 +37,10 @@ fun PlayerScreen(
     val progress = observePlayer(player, positionUpdates = true)
     var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-        val cover = minOf(maxWidth - 48.dp, maxHeight * 0.43f, 360.dp)
+         val cover = minOf(maxWidth - 48.dp, maxHeight * 0.43f, 360.dp)
         Column(
-            Modifier.fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+             Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.TopCenter)
+                 .verticalScroll(rememberScrollState())
                 .heightIn(min = maxHeight)
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.SpaceBetween,
@@ -70,9 +71,15 @@ fun PlayerScreen(
                     Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions))
                 }
             }
-            Spacer(Modifier.height(24.dp))
-            Artwork(track, cover, Modifier.align(Alignment.CenterHorizontally))
-            Spacer(Modifier.height(28.dp))
+             Spacer(Modifier.height(12.dp))
+             Box(
+                 Modifier.align(Alignment.CenterHorizontally).size(cover)
+                     .liquidGlass(36.dp, strong = true).padding(10.dp),
+                 contentAlignment = Alignment.Center,
+             ) {
+                 Artwork(track, cover - 20.dp)
+             }
+             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -152,7 +159,8 @@ fun PlayerScreen(
                 )
             }
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                 Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                     .liquidGlass(32.dp).padding(horizontal = 4.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -221,13 +229,7 @@ fun PlayerScreen(
                     )
                 }
             }
-            Text(
-                playbackOrderLabel(state),
-                Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
+             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

@@ -16,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -168,7 +170,7 @@ fun MusicScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
-                if (playlist != null)
+                 if (playlist != null)
                     IconButton(onClick = onPlaylistMenu) {
                         Icon(Icons.Rounded.MoreVert, tr(R.string.playlist_actions))
                     }
@@ -249,8 +251,8 @@ fun MusicScreen(
                         { sort = !sort },
                     )
                 }
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+             Row(
+                 Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (compact && !favorites && playlist == null)
@@ -263,7 +265,7 @@ fun MusicScreen(
                         onOffline,
                         { sort = !sort },
                     )
-                TextButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
+                 TextButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
                     Text(tr(R.string.select))
                 }
                 if (playlist != null)
@@ -290,10 +292,10 @@ fun MusicScreen(
                     },
                     enabled = tracks.any { it.local || it.available },
                 ) {
-                    Icon(
-                        Icons.Rounded.PlayArrow,
-                        tr(R.string.play_all),
-                        tint = MaterialTheme.colorScheme.primary,
+                     Icon(
+                         Icons.Rounded.PlayArrow,
+                         tr(R.string.play_all),
+                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -437,7 +439,7 @@ private fun MusicFilters(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { expanded = true }) {
+        TextButton(onClick = { expanded = true }, modifier = Modifier.liquidGlass(18.dp)) {
             Text(
                 source?.displayTitle ?: tr(R.string.all_sources),
                 maxLines = 1,
@@ -469,7 +471,8 @@ private fun MusicFilters(
         selected = offline,
         onClick = { onOffline(!offline) },
         label = { Text(tr(R.string.on_device)) },
-        leadingIcon = { Icon(Icons.Rounded.DownloadForOffline, null, Modifier.size(18.dp)) },
+         leadingIcon = { Icon(Icons.Rounded.DownloadForOffline, null, Modifier.size(18.dp)) },
+         border = null,
     )
     IconButton(onClick = onSort) {
         Icon(
@@ -492,7 +495,8 @@ fun MusicSearch(
     OutlinedTextField(
         value,
         onChange,
-        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+             .liquidGlass(22.dp, strong = true).clip(RoundedCornerShape(22.dp)),
         singleLine = true,
         placeholder = { Text(placeholder) },
         leadingIcon = { Icon(Icons.Rounded.Search, null) },
@@ -502,12 +506,13 @@ fun MusicSearch(
                     Icon(Icons.Rounded.Close, tr(R.string.clear_search))
                 }
         },
-        shape = RoundedCornerShape(8.dp),
-        colors =
-            OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+         shape = RoundedCornerShape(22.dp),
+         colors =
+             OutlinedTextFieldDefaults.colors(
+                 unfocusedContainerColor = Color.Transparent,
+                 focusedContainerColor = Color.Transparent,
+                 unfocusedBorderColor = Color.Transparent,
+                 focusedBorderColor = Color.Transparent,
             ),
     )
 }
@@ -526,10 +531,10 @@ fun TrackRow(
 ) {
     Row(
         Modifier.fillMaxWidth()
-            .background(
-                if (selected == true) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                else androidx.compose.ui.graphics.Color.Transparent
-            )
+             .background(
+                 if (selected == true || active) MaterialTheme.colorScheme.primary.copy(alpha = if (selected == true) 0.14f else 0.08f)
+                 else Color.Transparent
+             )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -541,7 +546,7 @@ fun TrackRow(
                     stateDescription =
                         if (selected) tr(R.string.selected) else tr(R.string.not_selected)
             }
-            .heightIn(min = 64.dp)
+             .heightIn(min = 66.dp)
             .padding(
                 start = if (selected == null) 16.dp else 4.dp,
                 end = 4.dp,

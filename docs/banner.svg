@@ -1,40 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480" role="img" aria-labelledby="title desc">
-  <title id="title">spotygram</title>
-  <desc id="desc">A mint-green record sleeve with oversized black lettering and a vinyl record sliding out on the right.</desc>
+  <title id="title">Spotygram</title>
+  <desc id="desc">Spotygram in a luminous glass capsule over flowing violet, rose and cyan light.</desc>
   <defs>
-    <clipPath id="frame"><rect width="1280" height="480" rx="12"/></clipPath>
+    <linearGradient id="night" x2="1" y2="1"><stop stop-color="#191b31"/><stop offset=".53" stop-color="#252044"/><stop offset="1" stop-color="#152e3a"/></linearGradient>
+    <linearGradient id="ribbon" x2="1" y2="0"><stop stop-color="#65d2de"/><stop offset=".37" stop-color="#9c7df5"/><stop offset=".7" stop-color="#ee8cb4"/><stop offset="1" stop-color="#f5d9a2"/></linearGradient>
+    <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#ffffff" stop-opacity=".28"/><stop offset=".52" stop-color="#e9d8ff" stop-opacity=".09"/><stop offset="1" stop-color="#ffffff" stop-opacity=".18"/></linearGradient>
+    <linearGradient id="edge" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".9"/><stop offset=".4" stop-color="#91deef" stop-opacity=".5"/><stop offset=".75" stop-color="#f19fbc" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity=".35"/></linearGradient>
+    <radialGradient id="halo"><stop stop-color="#a788ff" stop-opacity=".58"/><stop offset="1" stop-color="#a788ff" stop-opacity="0"/></radialGradient>
+    <clipPath id="frame"><rect width="1280" height="480" rx="28"/></clipPath>
   </defs>
   <g clip-path="url(#frame)">
-    <path fill="#eeeae1" d="M0 0h1280v480H0z"/>
-    <circle cx="1086" cy="242" r="302" fill="#131916"/>
-    <g fill="none" stroke="#303831" stroke-width="1">
-      <circle cx="1086" cy="242" r="284"/><circle cx="1086" cy="242" r="276"/>
-      <circle cx="1086" cy="242" r="262"/><circle cx="1086" cy="242" r="254"/>
-      <circle cx="1086" cy="242" r="240"/><circle cx="1086" cy="242" r="232"/>
-      <circle cx="1086" cy="242" r="218"/><circle cx="1086" cy="242" r="210"/>
-      <circle cx="1086" cy="242" r="196"/><circle cx="1086" cy="242" r="188"/>
-      <circle cx="1086" cy="242" r="174"/><circle cx="1086" cy="242" r="166"/>
-      <circle cx="1086" cy="242" r="152"/><circle cx="1086" cy="242" r="144"/>
-      <circle cx="1086" cy="242" r="130"/>
+    <rect width="1280" height="480" fill="url(#night)"/>
+    <ellipse cx="990" cy="62" rx="540" ry="350" fill="url(#halo)"/>
+    <path d="M-120 375C225 89 461 376 825 155S1250 175 1400-70" fill="none" stroke="url(#ribbon)" stroke-opacity=".3" stroke-width="95"/>
+    <path d="M-120 375C225 89 461 376 825 155S1250 175 1400-70" fill="none" stroke="url(#ribbon)" stroke-opacity=".55" stroke-width="2"/>
+    <path d="M-80 480C342 287 489 568 876 349S1251 407 1410 219" fill="none" stroke="url(#ribbon)" stroke-opacity=".19" stroke-width="125"/>
+    <rect x="52" y="83" width="1176" height="314" rx="64" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
+    <path d="M114 92h1040" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="2"/>
+    <rect x="93" y="129" width="176" height="176" rx="56" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
+    <g stroke="#fff" stroke-linecap="round" stroke-width="12" opacity=".95">
+      <path d="M141 201v30M169 181v70M198 163v105M226 195v41"/>
     </g>
-    <circle cx="1086" cy="242" r="113" fill="#ec805b"/>
-    <path d="M979 206h214M979 278h214" stroke="#131916" stroke-width="1"/>
-    <text x="1086" y="188" text-anchor="middle" fill="#131916" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" letter-spacing="4">SIDE A</text>
-    <path d="m1064 218 45 24-45 24z" fill="#131916"/>
-    <circle cx="1086" cy="242" r="5" fill="#eeeae1"/>
-    <text x="1086" y="311" text-anchor="middle" fill="#131916" font-family="Arial,Helvetica,sans-serif" font-size="14" letter-spacing="2">33⅓ RPM</text>
-    <path fill="#162a20" opacity=".12" d="M814 0h24v480h-24z"/>
-    <path fill="#a4ebba" d="M0 0h818v480H0z"/>
-    <g fill="#15251b" font-family="Arial,Helvetica,sans-serif">
-      <text x="46" y="57" font-size="15" letter-spacing="3">ANDROID / TELEGRAM / MUSIC</text>
-      <path d="M46 82h725" fill="none" stroke="#15251b" stroke-width="1"/>
-      <text x="39" y="232" font-size="126" font-weight="900" letter-spacing="-8">spotygram</text>
-      <path d="M48 282h78v78H48z"/>
-      <path d="m77 302 27 19-27 19z" fill="#a4ebba"/>
-      <path d="M153 321h618" fill="none" stroke="#15251b" stroke-width="1"/>
-      <circle cx="531" cy="321" r="6"/>
-      <text x="46" y="434" font-size="14" letter-spacing="3">YOUR CHAT COLLECTION</text>
-      <text x="772" y="434" text-anchor="end" font-size="14" letter-spacing="3">VOL. 01</text>
-    </g>
+    <text x="310" y="237" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="89" font-weight="700" letter-spacing="-5">spotygram</text>
+    <text x="316" y="288" fill="#e1dcef" font-family="Arial,Helvetica,sans-serif" font-size="19" letter-spacing="4">MUSIC FROM YOUR CHATS</text>
+    <circle cx="1096" cy="240" r="92" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
+    <circle cx="1096" cy="240" r="66" fill="none" stroke="#f6f2ff" stroke-opacity=".28"/>
+    <circle cx="1096" cy="240" r="48" fill="none" stroke="#f6f2ff" stroke-opacity=".2"/>
+    <circle cx="1096" cy="240" r="12" fill="#f2d2ee"/>
   </g>
 </svg>

@@ -40,7 +40,7 @@ private fun PlaylistCover(playlist: Playlist, library: LibraryState) {
         }
     Box(
         Modifier.size(56.dp)
-            .clip(RoundedCornerShape(6.dp))
+             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
@@ -73,7 +73,7 @@ fun PlaylistsScreen(
         }
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp),
+             Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -81,26 +81,16 @@ fun PlaylistsScreen(
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            Text("${library.playlists.size}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Button(
-            onClick = onCreate,
-            modifier =
-                Modifier.fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .heightIn(min = 48.dp),
-            shape = RoundedCornerShape(8.dp),
-        ) {
-            Icon(Icons.Rounded.Add, null)
-            Spacer(Modifier.width(8.dp))
-            Text(tr(R.string.new_playlist))
-        }
+             IconButton(onClick = onCreate) {
+                 Icon(Icons.Rounded.Add, tr(R.string.new_playlist), tint = MaterialTheme.colorScheme.primary)
+             }
+         }
         if (library.playlists.isNotEmpty())
             MusicSearch(query, { query = it }, tr(R.string.find_playlist))
         LazyColumn(
             state = rememberLazyListState(),
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 16.dp),
+             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
             if (playlists.isEmpty())
                 item {
@@ -120,8 +110,8 @@ fun PlaylistsScreen(
             items(playlists, key = { it.id }) { playlist ->
                 val haptic = LocalHapticFeedback.current
                 Row(
-                    Modifier.fillMaxWidth()
-                        .combinedClickable(
+                     Modifier.fillMaxWidth().padding(vertical = 4.dp).liquidGlass(22.dp)
+                         .combinedClickable(
                             onClick = { onOpen(playlist.id) },
                             onLongClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -316,7 +306,7 @@ fun PlaylistEditor(
                 }
             },
             modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 48.dp),
-            shape = RoundedCornerShape(8.dp),
+             shape = RoundedCornerShape(22.dp),
         ) {
             if (saving) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             else
@@ -448,7 +438,7 @@ fun AddToPlaylistSheet(
                 }
             },
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).heightIn(min = 48.dp),
-            shape = RoundedCornerShape(8.dp),
+             shape = RoundedCornerShape(22.dp),
         ) {
             Text(
                 if (saving) tr(R.string.saving)

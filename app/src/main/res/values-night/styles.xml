@@ -1,9 +1,9 @@
 <resources>
     <style name="Theme.Spotygram" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#F3F1F9</item>
-        <item name="android:colorAccent">#5835BB</item>
+        <item name="android:windowBackground">#11131E</item>
+        <item name="android:colorAccent">#BEA5FF</item>
     </style>
 </resources>

@@ -1,5 +1,51 @@
 # Verification record
 
+## 0.10.0 — Liquid Glass redesign
+
+Debug assembly, minified release assembly, full debug/release Lint and release
+lintVital passed. The signed ARM64 and x86-64 APKs passed `apksigner verify` and
+16 KB ZIP alignment. Both use the established certificate
+`b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`.
+Manifest: `app.spotygram`, versionCode 16 / versionName 0.10.0. SHA-256:
+ARM64 `053ee14a5b2171896f7e791090a9d7c61f6c5f5851175a81a3dbe2d45d2a375a`,
+x86-64 `f5558f52690b7a3d039e35f8316d2af45fec7f960e6168adbb55e91e1187fca9`.
+
+Manual Android 16 x86-64 checks used the existing local demonstration recordings
+and playlists, without a Telegram login or new test fixtures:
+
+- The debug build was inspected in both appearances. A first pass revealed black
+  inherited text in dark mode and an oversized empty playlist surface; both
+  were corrected and inspected again. Switching appearance inside the open
+  settings sheet left its text readable with no underlying content bleeding
+  through. Search with the keyboard open and track selection were exercised.
+- At 320 dp width and font scale 1.3, the library, selection controls, mini-player
+  and full player were inspected. The mini-player was revised to give the title
+  two lines at that width. The full player remains scrollable for lower actions.
+- The signed x86-64 APK installed over the existing 0.9.2 without clearing data.
+  Three local recordings and the Night/Road playlists remained visible. Local
+  playback reached MediaSession `PLAYING` with an advancing position; pause
+  reached `PAUSED`. The installed package reported 0.10.0. The final library,
+  player, playlists and settings captures were visually inspected and the four
+  README images were refreshed from that signed APK.
+- After replacing the last green launcher/window resources, the final x86-64
+  artifact installed over that 0.10.0 without clearing data. The installed
+  `base.apk` SHA-256 matched the x86-64 digest above. The library still showed
+  three recordings; choosing a different local track again reached `PLAYING`
+  with advancing position and then `PAUSED`. The new SVG banner was rendered
+  and visually checked in Chromium. Full debug/release Lint and both assemblies
+  were rerun after the resource change.
+- A 1200×800 display showed the 720 dp centered content and bottom controls.
+  The emulator process exited during the following wide-screen navigation, so
+  only the initial wide layout was observed. Its cold starts also produced
+  recurring System UI ANR dialogs, including with a bounded 4 GB guest; these
+  were distinct from the responsive Spotygram screens after dismissal.
+
+No physical ARM64 device, authenticated Telegram account, large distinct-track
+catalog, backdrop distortion benchmark or battery measurement was checked.
+Music-row drawing and the source-count projection were reviewed in source; no
+claim about phone performance follows from these emulator captures. No test
+files or scaffolds were added.
+
 ## 0.9.2 — local-first chat discovery
 
 The picker previously used only `searchChatsOnServer` for a nonempty query and

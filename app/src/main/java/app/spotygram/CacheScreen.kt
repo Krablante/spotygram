@@ -45,20 +45,18 @@ fun CacheScreen(app: SpotygramApp, connected: Boolean, onBack: () -> Unit, onCon
                 Modifier.padding(vertical = 16.dp),
             )
         }
-        state.bytes?.let { size ->
-            Text(cacheBytes(size), style = MaterialTheme.typography.displaySmall)
-            Text(
-                if (size == 0L) tr(R.string.cache_empty)
-                else
-                    AppText.context.resources.getQuantityString(
-                        R.plurals.cache_files,
-                        state.files,
-                        state.files,
-                    ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+         state.bytes?.let { size ->
+             Column(Modifier.fillMaxWidth().liquidGlass(24.dp).padding(20.dp)) {
+                 Text(cacheBytes(size), style = MaterialTheme.typography.displaySmall)
+                 Text(
+                     if (size == 0L) tr(R.string.cache_empty)
+                     else AppText.context.resources.getQuantityString(
+                         R.plurals.cache_files, state.files, state.files),
+                     style = MaterialTheme.typography.bodyMedium,
+                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 )
+             }
+         }
         Text(tr(R.string.cache_description), Modifier.padding(top = 24.dp))
         Text(
             tr(R.string.cache_preserved),

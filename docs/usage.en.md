@@ -159,8 +159,8 @@ for other languages. On Android 13+, **Settings → Language** opens a per-app
 language setting. Earlier Android versions follow the phone's language.
 Song and chat names are not translated.
 
-Choose light, dark or system appearance in Settings. Switching themes does
-not interrupt playback.
+Choose light or dark appearance in Settings. Until then, the app follows your
+phone. Switching appearance does not interrupt playback.
 
 ## Updates and keeping your data
 

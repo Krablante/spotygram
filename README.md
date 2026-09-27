@@ -66,7 +66,8 @@ independently, so the same song can come up twice in a row. It keeps going
 until you stop it; Previous retraces your recent listening history.
 
 Downloaded songs are available under **On device**. The interface comes in
-English and Russian, with light, dark and system themes.
+English and Russian, with light and dark appearances. The initial appearance
+follows the phone until you choose one in Settings.
 
 Repeated recordings are hidden by default. Turn **Settings → Hide duplicates**
 off to see separate entries again. This only changes the lists; nothing is deleted.

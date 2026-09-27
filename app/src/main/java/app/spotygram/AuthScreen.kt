@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -34,12 +35,10 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
             IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, tr(R.string.back)) }
         }
         Spacer(Modifier.height(44.dp))
-        Icon(
-            Icons.Rounded.GraphicEq,
-            null,
-            Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
+        Box(Modifier.size(88.dp).liquidGlass(30.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.GraphicEq, null, Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary)
+        }
         Spacer(Modifier.height(24.dp))
         Text("Spotygram", fontSize = 40.sp, fontWeight = FontWeight.Black)
         Spacer(Modifier.height(12.dp))
@@ -119,7 +118,13 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                     },
                     singleLine = true,
                     enabled = !auth.busy,
-                    modifier = Modifier.fillMaxWidth(),
+                     modifier = Modifier.fillMaxWidth().liquidGlass(20.dp),
+                     colors = OutlinedTextFieldDefaults.colors(
+                         focusedContainerColor = Color.Transparent,
+                         unfocusedContainerColor = Color.Transparent,
+                         focusedBorderColor = Color.Transparent,
+                         unfocusedBorderColor = Color.Transparent,
+                     ),
                     keyboardOptions =
                         KeyboardOptions(
                             keyboardType =

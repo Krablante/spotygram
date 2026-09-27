@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.session.MediaController
 import kotlinx.coroutines.flow.collectLatest
@@ -175,7 +177,10 @@ fun SpotygramUI(
             }
         }
     }
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(Modifier.fillMaxSize(), color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground) {
+    Box(Modifier.fillMaxSize()) {
+        PrismBackdrop(Modifier.fillMaxSize())
         when {
             authVisible ->
                 AuthScreen(
@@ -223,11 +228,14 @@ fun SpotygramUI(
             else ->
                 Scaffold(
                     modifier = Modifier.imePadding(),
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     snackbarHost = { if (sheet.isEmpty()) SnackbarHost(snackbar) },
                     bottomBar = {
                         if (!keyboardVisible)
-                            Column {
+                            Column(
+                                Modifier.fillMaxWidth().padding(bottom = 6.dp).navigationBarsPadding(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
                                 if (current != null)
                                     MiniPlayer(
                                         current,
@@ -237,52 +245,47 @@ fun SpotygramUI(
                                         onPrevious = { player?.seekToPreviousMediaItem() },
                                         onNext = { player?.seekToNextMediaItem() },
                                     )
-                                NavigationBar(
-                                    modifier = Modifier.height(if (compact) 56.dp else 80.dp),
-                                    containerColor = MaterialTheme.colorScheme.background,
-                                    tonalElevation = 0.dp,
+                                Row(
+                                    modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                                        .height(66.dp).liquidGlass(28.dp, strong = true)
+                                        .padding(horizontal = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     val destinations =
                                         listOf(
-                                            3 to (tr(R.string.chats) to Icons.Rounded.Forum),
+                                            0 to (tr(R.string.music) to Icons.Rounded.MusicNote),
                                             1 to (tr(R.string.favorites) to Icons.Rounded.Favorite),
                                             2 to
                                                 (tr(R.string.playlists) to
                                                     Icons.Rounded.PlaylistPlay),
-                                            0 to (tr(R.string.music) to Icons.Rounded.MusicNote),
+                                            3 to (tr(R.string.chats) to Icons.Rounded.Forum),
                                         )
                                     destinations.forEach { (index, destination) ->
                                         val (label, icon) = destination
-                                        NavigationBarItem(
-                                            selected = tab == index,
-                                            onClick = { navigate(index) },
-                                            icon = { Icon(icon, if (compact) label else null) },
-                                            label =
-                                                if (compact) null
-                                                else {
-                                                    {
-                                                        Text(
-                                                            label,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                        )
-                                                    }
-                                                },
-                                            colors =
-                                                NavigationBarItemDefaults.colors(
-                                                    indicatorColor = Color.Transparent,
-                                                    selectedIconColor =
-                                                        MaterialTheme.colorScheme.primary,
-                                                    selectedTextColor =
-                                                        MaterialTheme.colorScheme.primary,
-                                                ),
-                                        )
+                                        val selected = tab == index
+                                        Column(
+                                            Modifier.weight(1f).height(56.dp)
+                                                .clip(RoundedCornerShape(22.dp))
+                                                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.75f) else Color.Transparent)
+                                                .clickable { navigate(index) },
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center,
+                                        ) {
+                                            Icon(icon, label, Modifier.size(23.dp),
+                                                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(label, fontSize = 10.sp, maxLines = 1,
+                                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
                                     }
                                 }
                             }
                     },
                 ) { padding ->
-                    Column(Modifier.padding(padding).fillMaxSize()) {
+                    Column(
+                        Modifier.padding(padding).fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         UpdateBanner(app)
                         if (cache.clearing) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -294,7 +297,7 @@ fun SpotygramUI(
                         }
                         if (!compact)
                             Row(
-                                Modifier.fillMaxWidth()
+                                Modifier.widthIn(max = 720.dp).fillMaxWidth()
                                     .heightIn(min = 48.dp)
                                     .padding(start = 16.dp, end = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -302,7 +305,7 @@ fun SpotygramUI(
                                 Box(
                                     Modifier.size(28.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary),
+                                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, Color(0xFFE983AA), Color(0xFF7CCED5)))),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
@@ -332,6 +335,7 @@ fun SpotygramUI(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        Box(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth()) {
                         pages.SaveableStateProvider("$tab:$playlistId:$sourceId") {
                             when {
                                 tab == 0 || tab == 1 || tab == 2 && playlist != null ->
@@ -425,6 +429,7 @@ fun SpotygramUI(
                                     )
                             }
                         }
+                        }
                     }
                 }
         }
@@ -439,11 +444,14 @@ fun SpotygramUI(
             ModalBottomSheet(
                 onDismissRequest = { sheet = "" },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.995f),
             ) {
                 MatchDialogSystemBars()
-                SnackbarHost(snackbar)
-                when (sheet) {
+                CompositionLocalProvider(
+                    LocalContentColor provides MaterialTheme.colorScheme.onSurface
+                ) {
+                    SnackbarHost(snackbar)
+                    when (sheet) {
                     "settings" ->
                         SettingsSheet(
                             app,
@@ -634,6 +642,7 @@ fun SpotygramUI(
                                     Spacer(Modifier.height(12.dp))
                                 }
                             }
+                    }
                 }
             }
         if (rename)
@@ -713,6 +722,7 @@ fun SpotygramUI(
                 },
             )
     }
+    }
 }
 
 @Composable
@@ -739,31 +749,33 @@ private fun MiniPlayer(
     onNext: () -> Unit,
 ) {
     val state = observePlayer(player, positionUpdates = true)
+    val narrow = LocalConfiguration.current.screenWidthDp < 360
     Column(
-        Modifier.padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onOpen)
+         Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 12.dp)
+             .liquidGlass(22.dp, strong = true)
+             .clip(RoundedCornerShape(22.dp))
+             .clickable(onClick = onOpen)
     ) {
         Row(
             Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Artwork(track, 40.dp)
+             Artwork(track, 44.dp)
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                Text(
-                    track.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    track.subtitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                 Text(
+                     track.title,
+                     maxLines = if (narrow) 2 else 1,
+                     overflow = TextOverflow.Ellipsis,
+                     style = MaterialTheme.typography.titleMedium,
+                 )
+                 if (!narrow)
+                     Text(
+                         track.subtitle,
+                         maxLines = 1,
+                         overflow = TextOverflow.Ellipsis,
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )
             }
             IconButton(onClick = onPrevious) {
                 Icon(Icons.Rounded.SkipPrevious, tr(R.string.previous_track))
@@ -779,12 +791,12 @@ private fun MiniPlayer(
             }
             IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, tr(R.string.next_track)) }
         }
-        LinearProgressIndicator(
+         LinearProgressIndicator(
             progress = {
                 if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f)
                 else 0f
             },
-            modifier = Modifier.fillMaxWidth().height(2.dp),
+             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(2.dp),
             trackColor = Color.Transparent,
         )
     }

@@ -1,6 +1,7 @@
 package app.spotygram
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -37,18 +40,13 @@ fun ChatsScreen(
     onRefresh: () -> Unit,
 ) {
     var removing by remember { mutableStateOf<Source?>(null) }
+    val counts = remember(library.tracks) { library.tracks.groupingBy { it.chatId }.eachCount() }
     Column(Modifier.fillMaxSize()) {
         Text(
             tr(R.string.your_chats),
-            Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
-            style = MaterialTheme.typography.headlineLarge,
+            Modifier.padding(start = 20.dp, top = 10.dp, bottom = 12.dp),
+            style = MaterialTheme.typography.headlineSmall,
         )
-        Text(
-            tr(R.string.choose_sources_help),
-            Modifier.padding(horizontal = 20.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(20.dp))
         if (!connected) {
             Column(Modifier.padding(24.dp)) {
                 Text(
@@ -77,7 +75,10 @@ fun ChatsScreen(
                     else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
                 }
             }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 12.dp)) {
+            LazyColumn(
+                Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
                 items(library.sources, key = { it.id }) { source ->
                     ListItem(
                         headlineContent = {
@@ -89,7 +90,7 @@ fun ChatsScreen(
                         },
                         supportingContent = {
                             Text(
-                                trackCount(library.tracks.count { it.chatId == source.id }) +
+                                trackCount(counts[source.id] ?: 0) +
                                     if (source.fullyIndexed) ""
                                     else if (busy) tr(R.string.history_loading_suffix)
                                     else tr(R.string.history_incomplete_suffix)
@@ -100,6 +101,7 @@ fun ChatsScreen(
                                 if (source.id == AppText.savedChatId) Icons.Rounded.Bookmark
                                 else Icons.Rounded.Forum,
                                 null,
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         },
                         trailingContent = {
@@ -110,7 +112,9 @@ fun ChatsScreen(
                                 )
                             }
                         },
-                        modifier = Modifier.clickable { onOpen(source.id) },
+                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                             .liquidGlass(22.dp).clickable { onOpen(source.id) },
                     )
                 }
                 if (library.sources.isEmpty())
@@ -249,20 +253,8 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
                 Icon(Icons.Rounded.Refresh, tr(R.string.refresh_chats))
             }
         }
-        OutlinedTextField(
-            query,
-            { query = it },
-            Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            placeholder = { Text(tr(R.string.chat_search_hint)) },
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty())
-                    IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Rounded.Close, tr(R.string.clear_chat_search))
-                    }
-            },
-        )
+         MusicSearch(query, { query = it }, tr(R.string.chat_search_hint),
+             Modifier.fillMaxWidth())
         if (loading || searching || localLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (search.startsWith("@") || search.contains("t.me/"))
             TextButton(
