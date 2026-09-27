@@ -35,11 +35,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import java.io.File
 
-private val Violet = Color(0xFF754FE0)
-private val Iris = Color(0xFFBEA5FF)
-private val Rose = Color(0xFFFF8DAB)
-private val Aqua = Color(0xFF71D7DE)
-private val Lemon = Color(0xFFF4DF83)
+private val Red = Color(0xFFF07175)
+private val Amber = Color(0xFFF6AF58)
+private val Yellow = Color(0xFFE9D96C)
+private val Green = Color(0xFF72C987)
+private val Cyan = Color(0xFF58C9D2)
+private val Blue = Color(0xFF5E9DEB)
+private val Violet = Color(0xFFA08CE4)
+
+val Spectrum = listOf(Red, Amber, Yellow, Green, Cyan, Blue, Violet)
+
+@Composable
+fun spectrumAccent(index: Int): Color {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    return if (dark) listOf(Cyan, Red, Yellow, Green)[index]
+    else listOf(
+        Color(0xFF086D79), Color(0xFFAE4450), Color(0xFF785A1A), Color(0xFF277347),
+    )[index]
+}
 
 /** A modal has its own window; changing the app theme must update that window too. */
 @Composable
@@ -58,31 +71,35 @@ fun MatchDialogSystemBars() {
 
 private val Dark =
     darkColorScheme(
-        primary = Iris,
-        onPrimary = Color(0xFF20133C),
-        background = Color(0xFF11131E),
-        onBackground = Color(0xFFF7F4FF),
-        surface = Color(0xFF242535),
-        onSurface = Color(0xFFF7F4FF),
-        surfaceVariant = Color(0xFF343549),
-        onSurfaceVariant = Color(0xFFB9B8CB),
-        secondaryContainer = Color(0xFF443858),
-        onSecondaryContainer = Color(0xFFF7F4FF),
-        outline = Color(0xFF77758F),
+        primary = Color(0xFFF3F6F4),
+        onPrimary = Color(0xFF172A2C),
+        secondary = Color(0xFF8ADDE6),
+        tertiary = Color(0xFFFFA2A2),
+        background = Color(0xFF101B1D),
+        onBackground = Color(0xFFF1F6F3),
+        surface = Color(0xFF253437),
+        onSurface = Color(0xFFF1F6F3),
+        surfaceVariant = Color(0xFF35494C),
+        onSurfaceVariant = Color(0xFFC0CFCD),
+        secondaryContainer = Color(0xFF294C50),
+        onSecondaryContainer = Color(0xFFEAF7F2),
+        outline = Color(0xFF87A5A4),
     )
 private val Light =
     lightColorScheme(
-        primary = Color(0xFF5835BB),
+        primary = Color(0xFF253A3D),
         onPrimary = Color.White,
-        background = Color(0xFFF3F1F9),
-        onBackground = Color(0xFF242139),
-        surface = Color(0xFFFBFAFF),
-        onSurface = Color(0xFF242139),
-        surfaceVariant = Color(0xFFE5E1F0),
-        onSurfaceVariant = Color(0xFF625F75),
-        secondaryContainer = Color(0xFFE8DFFA),
-        onSecondaryContainer = Color(0xFF30204F),
-        outline = Color(0xFF8F89A2),
+        secondary = Color(0xFF137B8A),
+        tertiary = Color(0xFFB84750),
+        background = Color(0xFFF0F3F1),
+        onBackground = Color(0xFF1D3032),
+        surface = Color(0xFFFAFCFA),
+        onSurface = Color(0xFF1D3032),
+        surfaceVariant = Color(0xFFE0EAE7),
+        onSurfaceVariant = Color(0xFF52686B),
+        secondaryContainer = Color(0xFFD7F0E9),
+        onSecondaryContainer = Color(0xFF193F42),
+        outline = Color(0xFF789394),
     )
 
 /** One static color field sits behind the scrolling content and translucent controls. */
@@ -92,42 +109,56 @@ fun PrismBackdrop(modifier: Modifier = Modifier) {
     Canvas(modifier.background(MaterialTheme.colorScheme.background)) {
         val w = size.width
         val h = size.height
-        val strength = if (dark) 0.38f else 0.34f
-        drawCircle(
-            Brush.radialGradient(listOf(Violet.copy(alpha = strength), Color.Transparent),
-                center = Offset(w * 0.9f, h * 0.12f), radius = w * 0.95f),
-            radius = w * 0.95f, center = Offset(w * 0.9f, h * 0.12f),
+        val glows = listOf(
+            Triple(Blue, Offset(w * 0.06f, h * 0.13f), w * 0.88f),
+            Triple(Amber, Offset(w * 0.91f, h * 0.18f), w * 0.84f),
+            Triple(Green, Offset(w * 0.02f, h * 0.47f), w * 0.90f),
+            Triple(Cyan, Offset(w * 0.87f, h * 0.55f), w * 0.87f),
+            Triple(Violet, Offset(w * 0.12f, h * 0.79f), w * 0.85f),
+            Triple(Red, Offset(w * 0.97f, h * 0.89f), w * 0.94f),
         )
-        drawCircle(
-            Brush.radialGradient(listOf(Aqua.copy(alpha = strength * 0.75f), Color.Transparent),
-                center = Offset(w * 0.05f, h * 0.55f), radius = w * 0.8f),
-            radius = w * 0.8f, center = Offset(w * 0.05f, h * 0.55f),
-        )
-        drawCircle(
-            Brush.radialGradient(listOf(Rose.copy(alpha = strength * 0.78f), Color.Transparent),
-                center = Offset(w * 0.92f, h * 0.94f), radius = w * 0.85f),
-            radius = w * 0.85f, center = Offset(w * 0.92f, h * 0.94f),
-        )
+        glows.forEach { (color, center, radius) ->
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(color.copy(alpha = if (dark) 0.30f else 0.24f), Color.Transparent),
+                    center = center,
+                    radius = radius,
+                ),
+                radius = radius,
+                center = center,
+            )
+        }
+        val grid = 56.dp.toPx()
+        val gridColor = if (dark) Color.White.copy(alpha = 0.035f)
+            else Color(0xFF223A40).copy(alpha = 0.055f)
+        for (x in 0..(w / grid).toInt())
+            drawLine(gridColor, Offset(x * grid, 0f), Offset(x * grid, h), 0.6.dp.toPx())
+        for (y in 0..(h / grid).toInt())
+            drawLine(gridColor, Offset(0f, y * grid), Offset(w, y * grid), 0.6.dp.toPx())
+
+        val rainbow = Brush.horizontalGradient(Spectrum)
         val ribbon = Path().apply {
-            moveTo(-w * 0.25f, h * 0.32f)
-            cubicTo(w * 0.2f, h * 0.12f, w * 0.62f, h * 0.28f, w * 1.2f, h * 0.10f)
+            moveTo(-w * 0.15f, h * 0.30f)
+            cubicTo(w * 0.26f, h * 0.16f, w * 0.72f, h * 0.29f, w * 1.15f, h * 0.13f)
         }
-        drawPath(ribbon,
-            Brush.horizontalGradient(listOf(Aqua, Violet, Rose, Lemon).map {
-                it.copy(alpha = if (dark) 0.21f else 0.24f)
-            }), style = Stroke(width = 42.dp.toPx()))
-        drawPath(ribbon,
-            Brush.horizontalGradient(listOf(Aqua, Color.White, Rose).map {
-                it.copy(alpha = if (dark) 0.32f else 0.48f)
-            }), style = Stroke(width = 2.dp.toPx()))
+        drawPath(ribbon, Brush.horizontalGradient(Spectrum.map {
+            it.copy(alpha = if (dark) 0.19f else 0.24f)
+        }), style = Stroke(width = 55.dp.toPx()))
+        drawPath(ribbon, rainbow, alpha = if (dark) 0.80f else 0.75f,
+            style = Stroke(width = 12.dp.toPx()))
+        drawPath(ribbon, Brush.horizontalGradient(Spectrum.map {
+            it.copy(alpha = if (dark) 0.30f else 0.48f)
+        }), style = Stroke(width = 2.dp.toPx()))
+
         val lowerRibbon = Path().apply {
-            moveTo(-w * 0.2f, h * 0.95f)
-            cubicTo(w * 0.3f, h * 0.77f, w * 0.62f, h * 1.02f, w * 1.2f, h * 0.84f)
+            moveTo(-w * 0.16f, h * 0.96f)
+            cubicTo(w * 0.22f, h * 0.82f, w * 0.66f, h * 1.00f, w * 1.17f, h * 0.83f)
         }
-        drawPath(lowerRibbon,
-            Brush.horizontalGradient(listOf(Rose, Lemon, Aqua, Violet).map {
-                it.copy(alpha = if (dark) 0.24f else 0.27f)
-            }), style = Stroke(width = 60.dp.toPx()))
+        drawPath(lowerRibbon, Brush.horizontalGradient(Spectrum.reversed().map {
+            it.copy(alpha = if (dark) 0.22f else 0.27f)
+        }), style = Stroke(width = 74.dp.toPx()))
+        drawPath(lowerRibbon, Brush.horizontalGradient(Spectrum.reversed()),
+            alpha = if (dark) 0.55f else 0.53f, style = Stroke(width = 8.dp.toPx()))
     }
 }
 
@@ -135,21 +166,21 @@ fun PrismBackdrop(modifier: Modifier = Modifier) {
 @Composable
 fun Modifier.liquidGlass(radius: Dp = 24.dp, strong: Boolean = false): Modifier {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val base = if (dark) Color(0xFF36334F) else Color.White
-    val opacity = if (strong) if (dark) 0.79f else 0.80f else if (dark) 0.58f else 0.53f
+    val base = if (dark) Color(0xFF829DA0) else Color.White
+    val opacity = if (strong) if (dark) 0.29f else 0.80f else if (dark) 0.18f else 0.53f
     val rim = if (dark) Color.White.copy(alpha = 0.58f) else Color.White.copy(alpha = 0.96f)
     return this.drawWithCache {
         val r = radius.toPx()
         val corner = CornerRadius(r, r)
         val fill = Brush.linearGradient(
             listOf(base.copy(alpha = opacity),
-                (if (dark) Violet else Rose).copy(alpha = if (dark) 0.14f else 0.08f),
-                base.copy(alpha = opacity * 0.85f)),
+                base.copy(alpha = opacity * 0.52f),
+                base.copy(alpha = opacity * 0.80f)),
             start = Offset.Zero, end = Offset(size.width, size.height),
         )
         val edge = Brush.linearGradient(
-            listOf(rim, Aqua.copy(alpha = 0.37f), Rose.copy(alpha = 0.35f),
-                rim.copy(alpha = if (dark) 0.2f else 0.6f)),
+            listOf(rim, Cyan.copy(alpha = 0.55f), Yellow.copy(alpha = 0.50f),
+                Red.copy(alpha = 0.50f), rim.copy(alpha = if (dark) 0.32f else 0.7f)),
             start = Offset.Zero, end = Offset(size.width, size.height),
         )
         onDrawBehind {
@@ -235,19 +266,21 @@ fun Artwork(track: Track?, size: Dp, modifier: Modifier = Modifier) {
     }
     val palettes =
         listOf(
-             Color(0xFF55497D),
-             Color(0xFF88607D),
-             Color(0xFF5D7194),
-             Color(0xFF4C858D),
-             Color(0xFF9E7973),
+            Color(0xFF486F91),
+            Color(0xFFA75F56),
+            Color(0xFF477F67),
+            Color(0xFF7F6495),
+            Color(0xFF987B4C),
+            Color(0xFF4A8793),
         )
     val tint =
         palettes[
             ((track?.title?.hashCode() ?: 0).toLong().let { kotlin.math.abs(it) } % palettes.size)
                 .toInt()]
     Box(
-         modifier.size(size).clip(RoundedCornerShape((size * 0.23f).coerceAtMost(24.dp)))
-             .background(Brush.linearGradient(listOf(tint, tint.copy(alpha = 0.72f), Violet.copy(alpha = 0.7f)))),
+        modifier.size(size).clip(RoundedCornerShape((size * 0.23f).coerceAtMost(24.dp)))
+            .background(Brush.linearGradient(listOf(tint, tint.copy(alpha = 0.84f),
+                Spectrum[(palettes.indexOf(tint) + 3) % Spectrum.size].copy(alpha = 0.72f)))),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

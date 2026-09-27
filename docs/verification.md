@@ -1,5 +1,46 @@
 # Verification record
 
+## 0.10.1 — balanced RGB palette
+
+Debug and minified release assemblies, full debug/release Lint and release
+lintVital passed. Both signed APKs passed `apksigner verify` with the existing
+certificate and 16 KB ZIP alignment. Manifest: `app.spotygram`, versionCode 17 /
+versionName 0.10.1. SHA-256: ARM64
+`19e5e9a297d8be37494c6ffe979c506f641b9bf85756d22b784f2dfb3e24a25e`,
+x86-64 `49a2f126a085dd02541aa143d541561ddf115adf59a32ed6221f2c24d77804a1`.
+
+The SVG banner was rendered in Chromium and inspected. Manual Android 16 x86-64
+checks used the existing local demonstration recordings:
+
+- Debug library, settings and player were visually inspected in both appearances
+  at 480×1040/192 dpi. At 320 dp width and font scale 1.3, text, transport
+  controls and the two-line mini-player title remained readable. The full
+  player still scrolls to its lower actions. The full-spectrum light bands,
+  neutral glass and separately colored artwork/favorites were compared with the
+  reported violet-heavy phone screenshot.
+- Changing emulator density while the debug Activity was running produced an
+  input ANR. Its captured main thread waited in Android
+  `HardwareRenderer.setStopped` during Activity recreation, while RenderThread
+  was parked; a force-stop and launch at the fixed density restored interaction.
+  The mini-player and full player then opened normally. This does not establish
+  that every device will handle a live density change without delay.
+- The signed x86-64 APK installed over 0.10.0 without clearing data. The
+  installed `base.apk` SHA-256 matched the x86-64 release artifact. Three local
+  recordings and the Night/Road playlists remained visible. Selecting a local
+  track reached MediaSession `PLAYING` with advancing position; pause reached
+  `PAUSED`. The English light player/playlists and English dark library/settings
+  plus Russian dark player were captured from the installed version and visually
+  inspected. The four primary images appear in the README; the settings capture
+  was updated alongside them.
+- The emulator showed its recurring cold-boot System UI and Pixel Launcher ANRs
+  before the installed release became responsive. Density, font scale, language
+  and appearance were restored after verification, and the emulator was stopped.
+
+No authenticated Telegram session, physical ARM64 device, large distinct-track
+catalog or device power/performance measurement was checked. Track lists remain
+lazy; the background is one static canvas rather than a shader per row. No test
+files or fixtures were added.
+
 ## 0.10.0 — Liquid Glass redesign
 
 Debug assembly, minified release assembly, full debug/release Lint and release

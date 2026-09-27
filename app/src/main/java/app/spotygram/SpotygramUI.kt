@@ -264,18 +264,22 @@ fun SpotygramUI(
                                     destinations.forEach { (index, destination) ->
                                         val (label, icon) = destination
                                         val selected = tab == index
+                                        val accent = spectrumAccent(index)
                                         Column(
                                             Modifier.weight(1f).height(56.dp)
                                                 .clip(RoundedCornerShape(22.dp))
-                                                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.75f) else Color.Transparent)
+                                                .then(if (selected) Modifier.background(
+                                                    Brush.horizontalGradient(Spectrum.map {
+                                                        it.copy(alpha = 0.20f)
+                                                    })) else Modifier)
                                                 .clickable { navigate(index) },
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center,
                                         ) {
                                             Icon(icon, label, Modifier.size(23.dp),
-                                                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                                tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant)
                                             Text(label, fontSize = 10.sp, maxLines = 1,
-                                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                                color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
@@ -305,14 +309,14 @@ fun SpotygramUI(
                                 Box(
                                     Modifier.size(28.dp)
                                         .clip(CircleShape)
-                                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, Color(0xFFE983AA), Color(0xFF7CCED5)))),
+                                        .background(Brush.linearGradient(Spectrum)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
                                         Icons.Rounded.GraphicEq,
                                         null,
                                         Modifier.size(19.dp),
-                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        tint = Color.White,
                                     )
                                 }
                                 Text(

@@ -102,7 +102,7 @@ fun PlayerScreen(
                         if (track.liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         if (track.liked) tr(R.string.unlike) else tr(R.string.like),
                         tint =
-                            if (track.liked) MaterialTheme.colorScheme.primary
+                            if (track.liked) MaterialTheme.colorScheme.tertiary
                             else MaterialTheme.colorScheme.onSurface,
                     )
                 }
@@ -169,7 +169,7 @@ fun PlayerScreen(
                         if (state.random) Icons.Rounded.Casino else Icons.Rounded.Shuffle,
                         tr(R.string.change_playback_order, playbackOrderLabel(state)),
                         tint =
-                            if (state.shuffle) MaterialTheme.colorScheme.primary
+                            if (state.shuffle) MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

@@ -569,7 +569,7 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleMedium,
                 color =
-                    if (active) MaterialTheme.colorScheme.primary
+                    if (active) MaterialTheme.colorScheme.secondary
                     else MaterialTheme.colorScheme.onSurface,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -579,7 +579,7 @@ fun TrackRow(
                         else Icons.Rounded.DownloadForOffline,
                         tr(if (track.temporary) R.string.temporary_audio else R.string.on_device),
                         Modifier.padding(end = 3.dp).size(13.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.secondary,
                     )
                 Text(
                     if (!track.available && !track.local) tr(R.string.message_deleted)
@@ -610,7 +610,7 @@ fun TrackRow(
                     if (track.liked) tr(R.string.unlike_named, track.title)
                     else tr(R.string.like_named, track.title),
                     tint =
-                        if (track.liked) MaterialTheme.colorScheme.primary
+                        if (track.liked) MaterialTheme.colorScheme.tertiary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
