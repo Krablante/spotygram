@@ -3,6 +3,7 @@ package app.spotygram
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -28,10 +30,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.session.MediaController
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import dev.chrisbanes.haze.glass.hazeGlass
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalHazeApi::class)
 @Composable
 fun SpotygramUI(
     app: SpotygramApp,
@@ -84,6 +91,9 @@ fun SpotygramUI(
     val keyboardVisible = WindowInsets.isImeVisible
     val compact = LocalConfiguration.current.screenHeightDp < 480
     val pages = rememberSaveableStateHolder()
+    val dockHaze = rememberHazeState()
+    val navGlass = dockGlassStyle(27.dp)
+    val miniGlass = dockGlassStyle(22.dp)
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
     val source = library.sources.firstOrNull { it.id == sourceId }
     val offlineView = tab == 0 && offline
@@ -244,11 +254,18 @@ fun SpotygramUI(
                                         onToggle = { togglePlayback(player) },
                                         onPrevious = { player?.seekToPreviousMediaItem() },
                                         onNext = { player?.seekToNextMediaItem() },
+                                        glass = Modifier.hazeGlass(HazeInput.Sources(dockHaze), miniGlass),
                                     )
                                 Row(
                                     modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth()
                                         .padding(horizontal = 12.dp, vertical = 5.dp)
-                                        .height(66.dp).liquidGlass(28.dp, strong = true)
+                                        .height(62.dp)
+                                        .shadow(7.dp, RoundedCornerShape(27.dp),
+                                            ambientColor = Color.Black.copy(alpha = 0.09f),
+                                            spotColor = Color.Black.copy(alpha = 0.09f))
+                                        .clip(RoundedCornerShape(27.dp))
+                                        .hazeGlass(HazeInput.Sources(dockHaze), navGlass)
+                                        .dockVeil(27.dp)
                                         .padding(horizontal = 5.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -265,13 +282,15 @@ fun SpotygramUI(
                                         val (label, icon) = destination
                                         val selected = tab == index
                                         val accent = spectrumAccent(index)
+                                        val selectionColor by animateColorAsState(
+                                            if (selected) accent.copy(alpha = 0.16f)
+                                            else Color.Transparent,
+                                            label = "destination selection",
+                                        )
                                         Column(
-                                            Modifier.weight(1f).height(56.dp)
-                                                .clip(RoundedCornerShape(22.dp))
-                                                .then(if (selected) Modifier.background(
-                                                    Brush.horizontalGradient(Spectrum.map {
-                                                        it.copy(alpha = 0.20f)
-                                                    })) else Modifier)
+                                             Modifier.weight(1f).height(52.dp)
+                                                 .clip(RoundedCornerShape(21.dp))
+                                                 .background(selectionColor)
                                                 .clickable { navigate(index) },
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center,
@@ -287,7 +306,8 @@ fun SpotygramUI(
                     },
                 ) { padding ->
                     Column(
-                        Modifier.padding(padding).fillMaxSize(),
+                         Modifier.padding(top = padding.calculateTopPadding())
+                             .fillMaxSize().hazeSource(dockHaze),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         UpdateBanner(app)
@@ -309,7 +329,8 @@ fun SpotygramUI(
                                 Box(
                                     Modifier.size(28.dp)
                                         .clip(CircleShape)
-                                        .background(Brush.linearGradient(Spectrum)),
+                                         .background(Brush.linearGradient(listOf(
+                                             spectrumAccent(0), spectrumAccent(2), spectrumAccent(3)))),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
@@ -751,24 +772,30 @@ private fun MiniPlayer(
     onToggle: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    glass: Modifier = Modifier,
 ) {
     val state = observePlayer(player, positionUpdates = true)
     val narrow = LocalConfiguration.current.screenWidthDp < 360
     Column(
-         Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 12.dp)
-             .liquidGlass(22.dp, strong = true)
+         Modifier.widthIn(max = 720.dp).fillMaxWidth()
+             .padding(horizontal = if (narrow) 8.dp else 12.dp)
+             .shadow(7.dp, RoundedCornerShape(22.dp),
+                 ambientColor = Color.Black.copy(alpha = 0.09f),
+                 spotColor = Color.Black.copy(alpha = 0.09f))
+              .clip(RoundedCornerShape(22.dp)).then(glass)
+              .dockVeil(22.dp)
              .clip(RoundedCornerShape(22.dp))
              .clickable(onClick = onOpen)
     ) {
         Row(
-            Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp),
+             Modifier.padding(start = if (narrow) 6.dp else 8.dp, top = 4.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-             Artwork(track, 44.dp)
-            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+              Artwork(track, if (narrow) 36.dp else 44.dp)
+            Column(Modifier.weight(1f).padding(horizontal = if (narrow) 6.dp else 10.dp)) {
                  Text(
                      track.title,
-                     maxLines = if (narrow) 2 else 1,
+                      maxLines = 1,
                      overflow = TextOverflow.Ellipsis,
                      style = MaterialTheme.typography.titleMedium,
                  )

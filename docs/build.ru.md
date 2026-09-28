@@ -10,9 +10,9 @@
 
 ## Подготовить окружение
 
-Нужны Linux, полный JDK 21, Android SDK platform 36, build tools 36,
+Нужны Linux, полный JDK 21, Android SDK platform 37.0, build tools 36,
 NDK `28.2.13676358`, CMake, Ninja, gperf, Perl, C++-компилятор, Git и Make.
-Gradle Wrapper фиксирует Gradle 8.14.3.
+Gradle Wrapper фиксирует Gradle 9.3.1 и Android Gradle plugin 9.1.1.
 
 Исходники проекта и рабочие данные сборки хранятся отдельно.
 `SPOTYGRAM_STATE` содержит скачанные нативные исходники, результаты сборки,

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,14 +51,20 @@ fun SettingsSheet(
          } else theme
          Row(Modifier.fillMaxWidth().liquidGlass(22.dp).padding(4.dp)) {
              listOf("light" to tr(R.string.light_theme), "dark" to tr(R.string.dark_theme))
-                 .forEach { (key, label) ->
-                     Box(
-                         Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(18.dp))
-                             .background(if (selectedTheme == key) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                             .clickable { app.changeTheme(key) },
-                         contentAlignment = Alignment.Center,
-                     ) {
-                         Text(label, color = if (selectedTheme == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                  .forEach { (key, label) ->
+                      val selected = selectedTheme == key
+                      val selectionColor by animateColorAsState(
+                          if (selected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.20f)
+                          else Color.Transparent,
+                          label = "theme selection",
+                      )
+                      Box(
+                          Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(18.dp))
+                              .background(selectionColor)
+                              .clickable { app.changeTheme(key) },
+                          contentAlignment = Alignment.Center,
+                      ) {
+                          Text(label, color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                      }
                  }
          }

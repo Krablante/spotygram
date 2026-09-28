@@ -1,5 +1,46 @@
 # Verification record
 
+## 0.11.0 — Liquid Glass control layer
+
+Debug and minified release assemblies, debug/release Lint and release lintVital
+passed with Gradle 9.3.1, AGP 9.1.1, Kotlin 2.4.20 and SDK 37.0. No native
+library rebuild or test files were needed. The signed ARM64 and x86-64 APKs
+passed `apksigner verify` and 16 KB ZIP alignment with the established
+certificate `b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`.
+The manifest reports `app.spotygram`, versionCode 20, versionName 0.11.0,
+minSdk 26 and targetSdk 36. SHA-256: ARM64
+`072381586e83a45924211c4456a51ff3fe660c2ec2f86a9231e960ebd245285c`,
+x86-64 `4a138cd87a819252340b70a0fa67645f1ec5f912ab1305a2c4e7c4200b9af682`.
+
+Android 16 x86-64 manual checks used the existing imported recordings and
+playlists. The final signed APK installed over the prior release without
+clearing data; the installed `base.apk` SHA-256 matched the x86-64 artifact.
+The local library showed three tracks and the Night/Road playlists showed one
+and two tracks. The English light player and playlists, English dark library,
+favorites, selection and settings, and Russian dark player were inspected as
+actual screens; the documentation screenshots were refreshed from this APK.
+The SVG banner was rendered in Chrome and inspected.
+
+At 320 dp width and 517 dp height, the signed library and player were
+inspected with rows passing behind the floating controls. A visible-text bleed
+through the dock in the first Haze Glass pass was corrected with a denser
+material tint and protective veil; the final control labels remained readable.
+The compact player title ellipsized rather than leaving an orphaned final
+letter, Play was available without scrolling, and scrolling revealed the
+player's lower actions. The queue sheet, selected-track controls, settings
+theme switch, source selector menu and empty music-cache screen were opened.
+From the final release, a local track reached MediaSession `PLAYING` at
+55,659 ms and `PAUSED` at 55,929 ms. No Spotygram AndroidRuntime crash was
+found in the inspected crash logs.
+
+The emulator repeatedly displayed cold-boot Pixel Launcher and System UI ANR
+dialogs; changing its display size also produced an app input ANR during
+recreation. These were dismissed or followed by a fresh launch at a fixed
+size before screen checks. This does not establish physical-device graphics,
+frame time, power use, authenticated Telegram playback or a large catalog.
+Haze's optical output on a physical ARM64 device was not measured. The
+emulator was returned to 480×1040 at 192 dpi and stopped.
+
 ## 0.10.3 — restore the 0.10.1 appearance
 
 The source and documentation from the withdrawn 0.10.2 redesign were reverted.

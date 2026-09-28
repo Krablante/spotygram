@@ -26,14 +26,14 @@ val licenseAssets =
 
 android {
     namespace = "app.spotygram"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
     defaultConfig {
         applicationId = "app.spotygram"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.10.3"
+        versionCode = 20
+        versionName = "0.11.0"
         buildConfigField("int", "TELEGRAM_API_ID", credential("TELEGRAM_API_ID").ifBlank { "0" })
         buildConfigField("String", "TELEGRAM_API_HASH", "\"${credential("TELEGRAM_API_HASH")}\"")
         buildConfigField("boolean", "TELEGRAM_TEST_DC", "false")
@@ -76,8 +76,8 @@ android {
             isUniversalApk = false
         }
     }
-    sourceSets["main"].jniLibs.srcDir("$buildState/jniLibs")
-    sourceSets["main"].assets.srcDir(licenseAssets)
+    sourceSets["main"].jniLibs.directories += "$buildState/jniLibs"
+    sourceSets["main"].assets.directories += layout.buildDirectory.get().dir("generated/licenseAssets").asFile.path
     buildFeatures {
         compose = true
         buildConfig = true
@@ -107,4 +107,6 @@ dependencies {
     implementation("androidx.media3:media3-session:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("dev.chrisbanes.haze:haze:2.0.0")
+    implementation("dev.chrisbanes.haze:haze-glass:2.0.0")
 }

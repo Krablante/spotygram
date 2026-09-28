@@ -46,7 +46,7 @@ fun CacheScreen(app: SpotygramApp, connected: Boolean, onBack: () -> Unit, onCon
             )
         }
          state.bytes?.let { size ->
-             Column(Modifier.fillMaxWidth().liquidGlass(24.dp).padding(20.dp)) {
+             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                  Text(cacheBytes(size), style = MaterialTheme.typography.displaySmall)
                  Text(
                      if (size == 0L) tr(R.string.cache_empty)

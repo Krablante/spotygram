@@ -77,7 +77,7 @@ fun ChatsScreen(
             }
             LazyColumn(
                 Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                 contentPadding = PaddingValues(top = 8.dp, bottom = 160.dp),
             ) {
                 items(library.sources, key = { it.id }) { source ->
                     ListItem(
@@ -113,8 +113,7 @@ fun ChatsScreen(
                             }
                         },
                          colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                             .liquidGlass(22.dp).clickable { onOpen(source.id) },
+                          modifier = Modifier.fillMaxWidth().clickable { onOpen(source.id) },
                     )
                 }
                 if (library.sources.isEmpty())

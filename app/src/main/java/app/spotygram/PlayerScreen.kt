@@ -37,7 +37,8 @@ fun PlayerScreen(
     val progress = observePlayer(player, positionUpdates = true)
     var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-         val cover = minOf(maxWidth - 48.dp, maxHeight * 0.43f, 360.dp)
+          val cover = minOf(maxWidth - 48.dp,
+              maxHeight * if (maxHeight < 700.dp) 0.33f else 0.43f, 360.dp)
         Column(
              Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.TopCenter)
                  .verticalScroll(rememberScrollState())
@@ -73,11 +74,10 @@ fun PlayerScreen(
             }
              Spacer(Modifier.height(12.dp))
              Box(
-                 Modifier.align(Alignment.CenterHorizontally).size(cover)
-                     .liquidGlass(36.dp, strong = true).padding(10.dp),
+                 Modifier.align(Alignment.CenterHorizontally).size(cover),
                  contentAlignment = Alignment.Center,
              ) {
-                 Artwork(track, cover - 20.dp)
+                 Artwork(track, cover)
              }
              Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
