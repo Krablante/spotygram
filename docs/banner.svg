@@ -1,32 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480" role="img" aria-labelledby="title desc">
   <title id="title">Spotygram</title>
-  <desc id="desc">Spotygram branding beside a music player on a light surface, with color in the artwork and glass on the playback controls.</desc>
+  <desc id="desc">Dark lettering and clear glass over a cyan, blue, violet, red, amber, yellow and green spectrum.</desc>
   <defs>
-    <linearGradient id="art" x2="1" y2="1"><stop stop-color="#366d98"/><stop offset=".52" stop-color="#6796cb"/><stop offset="1" stop-color="#d17e82"/></linearGradient>
-    <linearGradient id="lens" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".92"/><stop offset=".55" stop-color="#dce8f2" stop-opacity=".74"/><stop offset="1" stop-color="#fff" stop-opacity=".84"/></linearGradient>
-    <linearGradient id="rim" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".55" stop-color="#9daec2" stop-opacity=".38"/><stop offset="1" stop-color="#7189a6" stop-opacity=".34"/></linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="15"/></filter>
-    <clipPath id="frame"><rect width="1280" height="480" rx="30"/></clipPath>
+    <linearGradient id="rainbow"><stop stop-color="#58c9d2"/><stop offset=".18" stop-color="#5e9deb"/><stop offset=".35" stop-color="#a08ce4"/><stop offset=".51" stop-color="#f07175"/><stop offset=".68" stop-color="#f6af58"/><stop offset=".84" stop-color="#e9d96c"/><stop offset="1" stop-color="#72c987"/></linearGradient>
+    <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".74"/><stop offset=".5" stop-color="#fff" stop-opacity=".29"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient>
+    <linearGradient id="edge" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#9edce7"/><stop offset=".72" stop-color="#f6bd9c"/><stop offset="1" stop-color="#fff"/></linearGradient>
+    <radialGradient id="blue"><stop stop-color="#84bedc" stop-opacity=".38"/><stop offset="1" stop-color="#84bedc" stop-opacity="0"/></radialGradient>
+    <radialGradient id="warm"><stop stop-color="#f1b991" stop-opacity=".43"/><stop offset="1" stop-color="#f1b991" stop-opacity="0"/></radialGradient>
+    <radialGradient id="green"><stop stop-color="#a1d8aa" stop-opacity=".42"/><stop offset="1" stop-color="#a1d8aa" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#4e747b" stroke-opacity=".12"/></pattern>
+    <clipPath id="frame"><rect width="1280" height="480" rx="28"/></clipPath>
   </defs>
   <g clip-path="url(#frame)">
-    <rect width="1280" height="480" fill="#fafafc"/>
-    <circle cx="104" cy="108" r="36" fill="url(#art)"/>
-    <g stroke="#fff" stroke-width="5" stroke-linecap="round"><path d="M89 107v8M99 99v25M109 93v35M119 103v16"/></g>
-    <text x="154" y="120" fill="#191c26" font-family="Arial,Helvetica,sans-serif" font-size="43" font-weight="700" letter-spacing="-2">spotygram</text>
-    <text x="84" y="266" fill="#191c26" font-family="Arial,Helvetica,sans-serif" font-size="68" font-weight="700" letter-spacing="-3">Your music.</text>
-    <text x="84" y="341" fill="#191c26" font-family="Arial,Helvetica,sans-serif" font-size="68" font-weight="700" letter-spacing="-3">From your chats.</text>
-    <rect x="786" y="56" width="394" height="365" rx="44" fill="#8492aa" opacity=".18" filter="url(#shadow)"/>
-    <rect x="786" y="56" width="394" height="365" rx="44" fill="#f0f2f6"/>
-    <rect x="812" y="82" width="342" height="186" rx="25" fill="url(#art)"/>
-    <circle cx="992" cy="148" r="69" fill="#f5b874" opacity=".47"/>
-    <path d="M812 234c67-59 116-24 181-73s100-37 161-24v131H812" fill="#263b68" opacity=".52"/>
-    <text x="818" y="316" fill="#191c26" font-family="Arial,Helvetica,sans-serif" font-size="23" font-weight="700">Music from your chats</text>
-    <text x="818" y="345" fill="#5c6271" font-family="Arial,Helvetica,sans-serif" font-size="16">Listen anywhere</text>
-    <rect x="830" y="352" width="310" height="55" rx="26" fill="#788ba5" opacity=".15" filter="url(#shadow)"/>
-    <rect x="830" y="352" width="310" height="55" rx="26" fill="url(#lens)" stroke="url(#rim)" stroke-width="2"/>
-    <path d="M847 356h272" stroke="#fff" opacity=".8" stroke-width="2" stroke-linecap="round"/>
-    <path d="M912 373v16m-9-9 9-7m-9 7 9 9m93-16v16m9-9-9-7m9 7-9 9" fill="none" stroke="#191c26" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="958" cy="380" r="19" fill="#191c26"/>
-    <path d="m953 370 14 10-14 10z" fill="#fff"/>
+    <rect width="1280" height="480" fill="#edf2f0"/>
+    <ellipse cx="110" cy="90" rx="450" ry="350" fill="url(#blue)"/>
+    <ellipse cx="1020" cy="110" rx="530" ry="370" fill="url(#warm)"/>
+    <ellipse cx="740" cy="450" rx="570" ry="370" fill="url(#green)"/>
+    <rect width="1280" height="480" fill="url(#grid)"/>
+    <path d="M-100 319C283 88 656 377 999 148S1311 201 1410 80" fill="none" stroke="url(#rainbow)" stroke-opacity=".28" stroke-width="109"/>
+    <path d="M-100 319C283 88 656 377 999 148S1311 201 1410 80" fill="none" stroke="url(#rainbow)" stroke-opacity=".89" stroke-width="29"/>
+    <path d="M-100 319C283 88 656 377 999 148S1311 201 1410 80" fill="none" stroke="#fff" stroke-opacity=".68" stroke-width="3"/>
+    <rect x="52" y="83" width="1176" height="314" rx="64" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
+    <path d="M115 91h1035" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2"/>
+    <rect x="93" y="129" width="176" height="176" rx="56" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
+    <g stroke="#1e393d" stroke-linecap="round" stroke-width="12">
+      <path d="M141 201v30M169 181v70M198 163v105M226 195v41"/>
+    </g>
+    <text x="310" y="237" fill="#20383c" font-family="Arial,Helvetica,sans-serif" font-size="89" font-weight="700" letter-spacing="-5">spotygram</text>
+    <text x="316" y="288" fill="#486166" font-family="Arial,Helvetica,sans-serif" font-size="19" letter-spacing="4">MUSIC FROM YOUR CHATS</text>
+    <circle cx="1096" cy="240" r="92" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
+    <circle cx="1096" cy="240" r="66" fill="none" stroke="#fff" stroke-opacity=".7"/>
+    <circle cx="1096" cy="240" r="48" fill="none" stroke="#42656c" stroke-opacity=".17"/>
+    <circle cx="1096" cy="240" r="12" fill="#50bcb8"/>
   </g>
 </svg>

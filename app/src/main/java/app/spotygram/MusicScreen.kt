@@ -17,7 +17,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
@@ -323,7 +322,7 @@ fun MusicScreen(
             LazyColumn(
                 state = scroll,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 160.dp),
+                contentPadding = PaddingValues(bottom = 12.dp),
             ) {
                 if (tracks.isEmpty())
                     item {
@@ -449,14 +448,7 @@ private fun MusicFilters(
             )
             Icon(Icons.Rounded.ArrowDropDown, null)
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.liquidGlass(18.dp),
-            shape = RoundedCornerShape(18.dp),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            tonalElevation = 0.dp,
-        ) {
+        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(tr(R.string.all_sources)) },
                 onClick = {
@@ -481,10 +473,6 @@ private fun MusicFilters(
         label = { Text(tr(R.string.on_device)) },
          leadingIcon = { Icon(Icons.Rounded.DownloadForOffline, null, Modifier.size(18.dp)) },
          border = null,
-         colors = FilterChipDefaults.filterChipColors(
-             containerColor = Color.Transparent,
-             selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-         ),
     )
     IconButton(onClick = onSort) {
         Icon(
@@ -508,9 +496,7 @@ fun MusicSearch(
         value,
         onChange,
          modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-              .shadow(5.dp, RoundedCornerShape(22.dp), ambientColor = Color.Black.copy(alpha = 0.06f),
-                  spotColor = Color.Black.copy(alpha = 0.06f))
-              .clip(RoundedCornerShape(22.dp)).liquidGlass(22.dp, strong = true),
+             .liquidGlass(22.dp, strong = true).clip(RoundedCornerShape(22.dp)),
         singleLine = true,
         placeholder = { Text(placeholder) },
         leadingIcon = { Icon(Icons.Rounded.Search, null) },
@@ -526,7 +512,7 @@ fun MusicSearch(
                  unfocusedContainerColor = Color.Transparent,
                  focusedContainerColor = Color.Transparent,
                  unfocusedBorderColor = Color.Transparent,
-                  focusedBorderColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f),
+                 focusedBorderColor = Color.Transparent,
             ),
     )
 }

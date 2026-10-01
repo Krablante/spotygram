@@ -90,7 +90,7 @@ fun PlaylistsScreen(
         LazyColumn(
             state = rememberLazyListState(),
              modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-             contentPadding = PaddingValues(top = 8.dp, bottom = 160.dp),
+             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
             if (playlists.isEmpty())
                 item {
@@ -110,7 +110,7 @@ fun PlaylistsScreen(
             items(playlists, key = { it.id }) { playlist ->
                 val haptic = LocalHapticFeedback.current
                 Row(
-                     Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                     Modifier.fillMaxWidth().padding(vertical = 4.dp).liquidGlass(22.dp)
                          .combinedClickable(
                             onClick = { onOpen(playlist.id) },
                             onLongClick = {
@@ -119,7 +119,7 @@ fun PlaylistsScreen(
                             },
                             onLongClickLabel = tr(R.string.playlist_actions),
                         )
-                         .padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                        .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PlaylistCover(playlist, library)

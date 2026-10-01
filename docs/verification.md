@@ -1,5 +1,47 @@
 # Verification record
 
+## 0.11.1 — restore the 0.10.3 app
+
+The app source and build configuration match the published `v0.10.3` tag,
+except versionCode 19 → 21 and versionName 0.10.3 → 0.11.1. Architecture,
+dependency documentation and promotional images were restored to that version;
+the build guides now name the actual required Build Tools 35.0.0. Release and
+verification history remain available. There are no database migrations.
+
+The minified release assembly and full release Lint passed with Gradle 8.14.3,
+AGP 8.11.1, Kotlin 2.2.10 and SDK 36. Lint reported warnings, with no errors.
+Both signed APKs passed `apksigner verify` and 16 KB ZIP alignment using the
+established certificate
+`b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`.
+Manifest: `app.spotygram`, versionCode 21 / versionName 0.11.1, minSdk 26,
+targetSdk 36. The packaged x86-64 TDLib library is byte-identical to 0.10.3.
+SHA-256: ARM64
+`0c4e367330ae57e3a0b2866f8aed0082903ae4fe86fa7c5e1a6e3460436bd6bb`,
+x86-64 `4ab7e75a1e09caf80f42a27c8d94090b8a04b74bc5fa498f01dcd6ea67f1ce81`.
+
+On the existing Android 16 x86-64 emulator, the signed APK installed over
+0.11.0 with `adb install -r`, without clearing data. The installed `base.apk`
+hash matched the final artifact. Before and after installation, SQLite schema
+was 4, integrity was `ok`, and all three local recordings, Night/Road playlists
+and three memberships remained. A tap on Fur Elise started local playback:
+MediaSession reported `PLAYING` at 11,918 ms and later `PAUSED` at 15,318 ms.
+No AndroidRuntime or ExoPlayer error appeared in the inspected logs.
+
+Actual Russian dark library/player/playlists and light settings/player screens
+were visually inspected at 480×1040/192 dpi against the restored appearance.
+At 320 dp width with font scale 1.3, playback controls remained accessible and
+scrolling exposed the lower player actions. The restored interface retains an
+existing limitation: the Russian Queue label wraps awkwardly at that size.
+The emulator displayed its recurring cold-boot System UI ANR, which was closed
+before the app checks. Display size, font scale and dark appearance were
+restored, playback left paused and the emulator stopped. Builds and emulator
+ran sequentially with two-core CPU limits and bounded memory. No test files
+or fixtures were added.
+
+Physical ARM64 installation, authenticated Telegram playback/session retention,
+device performance and the complete in-app download/installer flow were not
+retested. The data-preserving installation evidence covers the local emulator.
+
 ## 0.11.0 — Liquid Glass control layer
 
 Debug and minified release assemblies, debug/release Lint and release lintVital

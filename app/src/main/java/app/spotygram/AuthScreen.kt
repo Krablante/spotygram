@@ -35,7 +35,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
             IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, tr(R.string.back)) }
         }
         Spacer(Modifier.height(44.dp))
-         Box(Modifier.size(88.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(88.dp).liquidGlass(30.dp), contentAlignment = Alignment.Center) {
             Icon(Icons.Rounded.GraphicEq, null, Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.primary)
         }

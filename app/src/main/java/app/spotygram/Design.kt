@@ -1,6 +1,7 @@
 package app.spotygram
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +19,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
@@ -31,25 +33,24 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import dev.chrisbanes.haze.glass.GlassStyle
 import java.io.File
 
-private val Red = Color(0xFFED6478)
-private val Amber = Color(0xFFF4B65A)
-private val Yellow = Color(0xFFE9D578)
-private val Green = Color(0xFF61C697)
-private val Cyan = Color(0xFF53BDD0)
-private val Blue = Color(0xFF618FF0)
-private val Violet = Color(0xFFAB80DC)
+private val Red = Color(0xFFF07175)
+private val Amber = Color(0xFFF6AF58)
+private val Yellow = Color(0xFFE9D96C)
+private val Green = Color(0xFF72C987)
+private val Cyan = Color(0xFF58C9D2)
+private val Blue = Color(0xFF5E9DEB)
+private val Violet = Color(0xFFA08CE4)
 
 val Spectrum = listOf(Red, Amber, Yellow, Green, Cyan, Blue, Violet)
 
 @Composable
 fun spectrumAccent(index: Int): Color {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    return if (dark) listOf(Cyan, Red, Amber, Violet)[index]
+    return if (dark) listOf(Cyan, Red, Yellow, Green)[index]
     else listOf(
-        Color(0xFF166D9C), Color(0xFFBA4057), Color(0xFF96611F), Color(0xFF6955A4),
+        Color(0xFF086D79), Color(0xFFAE4450), Color(0xFF785A1A), Color(0xFF277347),
     )[index]
 }
 
@@ -70,111 +71,128 @@ fun MatchDialogSystemBars() {
 
 private val Dark =
     darkColorScheme(
-        primary = Color(0xFFF4F5F8),
-        onPrimary = Color(0xFF111319),
-        secondary = Color(0xFF78CBDF),
-        tertiary = Color(0xFFFF859B),
-        background = Color(0xFF0B0D12),
-        onBackground = Color(0xFFF4F5F8),
-        surface = Color(0xFF1B1E26),
-        onSurface = Color(0xFFF4F5F8),
-        surfaceVariant = Color(0xFF292D38),
-        onSurfaceVariant = Color(0xFFADB3C1),
-        secondaryContainer = Color(0xFF263A48),
-        onSecondaryContainer = Color(0xFFE3F3F7),
-        outline = Color(0xFF7F899B),
+        primary = Color(0xFFF3F6F4),
+        onPrimary = Color(0xFF172A2C),
+        secondary = Color(0xFF8ADDE6),
+        tertiary = Color(0xFFFFA2A2),
+        background = Color(0xFF101B1D),
+        onBackground = Color(0xFFF1F6F3),
+        surface = Color(0xFF253437),
+        onSurface = Color(0xFFF1F6F3),
+        surfaceVariant = Color(0xFF35494C),
+        onSurfaceVariant = Color(0xFFC0CFCD),
+        secondaryContainer = Color(0xFF294C50),
+        onSecondaryContainer = Color(0xFFEAF7F2),
+        outline = Color(0xFF87A5A4),
     )
 private val Light =
     lightColorScheme(
-        primary = Color(0xFF191C26),
+        primary = Color(0xFF253A3D),
         onPrimary = Color.White,
-        secondary = Color(0xFF166D9C),
-        tertiary = Color(0xFFB74059),
-        background = Color(0xFFFAFAFC),
-        onBackground = Color(0xFF191C26),
-        surface = Color(0xFFFFFFFF),
-        onSurface = Color(0xFF191C26),
-        surfaceVariant = Color(0xFFEDEEF3),
-        onSurfaceVariant = Color(0xFF5C6271),
-        secondaryContainer = Color(0xFFE2EFF6),
-        onSecondaryContainer = Color(0xFF193B4E),
-        outline = Color(0xFF888F9E),
+        secondary = Color(0xFF137B8A),
+        tertiary = Color(0xFFB84750),
+        background = Color(0xFFF0F3F1),
+        onBackground = Color(0xFF1D3032),
+        surface = Color(0xFFFAFCFA),
+        onSurface = Color(0xFF1D3032),
+        surfaceVariant = Color(0xFFE0EAE7),
+        onSurfaceVariant = Color(0xFF52686B),
+        secondaryContainer = Color(0xFFD7F0E9),
+        onSecondaryContainer = Color(0xFF193F42),
+        outline = Color(0xFF789394),
     )
 
-/** Quiet paper/ink base; artwork and interactive states carry the palette. */
+/** One static color field sits behind the scrolling content and translucent controls. */
 @Composable
 fun PrismBackdrop(modifier: Modifier = Modifier) {
-    Box(modifier.background(MaterialTheme.colorScheme.background))
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    Canvas(modifier.background(MaterialTheme.colorScheme.background)) {
+        val w = size.width
+        val h = size.height
+        val glows = listOf(
+            Triple(Blue, Offset(w * 0.06f, h * 0.13f), w * 0.88f),
+            Triple(Amber, Offset(w * 0.91f, h * 0.18f), w * 0.84f),
+            Triple(Green, Offset(w * 0.02f, h * 0.47f), w * 0.90f),
+            Triple(Cyan, Offset(w * 0.87f, h * 0.55f), w * 0.87f),
+            Triple(Violet, Offset(w * 0.12f, h * 0.79f), w * 0.85f),
+            Triple(Red, Offset(w * 0.97f, h * 0.89f), w * 0.94f),
+        )
+        glows.forEach { (color, center, radius) ->
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(color.copy(alpha = if (dark) 0.30f else 0.24f), Color.Transparent),
+                    center = center,
+                    radius = radius,
+                ),
+                radius = radius,
+                center = center,
+            )
+        }
+        val grid = 56.dp.toPx()
+        val gridColor = if (dark) Color.White.copy(alpha = 0.035f)
+            else Color(0xFF223A40).copy(alpha = 0.055f)
+        for (x in 0..(w / grid).toInt())
+            drawLine(gridColor, Offset(x * grid, 0f), Offset(x * grid, h), 0.6.dp.toPx())
+        for (y in 0..(h / grid).toInt())
+            drawLine(gridColor, Offset(0f, y * grid), Offset(w, y * grid), 0.6.dp.toPx())
+
+        val rainbow = Brush.horizontalGradient(Spectrum)
+        val ribbon = Path().apply {
+            moveTo(-w * 0.15f, h * 0.30f)
+            cubicTo(w * 0.26f, h * 0.16f, w * 0.72f, h * 0.29f, w * 1.15f, h * 0.13f)
+        }
+        drawPath(ribbon, Brush.horizontalGradient(Spectrum.map {
+            it.copy(alpha = if (dark) 0.19f else 0.24f)
+        }), style = Stroke(width = 55.dp.toPx()))
+        drawPath(ribbon, rainbow, alpha = if (dark) 0.80f else 0.75f,
+            style = Stroke(width = 12.dp.toPx()))
+        drawPath(ribbon, Brush.horizontalGradient(Spectrum.map {
+            it.copy(alpha = if (dark) 0.30f else 0.48f)
+        }), style = Stroke(width = 2.dp.toPx()))
+
+        val lowerRibbon = Path().apply {
+            moveTo(-w * 0.16f, h * 0.96f)
+            cubicTo(w * 0.22f, h * 0.82f, w * 0.66f, h * 1.00f, w * 1.17f, h * 0.83f)
+        }
+        drawPath(lowerRibbon, Brush.horizontalGradient(Spectrum.reversed().map {
+            it.copy(alpha = if (dark) 0.22f else 0.27f)
+        }), style = Stroke(width = 74.dp.toPx()))
+        drawPath(lowerRibbon, Brush.horizontalGradient(Spectrum.reversed()),
+            alpha = if (dark) 0.55f else 0.53f, style = Stroke(width = 8.dp.toPx()))
+    }
 }
 
-/** Optical edge and specular reflection for the small set of interactive surfaces. */
+/** A tinted optical rim and soft inner reflection; drawn once per surface, without per-row blur. */
 @Composable
 fun Modifier.liquidGlass(radius: Dp = 24.dp, strong: Boolean = false): Modifier {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val base = if (dark) Color(0xFF7E8EA9) else Color(0xFFB9C7D7)
-    val opacity = if (strong) if (dark) 0.18f else 0.34f else if (dark) 0.12f else 0.22f
+    val base = if (dark) Color(0xFF829DA0) else Color.White
+    val opacity = if (strong) if (dark) 0.29f else 0.80f else if (dark) 0.18f else 0.53f
+    val rim = if (dark) Color.White.copy(alpha = 0.58f) else Color.White.copy(alpha = 0.96f)
     return this.drawWithCache {
         val r = radius.toPx()
         val corner = CornerRadius(r, r)
-        val fill = Brush.linearGradient(listOf(base.copy(alpha = opacity * 1.2f),
-            base.copy(alpha = opacity * 0.53f), base.copy(alpha = opacity * 0.82f)))
-        val edge = Brush.linearGradient(listOf(
-            Color.White.copy(alpha = if (dark) 0.29f else 0.89f),
-            if (dark) Blue.copy(alpha = 0.10f) else Color(0xFF61748D).copy(alpha = 0.22f),
-            if (dark) Color.White.copy(alpha = 0.12f)
-            else Color(0xFF75879F).copy(alpha = 0.20f),
-        ))
+        val fill = Brush.linearGradient(
+            listOf(base.copy(alpha = opacity),
+                base.copy(alpha = opacity * 0.52f),
+                base.copy(alpha = opacity * 0.80f)),
+            start = Offset.Zero, end = Offset(size.width, size.height),
+        )
+        val edge = Brush.linearGradient(
+            listOf(rim, Cyan.copy(alpha = 0.55f), Yellow.copy(alpha = 0.50f),
+                Red.copy(alpha = 0.50f), rim.copy(alpha = if (dark) 0.32f else 0.7f)),
+            start = Offset.Zero, end = Offset(size.width, size.height),
+        )
         onDrawBehind {
             drawRoundRect(fill, cornerRadius = corner)
-            drawRoundRect(edge, cornerRadius = corner, style = Stroke(1.dp.toPx()))
+            drawRoundRect(edge, cornerRadius = corner, style = Stroke(0.9.dp.toPx()))
             drawRoundRect(
-                Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.24f else 0.82f),
-                    Color.Transparent), startY = 0f, endY = size.height * 0.58f),
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) 0.15f else 0.38f), Color.Transparent),
+                    startY = 0f, endY = size.height * 0.52f),
                 topLeft = Offset(2.dp.toPx(), 2.dp.toPx()),
                 size = androidx.compose.ui.geometry.Size(size.width - 4.dp.toPx(), size.height - 4.dp.toPx()),
                 cornerRadius = CornerRadius((r - 2.dp.toPx()).coerceAtLeast(0f)),
-                style = Stroke(1.3.dp.toPx()),
-            )
-        }
-    }
-}
-
-/** The dock refracts its captured content; light stays subtle on both appearances. */
-@Composable
-fun dockGlassStyle(radius: Dp): GlassStyle {
-    val background = MaterialTheme.colorScheme.background
-    val dark = background.luminance() < 0.5f
-    return GlassStyle.regular.then {
-        backgroundColor(background)
-        tint(if (dark) Color(0xFF171C28).copy(alpha = 0.94f)
-            else Color(0xFFF4F6FA).copy(alpha = 0.90f))
-        if (dark) whitePoint(0.05f)
-        shape(RoundedCornerShape(radius))
-        specularIntensity(if (dark) 0.63f else 0.72f)
-        ambientResponse(if (dark) 0.28f else 0.30f)
-        edgeShadow(Color.Black.copy(alpha = if (dark) 0.12f else 0.14f))
-    }
-}
-
-/** Keep moving row text from competing with controls on renderers with limited blur. */
-@Composable
-fun Modifier.dockVeil(radius: Dp): Modifier {
-    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    return this.background(
-        (if (dark) Color(0xFF10141D) else Color(0xFFF8F9FC))
-            .copy(alpha = if (dark) 0.78f else 0.76f),
-        RoundedCornerShape(radius),
-    ).drawWithCache {
-        val inset = 1.dp.toPx()
-        onDrawBehind {
-            drawRoundRect(
-                Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = if (dark) 0.35f else 0.94f),
-                        Color.Transparent), endY = size.height * 0.65f),
-                topLeft = Offset(inset, inset),
-                size = androidx.compose.ui.geometry.Size(size.width - 2 * inset, size.height - 2 * inset),
-                cornerRadius = CornerRadius(radius.toPx() - inset),
-                style = Stroke(0.8.dp.toPx()),
+                style = Stroke(1.dp.toPx()),
             )
         }
     }
