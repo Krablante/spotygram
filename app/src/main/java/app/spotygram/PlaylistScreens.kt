@@ -40,7 +40,7 @@ private fun PlaylistCover(playlist: Playlist, library: LibraryState) {
         }
     Box(
         Modifier.size(56.dp)
-             .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
@@ -73,7 +73,7 @@ fun PlaylistsScreen(
         }
     Column(Modifier.fillMaxSize()) {
         Row(
-             Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 56.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -81,16 +81,20 @@ fun PlaylistsScreen(
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.headlineSmall,
             )
-             IconButton(onClick = onCreate) {
-                 Icon(Icons.Rounded.Add, tr(R.string.new_playlist), tint = MaterialTheme.colorScheme.primary)
-             }
-         }
+            GlassIconButton(onClick = onCreate, tint = spectrumAccent(2)) {
+                Icon(
+                    Icons.Rounded.Add,
+                    tr(R.string.new_playlist),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         if (library.playlists.isNotEmpty())
             MusicSearch(query, { query = it }, tr(R.string.find_playlist))
         LazyColumn(
             state = rememberLazyListState(),
-             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-             contentPadding = PaddingValues(vertical = 8.dp),
+            modifier = Modifier.weight(1f).glassContent(),
+            contentPadding = PaddingValues(top = 8.dp, bottom = LocalDockInset.current + 12.dp),
         ) {
             if (playlists.isEmpty())
                 item {
@@ -110,8 +114,8 @@ fun PlaylistsScreen(
             items(playlists, key = { it.id }) { playlist ->
                 val haptic = LocalHapticFeedback.current
                 Row(
-                     Modifier.fillMaxWidth().padding(vertical = 4.dp).liquidGlass(22.dp)
-                         .combinedClickable(
+                    Modifier.fillMaxWidth()
+                        .combinedClickable(
                             onClick = { onOpen(playlist.id) },
                             onLongClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -148,6 +152,7 @@ fun PlaylistsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlaylistEditor(
     app: SpotygramApp,
@@ -162,7 +167,7 @@ fun PlaylistEditor(
     var saving by remember { mutableStateOf(false) }
     var discard by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
-    val compact = LocalConfiguration.current.screenHeightDp < 480
+    val compact = LocalConfiguration.current.screenHeightDp < 480 || WindowInsets.isImeVisible
     val playlist = library.playlists.firstOrNull { it.id == addingTo }
     val members = remember(playlist) { playlist?.tracks?.toSet().orEmpty() }
     val chosen = remember(selected) { selected.toSet() }
@@ -183,12 +188,12 @@ fun PlaylistEditor(
     LaunchedEffect(library.tracks, members) {
         selected = ArrayList(selected.filter { it in library.byId && it !in members })
     }
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().safeDrawingPadding().imePadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 4.dp).heightIn(min = 56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = ::leave, enabled = !saving) {
+            GlassIconButton(onClick = ::leave, enabled = !saving) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr(R.string.back))
             }
             Text(
@@ -196,41 +201,49 @@ fun PlaylistEditor(
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
-        if (compact && addingTo == null)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    name,
-                    { name = it.take(80) },
-                    label = { Text(tr(R.string.playlist_name)) },
-                    singleLine = true,
-                    enabled = !saving,
-                    modifier =
-                        Modifier.weight(1f).padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
-                )
-                MusicSearch(
-                    query,
-                    { query = it },
-                    tr(R.string.title_or_artist),
-                    Modifier.weight(1f),
-                )
+        if (addingTo == null)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val fieldWidth = if (compact) maxWidth / 2 else maxWidth
+                FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = if (compact) 2 else 1) {
+                    Box(Modifier.width(fieldWidth).align(Alignment.CenterVertically)) {
+                        OutlinedTextField(
+                            name,
+                            { name = it.take(80) },
+                            label = {
+                                Text(
+                                    tr(R.string.playlist_name),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            },
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            singleLine = true,
+                            enabled = !saving,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .liquidGlass(24.dp),
+                            colors = glassFieldColors(),
+                        )
+                    }
+                    Box(Modifier.width(fieldWidth).align(Alignment.CenterVertically)) {
+                        MusicSearch(
+                            query,
+                            { query = it },
+                            tr(R.string.title_or_artist),
+                            Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
-        else if (addingTo == null)
-            OutlinedTextField(
-                name,
-                { name = it.take(80) },
-                label = { Text(tr(R.string.playlist_name)) },
-                singleLine = true,
-                enabled = !saving,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            )
         else
             Text(
                 playlist?.name ?: tr(R.string.playlist_deleted),
                 Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        if (!compact || addingTo != null)
-            MusicSearch(query, { query = it }, tr(R.string.title_or_artist))
+        if (addingTo != null) MusicSearch(query, { query = it }, tr(R.string.title_or_artist))
         Row(
             Modifier.padding(horizontal = 8.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -257,7 +270,7 @@ fun PlaylistEditor(
                 )
             }
         }
-        LazyColumn(Modifier.weight(1f), state = rememberLazyListState()) {
+        LazyColumn(Modifier.weight(1f).glassContent(), state = rememberLazyListState()) {
             if (tracks.isEmpty())
                 item {
                     Text(
@@ -281,7 +294,8 @@ fun PlaylistEditor(
                 )
             }
         }
-        Button(
+        GlassButton(
+            tint = spectrumAccent(2),
             enabled =
                 !saving &&
                     (if (addingTo == null) name.isNotBlank()
@@ -306,7 +320,6 @@ fun PlaylistEditor(
                 }
             },
             modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 48.dp),
-             shape = RoundedCornerShape(22.dp),
         ) {
             if (saving) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             else
@@ -319,7 +332,7 @@ fun PlaylistEditor(
         }
     }
     if (discard)
-        AlertDialog(
+        GlassDialog(
             onDismissRequest = { discard = false },
             title = { Text(tr(R.string.discard_title)) },
             text = { Text(tr(R.string.discard_help)) },
@@ -415,7 +428,8 @@ fun AddToPlaylistSheet(
                 enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
             )
-        Button(
+        GlassButton(
+            tint = spectrumAccent(2),
             enabled =
                 !saving &&
                     ids.isNotEmpty() &&
@@ -438,7 +452,6 @@ fun AddToPlaylistSheet(
                 }
             },
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).heightIn(min = 48.dp),
-             shape = RoundedCornerShape(22.dp),
         ) {
             Text(
                 if (saving) tr(R.string.saving)

@@ -2,11 +2,15 @@ package app.spotygram
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
@@ -18,12 +22,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -64,10 +72,12 @@ fun MusicScreen(
     var selecting by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
     var lastReset by rememberSaveable { mutableIntStateOf(selectionReset) }
-    val compact = LocalConfiguration.current.screenHeightDp < 480
+    val configuration = LocalConfiguration.current
+    val compactActions = configuration.screenWidthDp < 360 || configuration.fontScale > 1.2f
     var removeSelected by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val scroll = rememberLazyListState()
+    val dockInset = LocalDockInset.current
     fun clearSelection() {
         selected = arrayListOf()
         selecting = false
@@ -126,6 +136,7 @@ fun MusicScreen(
             else if (positions != null) result.sortedBy { positions[it.id] } else result
         }
     val visibleIds = remember(tracks) { tracks.map { it.id } }
+    val playable = remember(tracks) { tracks.any { it.local || it.available } }
     val visibleKeys =
         remember(tracks, library.tracks, offline, hideDuplicates) {
             tracks.map { selectionKey(it.id) }.toSet()
@@ -170,7 +181,7 @@ fun MusicScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
-                 if (playlist != null)
+                if (playlist != null)
                     IconButton(onClick = onPlaylistMenu) {
                         Icon(Icons.Rounded.MoreVert, tr(R.string.playlist_actions))
                     }
@@ -191,7 +202,8 @@ fun MusicScreen(
             Row(
                 Modifier.fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .liquidGlass(24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(
@@ -234,11 +246,9 @@ fun MusicScreen(
                     }
             }
         } else {
-            if (!compact && !favorites && playlist == null)
+            if (!favorites && playlist == null)
                 Row(
-                    Modifier.fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 8.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     MusicFilters(
@@ -251,52 +261,59 @@ fun MusicScreen(
                         { sort = !sort },
                     )
                 }
-             Row(
-                 Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (compact && !favorites && playlist == null)
-                    MusicFilters(
-                        library,
-                        source,
-                        offline,
-                        sort,
-                        onSource,
-                        onOffline,
-                        { sort = !sort },
-                    )
-                 TextButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
+                TextButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
                     Text(tr(R.string.select))
                 }
-                if (playlist != null)
-                    TextButton(onClick = onAddTracks) {
-                        Icon(Icons.Rounded.Add, null)
-                        Text(tr(R.string.tracks))
-                    }
-                Spacer(Modifier.weight(1f))
-                TextButton(
-                    onClick = { onShuffle(tracks) },
-                    enabled = tracks.any { it.local || it.available },
-                ) {
-                    Icon(if (random) Icons.Rounded.Casino else Icons.Rounded.Shuffle, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(tr(if (random) R.string.random_play else R.string.shuffle_play))
+                if (playlist != null) {
+                    if (compactActions)
+                        IconButton(onClick = onAddTracks) {
+                            Icon(Icons.Rounded.PlaylistAdd, tr(R.string.add_tracks))
+                        }
+                    else
+                        TextButton(onClick = onAddTracks) {
+                            Icon(Icons.Rounded.Add, null)
+                            Text(tr(R.string.tracks))
+                        }
                 }
-                IconButton(
-                    onClick = {
-                        if (shuffle) onShuffle(tracks)
-                        else
-                            tracks
-                                .firstOrNull { it.local || it.available }
-                                ?.let { onPlay(it, tracks) }
-                    },
-                    enabled = tracks.any { it.local || it.available },
-                ) {
-                     Icon(
-                         Icons.Rounded.PlayArrow,
-                         tr(R.string.play_all),
-                         tint = MaterialTheme.colorScheme.primary,
-                    )
+                Spacer(Modifier.weight(1f))
+                Row(Modifier.liquidGlass(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (compactActions)
+                        GlassIconButton(onClick = { onShuffle(tracks) }, enabled = playable) {
+                            Icon(
+                                if (random) Icons.Rounded.Casino else Icons.Rounded.Shuffle,
+                                tr(if (random) R.string.random_play else R.string.shuffle_play),
+                            )
+                        }
+                    else
+                        GlassButton(
+                            onClick = { onShuffle(tracks) },
+                            enabled = playable,
+                        ) {
+                            Icon(if (random) Icons.Rounded.Casino else Icons.Rounded.Shuffle, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(tr(if (random) R.string.random_play else R.string.shuffle_play))
+                        }
+                    GlassIconButton(
+                        tint = spectrumAccent(0),
+                        onClick = {
+                            if (shuffle) onShuffle(tracks)
+                            else
+                                tracks
+                                    .firstOrNull { it.local || it.available }
+                                    ?.let { onPlay(it, tracks) }
+                        },
+                        enabled = playable,
+                    ) {
+                        Icon(
+                            Icons.Rounded.PlayArrow,
+                            tr(R.string.play_all),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
@@ -321,8 +338,8 @@ fun MusicScreen(
         ) {
             LazyColumn(
                 state = scroll,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 12.dp),
+                modifier = Modifier.fillMaxSize().glassContent(),
+                contentPadding = PaddingValues(bottom = dockInset + 12.dp),
             ) {
                 if (tracks.isEmpty())
                     item {
@@ -353,7 +370,9 @@ fun MusicScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             if (playlist != null)
-                                Button(onClick = onAddTracks) { Text(tr(R.string.add_tracks)) }
+                                GlassButton(onClick = onAddTracks, tint = spectrumAccent(2)) {
+                                    Text(tr(R.string.add_tracks))
+                                }
                             else if (!favorites && query.isBlank() && !offline && !selecting) {
                                 TextButton(onClick = onChats) { Text(tr(R.string.choose_chats)) }
                                 TextButton(onClick = onImport) {
@@ -404,7 +423,7 @@ fun MusicScreen(
         }
     }
     if (removeSelected)
-        AlertDialog(
+        GlassDialog(
             onDismissRequest = { removeSelected = false },
             title = { Text(tr(R.string.remove_tracks_title, trackCount(selected.size))) },
             text = {
@@ -437,18 +456,25 @@ private fun MusicFilters(
     onOffline: (Boolean) -> Unit,
     onSort: () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val narrow = configuration.screenWidthDp < 360 || configuration.fontScale > 1.2f
     var expanded by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { expanded = true }, modifier = Modifier.liquidGlass(18.dp)) {
+        GlassButton(onClick = { expanded = true }) {
             Text(
                 source?.displayTitle ?: tr(R.string.all_sources),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 148.dp),
+                modifier = Modifier.widthIn(max = if (narrow) 104.dp else 128.dp),
             )
             Icon(Icons.Rounded.ArrowDropDown, null)
         }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = Color.Transparent,
+            modifier = Modifier.liquidGlass(24.dp, strong = true),
+        ) {
             DropdownMenuItem(
                 text = { Text(tr(R.string.all_sources)) },
                 onClick = {
@@ -467,13 +493,25 @@ private fun MusicFilters(
             }
         }
     }
-    FilterChip(
-        selected = offline,
-        onClick = { onOffline(!offline) },
-        label = { Text(tr(R.string.on_device)) },
-         leadingIcon = { Icon(Icons.Rounded.DownloadForOffline, null, Modifier.size(18.dp)) },
-         border = null,
-    )
+    Spacer(Modifier.width(6.dp))
+    if (narrow)
+        GlassIconButton(
+            onClick = { onOffline(!offline) },
+            modifier = Modifier.semantics { selected = offline },
+            tint = if (offline) spectrumAccent(0) else Color.Transparent,
+        ) {
+            Icon(Icons.Rounded.DownloadForOffline, tr(R.string.on_device))
+        }
+    else
+        GlassButton(
+            onClick = { onOffline(!offline) },
+            modifier = Modifier.semantics { selected = offline },
+            tint = if (offline) spectrumAccent(0) else Color.Transparent,
+        ) {
+            Icon(Icons.Rounded.DownloadForOffline, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(tr(R.string.on_device))
+        }
     IconButton(onClick = onSort) {
         Icon(
             Icons.Rounded.SortByAlpha,
@@ -492,28 +530,52 @@ fun MusicSearch(
     placeholder: String,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedTextField(
+    val interaction = remember { MutableInteractionSource() }
+    val focus = LocalFocusManager.current
+    BasicTextField(
         value,
         onChange,
-         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-             .liquidGlass(22.dp, strong = true).clip(RoundedCornerShape(22.dp)),
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .heightIn(min = 50.dp)
+            .liquidGlass(25.dp, interaction = interaction)
+            .clip(RoundedCornerShape(25.dp)),
         singleLine = true,
-        placeholder = { Text(placeholder) },
-        leadingIcon = { Icon(Icons.Rounded.Search, null) },
-        trailingIcon = {
-            if (value.isNotEmpty())
-                IconButton(onClick = { onChange("") }) {
-                    Icon(Icons.Rounded.Close, tr(R.string.clear_search))
+        interactionSource = interaction,
+        textStyle =
+            MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+        decorationBox = { input ->
+            Row(
+                Modifier.padding(start = 16.dp, end = if (value.isEmpty()) 16.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Rounded.Search,
+                    null,
+                    Modifier.size(21.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Box(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 14.dp)) {
+                    if (value.isEmpty())
+                        Text(
+                            placeholder,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    input()
                 }
+                if (value.isNotEmpty())
+                    IconButton(onClick = { onChange("") }) {
+                        Icon(Icons.Rounded.Close, tr(R.string.clear_search))
+                    }
+            }
         },
-         shape = RoundedCornerShape(22.dp),
-         colors =
-             OutlinedTextFieldDefaults.colors(
-                 unfocusedContainerColor = Color.Transparent,
-                 focusedContainerColor = Color.Transparent,
-                 unfocusedBorderColor = Color.Transparent,
-                 focusedBorderColor = Color.Transparent,
-            ),
     )
 }
 
@@ -529,12 +591,16 @@ fun TrackRow(
     onLike: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null,
 ) {
+    val narrow = LocalConfiguration.current.screenWidthDp < 360
     Row(
         Modifier.fillMaxWidth()
-             .background(
-                 if (selected == true || active) MaterialTheme.colorScheme.primary.copy(alpha = if (selected == true) 0.14f else 0.08f)
-                 else Color.Transparent
-             )
+            .background(
+                if (selected == true || active)
+                    MaterialTheme.colorScheme.primary.copy(
+                        alpha = if (selected == true) 0.14f else 0.08f
+                    )
+                else Color.Transparent
+            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -546,7 +612,7 @@ fun TrackRow(
                     stateDescription =
                         if (selected) tr(R.string.selected) else tr(R.string.not_selected)
             }
-             .heightIn(min = 66.dp)
+            .heightIn(min = 64.dp)
             .padding(
                 start = if (selected == null) 16.dp else 4.dp,
                 end = 4.dp,
@@ -587,8 +653,16 @@ fun TrackRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
+                    modifier = if (narrow) Modifier.weight(1f) else Modifier,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (narrow)
+                    Text(
+                        if (track.duration > 0) seconds(track.duration.toLong()) else "—",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
             }
         }
         if (download != null)
@@ -597,7 +671,7 @@ fun TrackRow(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
             )
-        else
+        else if (!narrow)
             Text(
                 if (track.duration > 0) seconds(track.duration.toLong()) else "—",
                 style = MaterialTheme.typography.bodySmall,

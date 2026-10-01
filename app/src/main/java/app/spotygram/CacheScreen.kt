@@ -45,18 +45,22 @@ fun CacheScreen(app: SpotygramApp, connected: Boolean, onBack: () -> Unit, onCon
                 Modifier.padding(vertical = 16.dp),
             )
         }
-         state.bytes?.let { size ->
-             Column(Modifier.fillMaxWidth().liquidGlass(24.dp).padding(20.dp)) {
-                 Text(cacheBytes(size), style = MaterialTheme.typography.displaySmall)
-                 Text(
-                     if (size == 0L) tr(R.string.cache_empty)
-                     else AppText.context.resources.getQuantityString(
-                         R.plurals.cache_files, state.files, state.files),
-                     style = MaterialTheme.typography.bodyMedium,
-                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                 )
-             }
-         }
+        state.bytes?.let { size ->
+            Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(cacheBytes(size), style = MaterialTheme.typography.displaySmall)
+                Text(
+                    if (size == 0L) tr(R.string.cache_empty)
+                    else
+                        AppText.context.resources.getQuantityString(
+                            R.plurals.cache_files,
+                            state.files,
+                            state.files,
+                        ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Text(tr(R.string.cache_description), Modifier.padding(top = 24.dp))
         Text(
             tr(R.string.cache_preserved),
@@ -78,11 +82,15 @@ fun CacheScreen(app: SpotygramApp, connected: Boolean, onBack: () -> Unit, onCon
         Spacer(Modifier.height(24.dp))
         if (!connected && (state.bytes ?: 0L) > 0L) {
             Text(tr(R.string.cache_connect_required), style = MaterialTheme.typography.bodySmall)
-            Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) {
+            GlassButton(
+                onClick = onConnect,
+                modifier = Modifier.fillMaxWidth(),
+                tint = spectrumAccent(3),
+            ) {
                 Text(tr(R.string.connect_telegram))
             }
         } else {
-            Button(
+            GlassButton(
                 onClick = { confirm = true },
                 enabled =
                     connected &&
@@ -100,7 +108,7 @@ fun CacheScreen(app: SpotygramApp, connected: Boolean, onBack: () -> Unit, onCon
         Spacer(Modifier.height(24.dp))
     }
     if (confirm)
-        AlertDialog(
+        GlassDialog(
             onDismissRequest = { confirm = false },
             title = { Text(tr(R.string.cache_confirm_title)) },
             text = {

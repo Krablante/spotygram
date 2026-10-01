@@ -8,7 +8,7 @@ The first build compiles TDLib and OpenSSL; later builds reuse those native libr
 
 ## Prepare the machine
 
-Use Linux, JDK 21 (a full JDK, not only a JRE), Android SDK platform 36, build tools 35.0.0, NDK `28.2.13676358`, CMake, Ninja, gperf, Perl, a C++ compiler, Git, and Make. The Gradle wrapper pins Gradle 8.14.3 with Android Gradle plugin 8.11.1.
+Use Linux, JDK 21 (a full JDK, not only a JRE), Android SDK platform 37, build tools 36.0.0, NDK `28.2.13676358`, CMake, Ninja, gperf, Perl, a C++ compiler, Git, and Make. The Gradle wrapper pins Gradle 9.3.1 with Android Gradle plugin 9.1.1 and Kotlin 2.4.20. The app still targets Android 36 and supports Android 8+.
 
 Keep generated data outside the checkout. `SPOTYGRAM_STATE` holds native sources,
 build outputs, caches and private configuration; it is not a second source repository.

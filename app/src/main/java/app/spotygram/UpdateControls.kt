@@ -76,7 +76,10 @@ private fun InstallControls(app: SpotygramApp, install: InstallState) {
                 }
         }
         else -> {
-            Button(onClick = { app.updates.installer.start(app.updates.asset) }) {
+            GlassButton(
+                onClick = { app.updates.installer.start(app.updates.asset) },
+                tint = spectrumAccent(0),
+            ) {
                 Text(
                     tr(
                         if (install.phase == InstallPhase.READY) R.string.update_install
@@ -117,7 +120,7 @@ fun UpdateSettings(app: SpotygramApp) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = update.automatic, onCheckedChange = { app.updates.automatic(it) })
+        GlassSwitch(checked = update.automatic, onCheckedChange = { app.updates.automatic(it) })
     }
     TextButton(onClick = { app.updates.check(manual = true) }, enabled = !update.checking) {
         Text(tr(if (update.checking) R.string.update_checking else R.string.update_check))

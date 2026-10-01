@@ -1,11 +1,11 @@
 package app.spotygram
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -43,24 +42,39 @@ fun SettingsSheet(
             .navigationBarsPadding()
     ) {
         Text(tr(R.string.settings), style = MaterialTheme.typography.headlineMedium)
-         Text(tr(R.string.appearance), Modifier.padding(top = 18.dp, bottom = 8.dp),
-             style = MaterialTheme.typography.titleMedium)
-         val selectedTheme = if (theme == "system") {
-             if (isSystemInDarkTheme()) "dark" else "light"
-         } else theme
-         Row(Modifier.fillMaxWidth().liquidGlass(22.dp).padding(4.dp)) {
-             listOf("light" to tr(R.string.light_theme), "dark" to tr(R.string.dark_theme))
-                 .forEach { (key, label) ->
-                     Box(
-                         Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(18.dp))
-                             .background(if (selectedTheme == key) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                             .clickable { app.changeTheme(key) },
-                         contentAlignment = Alignment.Center,
-                     ) {
-                         Text(label, color = if (selectedTheme == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                     }
-                 }
-         }
+        Text(
+            tr(R.string.appearance),
+            Modifier.padding(top = 18.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        val selectedTheme =
+            if (theme == "system") {
+                if (isSystemInDarkTheme()) "dark" else "light"
+            } else theme
+        Row(Modifier.fillMaxWidth().liquidGlass(22.dp).padding(4.dp)) {
+            listOf("light" to tr(R.string.light_theme), "dark" to tr(R.string.dark_theme))
+                .forEach { (key, label) ->
+                    Box(
+                        Modifier.weight(1f)
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .then(
+                                if (selectedTheme == key)
+                                    Modifier.liquidGlass(24.dp, tint = spectrumAccent(0))
+                                else Modifier
+                            )
+                            .clickable { app.changeTheme(key) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            label,
+                            color =
+                                if (selectedTheme == key) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+        }
         ActionRow(Icons.Rounded.Language, tr(R.string.language)) {
             if (android.os.Build.VERSION.SDK_INT >= 33) {
                 app.startActivity(
@@ -101,22 +115,22 @@ fun SettingsSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(checked = hideDuplicates, onCheckedChange = null)
+            GlassSwitch(checked = hideDuplicates, onCheckedChange = null)
         }
         val local =
             remember(library, hideDuplicates) {
                 if (hideDuplicates) library.duplicates.view(library.localTracks)
                 else library.localTracks
             }
-         ListItem(
+        ListItem(
             headlineContent = { Text(tr(R.string.on_device)) },
             supportingContent = {
                 Text("${trackCount(local.size)} · ${bytes(library.localSize)}")
             },
             leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null) },
             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-             modifier = Modifier.clickable(onClick = onLocal),
-             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(onClick = onLocal),
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         Text(
             tr(R.string.local_storage_help),
@@ -134,7 +148,7 @@ fun SettingsSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(
+            GlassSwitch(
                 checked = listening.enabled,
                 onCheckedChange = { app.listeningCache.setEnabled(it) },
                 enabled = !listening.changing,
@@ -157,13 +171,13 @@ fun SettingsSheet(
                 Text(tr(R.string.retry_temporary_cleanup))
             }
         }
-         ListItem(
+        ListItem(
             headlineContent = { Text(tr(R.string.clear_music_cache)) },
             supportingContent = { Text(tr(R.string.cache_settings_help)) },
             leadingContent = { Icon(Icons.Rounded.DeleteSweep, null) },
             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-             modifier = Modifier.clickable(onClick = onCache),
-             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(onClick = onCache),
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -177,7 +191,7 @@ fun SettingsSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(
+            GlassSwitch(
                 wifi,
                 {
                     wifi = it

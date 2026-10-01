@@ -1,7 +1,6 @@
 package app.spotygram
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,7 +12,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -44,7 +42,7 @@ fun ChatsScreen(
     Column(Modifier.fillMaxSize()) {
         Text(
             tr(R.string.your_chats),
-            Modifier.padding(start = 20.dp, top = 10.dp, bottom = 12.dp),
+            Modifier.padding(start = 16.dp, top = 10.dp, bottom = 12.dp),
             style = MaterialTheme.typography.headlineSmall,
         )
         if (!connected) {
@@ -58,26 +56,28 @@ fun ChatsScreen(
                     Modifier.padding(vertical = 12.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onConnect) { Text(tr(R.string.connect)) }
+                GlassButton(onClick = onConnect, tint = spectrumAccent(3)) {
+                    Text(tr(R.string.connect))
+                }
             }
         } else {
             Row(
                 Modifier.padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Button(onClick = onAdd) {
+                GlassButton(onClick = onAdd, tint = spectrumAccent(3)) {
                     Icon(Icons.Rounded.Add, null)
                     Spacer(Modifier.width(6.dp))
                     Text(tr(R.string.add_chats))
                 }
-                IconButton(onClick = onRefresh, enabled = !busy) {
+                GlassIconButton(onClick = onRefresh, enabled = !busy) {
                     if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
                 }
             }
             LazyColumn(
-                Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                Modifier.weight(1f).padding(horizontal = 4.dp, vertical = 8.dp).glassContent(),
+                contentPadding = PaddingValues(top = 4.dp, bottom = LocalDockInset.current + 12.dp),
             ) {
                 items(library.sources, key = { it.id }) { source ->
                     ListItem(
@@ -112,9 +112,8 @@ fun ChatsScreen(
                                 )
                             }
                         },
-                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                             .liquidGlass(22.dp).clickable { onOpen(source.id) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.fillMaxWidth().clickable { onOpen(source.id) },
                     )
                 }
                 if (library.sources.isEmpty())
@@ -129,7 +128,7 @@ fun ChatsScreen(
         }
     }
     removing?.let { source ->
-        AlertDialog(
+        GlassDialog(
             onDismissRequest = { removing = null },
             title = { Text(tr(R.string.remove_chat_title)) },
             text = {
@@ -249,12 +248,16 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.headlineMedium,
             )
-            IconButton(onClick = { refresh++ }, enabled = online && !loading && !searching) {
+            GlassIconButton(onClick = { refresh++ }, enabled = online && !loading && !searching) {
                 Icon(Icons.Rounded.Refresh, tr(R.string.refresh_chats))
             }
         }
-         MusicSearch(query, { query = it }, tr(R.string.chat_search_hint),
-             Modifier.fillMaxWidth())
+        MusicSearch(
+            query,
+            { query = it },
+            tr(R.string.chat_search_hint),
+            Modifier.fillMaxWidth(),
+        )
         if (loading || searching || localLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (search.startsWith("@") || search.contains("t.me/"))
             TextButton(
@@ -344,7 +347,11 @@ fun ChatPicker(app: SpotygramApp, library: LibraryState, onDone: () -> Unit) {
                 )
             }
         }
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+        GlassButton(
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth(),
+            tint = spectrumAccent(3),
+        ) {
             Text(tr(R.string.done_chats, library.sources.size))
         }
         Spacer(Modifier.height(20.dp))

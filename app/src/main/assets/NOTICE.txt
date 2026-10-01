@@ -14,6 +14,8 @@ https://android.googlesource.com/platform/frameworks/support — Apache License 
 Kotlin / kotlinx.coroutines — JetBrains s.r.o. and Kotlin Programming Language contributors.
 https://github.com/JetBrains/kotlin — Apache License 2.0.
 Coil — Coil Contributors. https://github.com/coil-kt/coil — Apache License 2.0.
+Haze / Haze Glass 2.0.1 — Christopher Banes and the Haze project contributors.
+https://github.com/chrisbanes/haze — Apache License 2.0.
 Guava / ListenableFuture — Google LLC. https://github.com/google/guava — Apache License 2.0.
 See Apache-2.0.txt bundled in these assets.
 

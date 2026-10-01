@@ -69,6 +69,11 @@ Downloaded songs are available under **On device**. The interface comes in
 English and Russian, with light and dark appearances. The initial appearance
 follows the phone until you choose one in Settings.
 
+Glass controls reflect the artwork and the library scrolling beneath them.
+Light and dark share the same layout and material; wide screens use side
+navigation and a player with separate artwork and control columns. Full
+refraction needs Android 13+; older supported versions use simpler glass.
+
 Repeated recordings are hidden by default. Turn **Settings → Hide duplicates**
 off to see separate entries again. This only changes the lists; nothing is deleted.
 

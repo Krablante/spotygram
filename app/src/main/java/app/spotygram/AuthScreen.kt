@@ -12,19 +12,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: () -> Unit) {
     var value by rememberSaveable(auth.type) { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    val keyboardVisible = WindowInsets.isImeVisible
     Column(
-        Modifier.fillMaxSize()
+        Modifier.widthIn(max = 480.dp)
+            .fillMaxSize()
             .safeDrawingPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
@@ -32,16 +33,25 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, tr(R.string.back)) }
+            GlassIconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, tr(R.string.back)) }
         }
-        Spacer(Modifier.height(44.dp))
-        Box(Modifier.size(88.dp).liquidGlass(30.dp), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.GraphicEq, null, Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary)
+        if (!keyboardVisible) {
+            Spacer(Modifier.height(20.dp))
+            Box(
+                Modifier.size(64.dp).liquidGlass(24.dp, tint = spectrumAccent(0)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.GraphicEq,
+                    null,
+                    Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Spotygram", style = MaterialTheme.typography.headlineLarge)
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.height(24.dp))
-        Text("Spotygram", fontSize = 40.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(12.dp))
         val welcome = auth.type in listOf("welcome", "authorizationStateClosed")
         Text(
             if (welcome) tr(R.string.welcome_tagline)
@@ -64,10 +74,11 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 tr(R.string.welcome_help),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(36.dp))
-            Button(
+            Spacer(Modifier.height(24.dp))
+            GlassButton(
                 onClick = { app.telegram.start() },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
+                modifier = Modifier.fillMaxWidth(),
+                tint = spectrumAccent(0),
             ) {
                 Text(tr(R.string.connect_telegram))
             }
@@ -118,13 +129,14 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                     },
                     singleLine = true,
                     enabled = !auth.busy,
-                     modifier = Modifier.fillMaxWidth().liquidGlass(20.dp),
-                     colors = OutlinedTextFieldDefaults.colors(
-                         focusedContainerColor = Color.Transparent,
-                         unfocusedContainerColor = Color.Transparent,
-                         focusedBorderColor = Color.Transparent,
-                         unfocusedBorderColor = Color.Transparent,
-                     ),
+                    modifier = Modifier.fillMaxWidth().liquidGlass(20.dp),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                        ),
                     keyboardOptions =
                         KeyboardOptions(
                             keyboardType =
@@ -150,10 +162,11 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                         } else null,
                 )
                 Spacer(Modifier.height(16.dp))
-                Button(
+                GlassButton(
                     onClick = { app.telegram.submit(value) },
                     enabled = value.isNotBlank() && !auth.busy,
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    tint = spectrumAccent(0),
                 ) {
                     if (auth.busy)
                         CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)

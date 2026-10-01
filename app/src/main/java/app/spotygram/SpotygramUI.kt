@@ -3,8 +3,11 @@ package app.spotygram
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,6 +18,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -23,11 +29,13 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.session.MediaController
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -82,8 +90,9 @@ fun SpotygramUI(
     val haptic = LocalHapticFeedback.current
     val focus = LocalFocusManager.current
     val keyboardVisible = WindowInsets.isImeVisible
-    val compact = LocalConfiguration.current.screenHeightDp < 480
+    val wide = LocalConfiguration.current.screenWidthDp >= 840
     val pages = rememberSaveableStateHolder()
+    val glassState = rememberHazeState()
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
     val source = library.sources.firstOrNull { it.id == sourceId }
     val offlineView = tab == 0 && offline
@@ -177,555 +186,774 @@ fun SpotygramUI(
             }
         }
     }
-    Surface(Modifier.fillMaxSize(), color = Color.Transparent,
-        contentColor = MaterialTheme.colorScheme.onBackground) {
-    Box(Modifier.fillMaxSize()) {
-        PrismBackdrop(Modifier.fillMaxSize())
-        when {
-            authVisible ->
-                AuthScreen(
-                    app,
-                    auth,
-                    onLocal = {
-                        localMode = true
-                        app.localMode()
-                        connect = false
-                    },
-                    onBack = {
-                        localMode = true
-                        app.localMode()
-                        connect = false
-                    },
-                )
-            editor ->
-                PlaylistEditor(
-                    app,
-                    library,
-                    addingTo,
-                    onClose = { editor = false },
-                    onSaved = { id ->
-                        editor = false
-                        navigate(2)
-                        playlistId = id
-                    },
-                )
-            fullPlayer && current != null ->
-                PlayerScreen(
-                    current,
-                    playing,
-                    player,
-                    onBack = { fullPlayer = false },
-                    onMore = {
-                        selectedTrackId = current.id
-                        sheet = "track"
-                    },
-                    onLike = { like(current) },
-                    onDownload = { onDownload(listOf(current.id)) },
-                    onQueue = { sheet = "queue" },
-                    onShuffle = { app.playback?.setMode(order = mode.order.next()) },
-                    onRepeat = { app.playback?.setMode(repeat = it) },
-                )
-            else ->
-                Scaffold(
-                    modifier = Modifier.imePadding(),
-                    containerColor = Color.Transparent,
-                    snackbarHost = { if (sheet.isEmpty()) SnackbarHost(snackbar) },
-                    bottomBar = {
-                        if (!keyboardVisible)
+    CompositionLocalProvider(
+        LocalGlassState provides glassState,
+        LocalDockInset provides
+            (if (keyboardVisible) 12.dp
+            else
+                (if (current != null) 72.dp else 8.dp) +
+                    (if (wide) 0.dp else 70.dp) +
+                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
+    ) {
+        Surface(
+            Modifier.fillMaxSize(),
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.fillMaxSize().glassContent(0f)) {
+                    PrismBackdrop(Modifier.fillMaxSize())
+                    if (current != null && !fullPlayer) {
+                        Artwork(
+                            current,
+                            160.dp,
+                            Modifier.align(Alignment.BottomStart)
+                                .offset(x = (-32).dp, y = 36.dp)
+                                .blur(40.dp, BlurredEdgeTreatment.Unbounded)
+                                .alpha(0.22f),
+                        )
+                    }
+                }
+                when {
+                    authVisible ->
+                        AuthScreen(
+                            app,
+                            auth,
+                            onLocal = {
+                                localMode = true
+                                app.localMode()
+                                connect = false
+                            },
+                            onBack = {
+                                localMode = true
+                                app.localMode()
+                                connect = false
+                            },
+                        )
+                    editor ->
+                        PlaylistEditor(
+                            app,
+                            library,
+                            addingTo,
+                            onClose = { editor = false },
+                            onSaved = { id ->
+                                editor = false
+                                navigate(2)
+                                playlistId = id
+                            },
+                        )
+                    fullPlayer && current != null ->
+                        PlayerScreen(
+                            current,
+                            playing,
+                            player,
+                            onBack = { fullPlayer = false },
+                            onMore = {
+                                selectedTrackId = current.id
+                                sheet = "track"
+                            },
+                            onLike = { like(current) },
+                            onDownload = { onDownload(listOf(current.id)) },
+                            onQueue = { sheet = "queue" },
+                            onShuffle = { app.playback?.setMode(order = mode.order.next()) },
+                            onRepeat = { app.playback?.setMode(repeat = it) },
+                        )
+                    else ->
+                        Scaffold(
+                            modifier = Modifier.imePadding(),
+                            containerColor = Color.Transparent,
+                            snackbarHost = { if (sheet.isEmpty()) GlassSnackbarHost(snackbar) },
+                            bottomBar = {
+                                if (!keyboardVisible)
+                                    Column(
+                                        Modifier.fillMaxWidth()
+                                            .padding(
+                                                start = if (wide) 96.dp else 0.dp,
+                                                bottom = 6.dp,
+                                            )
+                                            .navigationBarsPadding(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        if (current != null)
+                                            MiniPlayer(
+                                                current,
+                                                player,
+                                                onOpen = { fullPlayer = true },
+                                                onToggle = { togglePlayback(player) },
+                                                onPrevious = { player?.seekToPreviousMediaItem() },
+                                                onNext = { player?.seekToNextMediaItem() },
+                                            )
+                                        if (!wide)
+                                            BoxWithConstraints(
+                                                modifier =
+                                                    Modifier.widthIn(max = 720.dp)
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            horizontal = 12.dp,
+                                                            vertical = 5.dp,
+                                                        )
+                                                        .height(62.dp)
+                                                        .liquidGlass(31.dp, strong = true)
+                                                        .padding(horizontal = 5.dp)
+                                            ) {
+                                                val cellWidth = maxWidth / 4
+                                                val offset by
+                                                    animateDpAsState(
+                                                        cellWidth * tab,
+                                                        spring(
+                                                            dampingRatio = 0.82f,
+                                                            stiffness = 550f,
+                                                        ),
+                                                        label = "tab lens",
+                                                    )
+                                                Box(
+                                                    Modifier.offset(x = offset, y = 5.dp)
+                                                        .width(cellWidth)
+                                                        .height(52.dp)
+                                                        .liquidGlass(
+                                                            26.dp,
+                                                            tint = spectrumAccent(tab),
+                                                        )
+                                                )
+                                                Row(
+                                                    Modifier.fillMaxSize(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                ) {
+                                                    val destinations =
+                                                        listOf(
+                                                            0 to
+                                                                (tr(R.string.music) to
+                                                                    Icons.Rounded.MusicNote),
+                                                            1 to
+                                                                (tr(R.string.favorites) to
+                                                                    Icons.Rounded.Favorite),
+                                                            2 to
+                                                                (tr(R.string.playlists) to
+                                                                    Icons.Rounded.PlaylistPlay),
+                                                            3 to
+                                                                (tr(R.string.chats) to
+                                                                    Icons.Rounded.Forum),
+                                                        )
+                                                    destinations.forEach { (index, destination) ->
+                                                        val (label, icon) = destination
+                                                        val selected = tab == index
+                                                        val accent = spectrumAccent(index)
+                                                        Column(
+                                                            Modifier.weight(1f)
+                                                                .height(52.dp)
+                                                                .clip(RoundedCornerShape(26.dp))
+                                                                .selectable(
+                                                                    selected,
+                                                                    role = Role.Tab,
+                                                                ) {
+                                                                    navigate(index)
+                                                                },
+                                                            horizontalAlignment =
+                                                                Alignment.CenterHorizontally,
+                                                            verticalArrangement =
+                                                                Arrangement.Center,
+                                                        ) {
+                                                            Icon(
+                                                                icon,
+                                                                label,
+                                                                Modifier.size(23.dp),
+                                                                tint =
+                                                                    if (selected) accent
+                                                                    else
+                                                                        MaterialTheme.colorScheme
+                                                                            .onSurfaceVariant,
+                                                            )
+                                                            Text(
+                                                                label,
+                                                                fontSize = 11.sp,
+                                                                lineHeight = 14.sp,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                color =
+                                                                    if (selected) accent
+                                                                    else
+                                                                        MaterialTheme.colorScheme
+                                                                            .onSurfaceVariant,
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                    }
+                            },
+                        ) { padding ->
                             Column(
-                                Modifier.fillMaxWidth().padding(bottom = 6.dp).navigationBarsPadding(),
+                                Modifier.padding(
+                                        top = padding.calculateTopPadding(),
+                                        start = if (wide) 96.dp else 0.dp,
+                                    )
+                                    .fillMaxSize(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                if (current != null)
-                                    MiniPlayer(
-                                        current,
-                                        player,
-                                        onOpen = { fullPlayer = true },
-                                        onToggle = { togglePlayback(player) },
-                                        onPrevious = { player?.seekToPreviousMediaItem() },
-                                        onNext = { player?.seekToNextMediaItem() },
+                                UpdateBanner(app)
+                                if (cache.clearing) {
+                                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    Text(
+                                        tr(R.string.cache_clearing),
+                                        Modifier.padding(horizontal = 16.dp),
+                                        style = MaterialTheme.typography.bodySmall,
                                     )
-                                Row(
-                                    modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 5.dp)
-                                        .height(66.dp).liquidGlass(28.dp, strong = true)
-                                        .padding(horizontal = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    val destinations =
-                                        listOf(
-                                            0 to (tr(R.string.music) to Icons.Rounded.MusicNote),
-                                            1 to (tr(R.string.favorites) to Icons.Rounded.Favorite),
-                                            2 to
-                                                (tr(R.string.playlists) to
-                                                    Icons.Rounded.PlaylistPlay),
-                                            3 to (tr(R.string.chats) to Icons.Rounded.Forum),
-                                        )
-                                    destinations.forEach { (index, destination) ->
-                                        val (label, icon) = destination
-                                        val selected = tab == index
-                                        val accent = spectrumAccent(index)
-                                        Column(
-                                            Modifier.weight(1f).height(56.dp)
-                                                .clip(RoundedCornerShape(22.dp))
-                                                .then(if (selected) Modifier.background(
-                                                    Brush.horizontalGradient(Spectrum.map {
-                                                        it.copy(alpha = 0.20f)
-                                                    })) else Modifier)
-                                                .clickable { navigate(index) },
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center,
+                                }
+                                if (!keyboardVisible)
+                                    Row(
+                                        Modifier.widthIn(max = 720.dp)
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                            .padding(start = 16.dp, end = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(
+                                            Modifier.size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(Brush.linearGradient(Spectrum)),
+                                            contentAlignment = Alignment.Center,
                                         ) {
-                                            Icon(icon, label, Modifier.size(23.dp),
-                                                tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text(label, fontSize = 10.sp, maxLines = 1,
-                                                color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Icon(
+                                                Icons.Rounded.GraphicEq,
+                                                null,
+                                                Modifier.size(19.dp),
+                                                tint = Color.White,
+                                            )
+                                        }
+                                        Text(
+                                            "Spotygram",
+                                            Modifier.weight(1f).padding(start = 8.dp),
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        GlassIconButton(
+                                            onClick = { sheet = "settings" },
+                                            modifier = Modifier.padding(end = 8.dp),
+                                        ) {
+                                            Icon(Icons.Rounded.Settings, tr(R.string.settings))
+                                        }
+                                    }
+                                if (
+                                    connection.isNotBlank() &&
+                                        auth.type == "authorizationStateReady"
+                                )
+                                    Text(
+                                        when (connection) {
+                                            "connectionStateWaitingForNetwork" ->
+                                                tr(R.string.no_network)
+                                            "connectionStateUpdating" ->
+                                                tr(R.string.telegram_updating)
+                                            else -> tr(R.string.telegram_connecting)
+                                        },
+                                        Modifier.padding(horizontal = 16.dp),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                Box(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth()) {
+                                    pages.SaveableStateProvider("$tab:$playlistId:$sourceId") {
+                                        when {
+                                            tab == 0 || tab == 1 || tab == 2 && playlist != null ->
+                                                MusicScreen(
+                                                    hideDuplicates = groupedView,
+                                                    library,
+                                                    playing.id,
+                                                    playing.shuffle,
+                                                    playing.random,
+                                                    download,
+                                                    busy,
+                                                    tab == 1,
+                                                    if (tab == 0) offline else false,
+                                                    source,
+                                                    playlist,
+                                                    selectionReset,
+                                                    onOffline = { offline = it },
+                                                    onSource = { sourceId = it },
+                                                    onBack = {
+                                                        playlistId = null
+                                                        sourceId = null
+                                                    },
+                                                    onPlay = { track, tracks ->
+                                                        play(track, tracks)
+                                                    },
+                                                    onLike = { like(it) },
+                                                    onMore = {
+                                                        selectedTrackId = it.id
+                                                        sheet = "track"
+                                                    },
+                                                    onImport = onImport,
+                                                    onChats = { navigate(3) },
+                                                    onRefresh = { app.action { app.refresh() } },
+                                                    onShuffle = { tracks ->
+                                                        randomTrack(tracks)?.let {
+                                                            val available = tracks.filter { t ->
+                                                                t.local || t.available
+                                                            }
+                                                            onStartPlayback(
+                                                                available,
+                                                                available.indexOf(it),
+                                                                if (mode.random)
+                                                                    PlaybackOrder.RANDOM
+                                                                else PlaybackOrder.SHUFFLE,
+                                                            )
+                                                        }
+                                                    },
+                                                    onDownload = onDownload,
+                                                    onAddToPlaylist = { addToPlaylist(it) },
+                                                    onSearchChats = { q ->
+                                                        app.action { app.searchMusic(q) }
+                                                    },
+                                                    onAddTracks = { editPlaylist(playlistId) },
+                                                    onPlaylistMenu = {
+                                                        managedPlaylist = playlist
+                                                        sheet = "playlist"
+                                                    },
+                                                    onRemoveTracks = { ids ->
+                                                        playlistId?.let { id ->
+                                                            app.action {
+                                                                app.library.removeFromPlaylist(
+                                                                    id,
+                                                                    ids,
+                                                                )
+                                                            }
+                                                        }
+                                                    },
+                                                )
+                                            tab == 2 ->
+                                                PlaylistsScreen(
+                                                    library,
+                                                    onCreate = { editPlaylist() },
+                                                    onOpen = { playlistId = it },
+                                                    onMore = {
+                                                        managedPlaylist = it
+                                                        sheet = "playlist"
+                                                    },
+                                                )
+                                            else ->
+                                                ChatsScreen(
+                                                    library,
+                                                    busy,
+                                                    auth.type == "authorizationStateReady",
+                                                    onConnect = {
+                                                        connect = true
+                                                        app.telegram.start()
+                                                    },
+                                                    onAdd = { sheet = "chats" },
+                                                    onOpen = {
+                                                        navigate(0)
+                                                        sourceId = it
+                                                    },
+                                                    onRemove = { s ->
+                                                        app.action {
+                                                            app.library.source(
+                                                                ChatChoice(s.id, s.title),
+                                                                false,
+                                                            )
+                                                        }
+                                                    },
+                                                    onRefresh = { app.action { app.refresh() } },
+                                                )
                                         }
                                     }
                                 }
                             }
-                    },
-                ) { padding ->
+                        }
+                }
+                if (wide && !fullPlayer && !editor && !authVisible) {
                     Column(
-                        Modifier.padding(padding).fillMaxSize(),
+                        Modifier.align(Alignment.CenterStart)
+                            .padding(start = 16.dp)
+                            .width(76.dp)
+                            .liquidGlass(32.dp, strong = true)
+                            .padding(vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        UpdateBanner(app)
-                        if (cache.clearing) {
-                            LinearProgressIndicator(Modifier.fillMaxWidth())
-                            Text(
-                                tr(R.string.cache_clearing),
-                                Modifier.padding(horizontal = 16.dp),
-                                style = MaterialTheme.typography.bodySmall,
+                        listOf(
+                                R.string.music to Icons.Rounded.MusicNote,
+                                R.string.favorites to Icons.Rounded.Favorite,
+                                R.string.playlists to Icons.Rounded.PlaylistPlay,
+                                R.string.chats to Icons.Rounded.Forum,
                             )
-                        }
-                        if (!compact)
-                            Row(
-                                Modifier.widthIn(max = 720.dp).fillMaxWidth()
-                                    .heightIn(min = 48.dp)
-                                    .padding(start = 16.dp, end = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(
-                                    Modifier.size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(Brush.linearGradient(Spectrum)),
-                                    contentAlignment = Alignment.Center,
+                            .forEachIndexed { index, (label, icon) ->
+                                Column(
+                                    Modifier.fillMaxWidth()
+                                        .heightIn(min = 68.dp)
+                                        .then(
+                                            if (tab == index)
+                                                Modifier.liquidGlass(
+                                                    26.dp,
+                                                    tint = spectrumAccent(index),
+                                                )
+                                            else Modifier
+                                        )
+                                        .clip(RoundedCornerShape(26.dp))
+                                        .selectable(tab == index, role = Role.Tab) {
+                                            navigate(index)
+                                        },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
                                 ) {
                                     Icon(
-                                        Icons.Rounded.GraphicEq,
+                                        icon,
                                         null,
-                                        Modifier.size(19.dp),
-                                        tint = Color.White,
+                                        tint =
+                                            if (tab == index) spectrumAccent(index)
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                }
-                                Text(
-                                    "Spotygram",
-                                    Modifier.weight(1f).padding(start = 8.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                IconButton(onClick = { sheet = "settings" }) {
-                                    Icon(Icons.Rounded.Settings, tr(R.string.settings))
+                                    Text(tr(label), fontSize = 10.sp, maxLines = 1)
                                 }
                             }
-                        if (connection.isNotBlank() && auth.type == "authorizationStateReady")
-                            Text(
-                                when (connection) {
-                                    "connectionStateWaitingForNetwork" -> tr(R.string.no_network)
-                                    "connectionStateUpdating" -> tr(R.string.telegram_updating)
-                                    else -> tr(R.string.telegram_connecting)
-                                },
-                                Modifier.padding(horizontal = 16.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    }
+                }
+                if ((fullPlayer || editor || authVisible) && sheet.isEmpty())
+                    Box(
+                        Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        GlassSnackbarHost(snackbar)
+                    }
+                if (sheet.isNotEmpty())
+                    ModalBottomSheet(
+                        onDismissRequest = { sheet = "" },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = Color.Transparent,
+                        dragHandle = null,
+                    ) {
+                        // Material must travel inside the sheet's native placement/drag transform.
+                        Column(Modifier.fillMaxWidth().liquidGlass(30.dp, strong = true)) {
+                            BottomSheetDefaults.DragHandle(
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                                color =
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             )
-                        Box(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth()) {
-                        pages.SaveableStateProvider("$tab:$playlistId:$sourceId") {
-                            when {
-                                tab == 0 || tab == 1 || tab == 2 && playlist != null ->
-                                    MusicScreen(
-                                        hideDuplicates = groupedView,
-                                        library,
-                                        playing.id,
-                                        playing.shuffle,
-                                        playing.random,
-                                        download,
-                                        busy,
-                                        tab == 1,
-                                        if (tab == 0) offline else false,
-                                        source,
-                                        playlist,
-                                        selectionReset,
-                                        onOffline = { offline = it },
-                                        onSource = { sourceId = it },
-                                        onBack = {
-                                            playlistId = null
-                                            sourceId = null
-                                        },
-                                        onPlay = { track, tracks -> play(track, tracks) },
-                                        onLike = { like(it) },
-                                        onMore = {
-                                            selectedTrackId = it.id
-                                            sheet = "track"
-                                        },
-                                        onImport = onImport,
-                                        onChats = { navigate(3) },
-                                        onRefresh = { app.action { app.refresh() } },
-                                        onShuffle = { tracks ->
-                                            randomTrack(tracks)?.let {
-                                                val available = tracks.filter { t ->
-                                                    t.local || t.available
-                                                }
-                                                onStartPlayback(
-                                                    available,
-                                                    available.indexOf(it),
-                                                    if (mode.random) PlaybackOrder.RANDOM
-                                                    else PlaybackOrder.SHUFFLE,
-                                                )
-                                            }
-                                        },
-                                        onDownload = onDownload,
-                                        onAddToPlaylist = { addToPlaylist(it) },
-                                        onSearchChats = { q -> app.action { app.searchMusic(q) } },
-                                        onAddTracks = { editPlaylist(playlistId) },
-                                        onPlaylistMenu = {
-                                            managedPlaylist = playlist
-                                            sheet = "playlist"
-                                        },
-                                        onRemoveTracks = { ids ->
-                                            playlistId?.let { id ->
+                            MatchDialogSystemBars()
+                            CompositionLocalProvider(
+                                LocalContentColor provides MaterialTheme.colorScheme.onSurface
+                            ) {
+                                GlassSnackbarHost(snackbar)
+                                when (sheet) {
+                                    "settings" ->
+                                        SettingsSheet(
+                                            app,
+                                            library,
+                                            auth.type == "authorizationStateReady",
+                                            onConnect = {
+                                                sheet = ""
+                                                connect = true
+                                                app.telegram.start()
+                                            },
+                                            onLogout = {
+                                                sheet = ""
+                                                confirmLogout = true
+                                            },
+                                            onImport = {
+                                                sheet = ""
+                                                onImport()
+                                            },
+                                            onLocal = {
+                                                navigate(0)
+                                                offline = true
+                                                sheet = ""
+                                            },
+                                            onResume = {
                                                 app.action {
-                                                    app.library.removeFromPlaylist(id, ids)
+                                                    val ids = app.library.pending()
+                                                    if (ids.isEmpty())
+                                                        app.notices.emit(
+                                                            tr(R.string.no_pending_downloads)
+                                                        )
+                                                    else onDownload(ids)
                                                 }
+                                            },
+                                            onCache = { sheet = "cache" },
+                                        )
+                                    "cache" ->
+                                        CacheScreen(
+                                            app,
+                                            auth.type == "authorizationStateReady",
+                                            onBack = { sheet = "settings" },
+                                            onConnect = {
+                                                sheet = ""
+                                                connect = true
+                                                app.telegram.start()
+                                            },
+                                        )
+                                    "chats" ->
+                                        ChatPicker(
+                                            app,
+                                            library,
+                                            onDone = {
+                                                sheet = ""
+                                                app.action { app.refresh() }
+                                            },
+                                        )
+                                    "queue" -> QueueSheet(library, playing, app)
+                                    "addPlaylist" ->
+                                        AddToPlaylistSheet(
+                                            app,
+                                            library,
+                                            playlistTracks,
+                                            onDone = {
+                                                sheet = ""
+                                                selectionReset++
+                                                app.notices.tryEmit(tr(R.string.added_to_playlist))
+                                            },
+                                        )
+                                    "order" ->
+                                        managedPlaylist?.let { p ->
+                                            PlaylistOrderSheet(
+                                                app,
+                                                library,
+                                                p.id,
+                                                onDone = { sheet = "" },
+                                            )
+                                        }
+                                    "playlist" ->
+                                        managedPlaylist?.let { p ->
+                                            Column(
+                                                Modifier.navigationBarsPadding()
+                                                    .padding(horizontal = 16.dp)
+                                            ) {
+                                                Text(
+                                                    p.name,
+                                                    style = MaterialTheme.typography.headlineSmall,
+                                                    modifier = Modifier.padding(bottom = 12.dp),
+                                                )
+                                                ActionRow(
+                                                    Icons.Rounded.PlaylistAdd,
+                                                    tr(R.string.add_tracks),
+                                                ) {
+                                                    editPlaylist(p.id)
+                                                }
+                                                ActionRow(
+                                                    Icons.Rounded.SwapVert,
+                                                    tr(R.string.change_order),
+                                                ) {
+                                                    sheet = "order"
+                                                }
+                                                ActionRow(Icons.Rounded.Edit, tr(R.string.rename)) {
+                                                    renameText = p.name
+                                                    sheet = ""
+                                                    rename = true
+                                                }
+                                                ActionRow(
+                                                    Icons.Rounded.DeleteOutline,
+                                                    tr(R.string.delete_playlist),
+                                                ) {
+                                                    sheet = ""
+                                                    delete = true
+                                                }
+                                                Spacer(Modifier.height(12.dp))
                                             }
-                                        },
-                                    )
-                                tab == 2 ->
-                                    PlaylistsScreen(
-                                        library,
-                                        onCreate = { editPlaylist() },
-                                        onOpen = { playlistId = it },
-                                        onMore = {
-                                            managedPlaylist = it
-                                            sheet = "playlist"
-                                        },
-                                    )
-                                else ->
-                                    ChatsScreen(
-                                        library,
-                                        busy,
-                                        auth.type == "authorizationStateReady",
-                                        onConnect = {
-                                            connect = true
-                                            app.telegram.start()
-                                        },
-                                        onAdd = { sheet = "chats" },
-                                        onOpen = {
-                                            navigate(0)
-                                            sourceId = it
-                                        },
-                                        onRemove = { s ->
-                                            app.action {
-                                                app.library.source(ChatChoice(s.id, s.title), false)
+                                        }
+                                    "track" ->
+                                        library.byId[selectedTrackId]
+                                            ?.let {
+                                                if (groupedView) library.duplicates.display(it)
+                                                else if (offlineView && it.local)
+                                                    library.localDisplay(it)
+                                                else it
                                             }
-                                        },
-                                        onRefresh = { app.action { app.refresh() } },
-                                    )
-                            }
-                        }
-                        }
-                    }
-                }
-        }
-        if ((fullPlayer || editor || authVisible) && sheet.isEmpty())
-            Box(
-                Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                SnackbarHost(snackbar)
-            }
-        if (sheet.isNotEmpty())
-            ModalBottomSheet(
-                onDismissRequest = { sheet = "" },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.995f),
-            ) {
-                MatchDialogSystemBars()
-                CompositionLocalProvider(
-                    LocalContentColor provides MaterialTheme.colorScheme.onSurface
-                ) {
-                    SnackbarHost(snackbar)
-                    when (sheet) {
-                    "settings" ->
-                        SettingsSheet(
-                            app,
-                            library,
-                            auth.type == "authorizationStateReady",
-                            onConnect = {
-                                sheet = ""
-                                connect = true
-                                app.telegram.start()
-                            },
-                            onLogout = {
-                                sheet = ""
-                                confirmLogout = true
-                            },
-                            onImport = {
-                                sheet = ""
-                                onImport()
-                            },
-                            onLocal = {
-                                navigate(0)
-                                offline = true
-                                sheet = ""
-                            },
-                            onResume = {
-                                app.action {
-                                    val ids = app.library.pending()
-                                    if (ids.isEmpty())
-                                        app.notices.emit(tr(R.string.no_pending_downloads))
-                                    else onDownload(ids)
-                                }
-                            },
-                            onCache = { sheet = "cache" },
-                        )
-                    "cache" ->
-                        CacheScreen(
-                            app,
-                            auth.type == "authorizationStateReady",
-                            onBack = { sheet = "settings" },
-                            onConnect = {
-                                sheet = ""
-                                connect = true
-                                app.telegram.start()
-                            },
-                        )
-                    "chats" ->
-                        ChatPicker(
-                            app,
-                            library,
-                            onDone = {
-                                sheet = ""
-                                app.action { app.refresh() }
-                            },
-                        )
-                    "queue" -> QueueSheet(library, playing, app)
-                    "addPlaylist" ->
-                        AddToPlaylistSheet(
-                            app,
-                            library,
-                            playlistTracks,
-                            onDone = {
-                                sheet = ""
-                                selectionReset++
-                                app.notices.tryEmit(tr(R.string.added_to_playlist))
-                            },
-                        )
-                    "order" ->
-                        managedPlaylist?.let { p ->
-                            PlaylistOrderSheet(app, library, p.id, onDone = { sheet = "" })
-                        }
-                    "playlist" ->
-                        managedPlaylist?.let { p ->
-                            Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp)) {
-                                Text(
-                                    p.name,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    modifier = Modifier.padding(bottom = 12.dp),
-                                )
-                                ActionRow(Icons.Rounded.PlaylistAdd, tr(R.string.add_tracks)) {
-                                    editPlaylist(p.id)
-                                }
-                                ActionRow(Icons.Rounded.SwapVert, tr(R.string.change_order)) {
-                                    sheet = "order"
-                                }
-                                ActionRow(Icons.Rounded.Edit, tr(R.string.rename)) {
-                                    renameText = p.name
-                                    sheet = ""
-                                    rename = true
-                                }
-                                ActionRow(
-                                    Icons.Rounded.DeleteOutline,
-                                    tr(R.string.delete_playlist),
-                                ) {
-                                    sheet = ""
-                                    delete = true
-                                }
-                                Spacer(Modifier.height(12.dp))
-                            }
-                        }
-                    "track" ->
-                        library.byId[selectedTrackId]
-                            ?.let {
-                                if (groupedView) library.duplicates.display(it)
-                                else if (offlineView && it.local) library.localDisplay(it) else it
-                            }
-                            ?.let { track ->
-                                Column(
-                                    Modifier.navigationBarsPadding()
-                                        .padding(horizontal = 12.dp)
-                                        .verticalScroll(rememberScrollState())
-                                ) {
-                                    ListItem(
-                                        headlineContent = { Text(track.title, maxLines = 2) },
-                                        supportingContent = { Text(track.subtitle) },
-                                        leadingContent = { Artwork(track, 48.dp) },
-                                    )
-                                    ActionRow(
-                                        if (track.liked) Icons.Rounded.Favorite
-                                        else Icons.Rounded.FavoriteBorder,
-                                        if (track.liked) tr(R.string.unlike) else tr(R.string.like),
-                                    ) {
-                                        like(track)
-                                        sheet = ""
-                                    }
-                                    ActionRow(Icons.Rounded.PlaylistAdd, tr(R.string.to_playlist)) {
-                                        addToPlaylist(listOf(track.id))
-                                    }
-                                    ActionRow(Icons.Rounded.QueuePlayNext, tr(R.string.play_next)) {
-                                        app.playback?.addNext(track)
-                                        sheet = ""
-                                    }
-                                    if (track.local && track.temporary)
-                                        ActionRow(
-                                            Icons.Rounded.Download,
-                                            tr(R.string.keep_on_device),
-                                        ) {
-                                            onDownload(listOf(track.id))
-                                            sheet = ""
-                                        }
-                                    if (track.local)
-                                        ActionRow(
-                                            Icons.Rounded.DeleteOutline,
-                                            tr(R.string.remove_from_device),
-                                        ) {
-                                            app.action { app.removeLocal(track) }
-                                            sheet = ""
-                                        }
-                                    else if (track.available)
-                                        ActionRow(
-                                            Icons.Rounded.Download,
-                                            tr(R.string.download_to_device),
-                                        ) {
-                                            onDownload(listOf(track.id))
-                                            sheet = ""
-                                        }
-                                    playlistId?.let { id ->
-                                        ActionRow(
-                                            Icons.Rounded.PlaylistRemove,
-                                            tr(R.string.remove_from_playlist),
-                                        ) {
-                                            app.action {
-                                                app.library.removeFromPlaylist(id, track.id)
-                                            }
-                                            sheet = ""
-                                        }
-                                    }
-                                    if (track.chatId != 0L && track.available)
-                                        ActionRow(
-                                            Icons.Rounded.OpenInNew,
-                                            tr(R.string.open_in_telegram),
-                                        ) {
-                                            snackbar.currentSnackbarData?.dismiss()
-                                            app.action {
-                                                try {
-                                                    app.startActivity(
-                                                        Intent(
-                                                                Intent.ACTION_VIEW,
-                                                                Uri.parse(app.messageLink(track)),
-                                                            )
-                                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            ?.let { track ->
+                                                Column(
+                                                    Modifier.navigationBarsPadding()
+                                                        .padding(horizontal = 12.dp)
+                                                        .verticalScroll(rememberScrollState())
+                                                ) {
+                                                    ListItem(
+                                                        colors =
+                                                            ListItemDefaults.colors(
+                                                                containerColor = Color.Transparent
+                                                            ),
+                                                        headlineContent = {
+                                                            Text(track.title, maxLines = 2)
+                                                        },
+                                                        supportingContent = {
+                                                            Text(track.subtitle)
+                                                        },
+                                                        leadingContent = { Artwork(track, 48.dp) },
                                                     )
-                                                } catch (
-                                                    _: android.content.ActivityNotFoundException) {
-                                                    error(tr(R.string.telegram_app_missing))
+                                                    ActionRow(
+                                                        if (track.liked) Icons.Rounded.Favorite
+                                                        else Icons.Rounded.FavoriteBorder,
+                                                        if (track.liked) tr(R.string.unlike)
+                                                        else tr(R.string.like),
+                                                    ) {
+                                                        like(track)
+                                                        sheet = ""
+                                                    }
+                                                    ActionRow(
+                                                        Icons.Rounded.PlaylistAdd,
+                                                        tr(R.string.to_playlist),
+                                                    ) {
+                                                        addToPlaylist(listOf(track.id))
+                                                    }
+                                                    ActionRow(
+                                                        Icons.Rounded.QueuePlayNext,
+                                                        tr(R.string.play_next),
+                                                    ) {
+                                                        app.playback?.addNext(track)
+                                                        sheet = ""
+                                                    }
+                                                    if (track.local && track.temporary)
+                                                        ActionRow(
+                                                            Icons.Rounded.Download,
+                                                            tr(R.string.keep_on_device),
+                                                        ) {
+                                                            onDownload(listOf(track.id))
+                                                            sheet = ""
+                                                        }
+                                                    if (track.local)
+                                                        ActionRow(
+                                                            Icons.Rounded.DeleteOutline,
+                                                            tr(R.string.remove_from_device),
+                                                        ) {
+                                                            app.action { app.removeLocal(track) }
+                                                            sheet = ""
+                                                        }
+                                                    else if (track.available)
+                                                        ActionRow(
+                                                            Icons.Rounded.Download,
+                                                            tr(R.string.download_to_device),
+                                                        ) {
+                                                            onDownload(listOf(track.id))
+                                                            sheet = ""
+                                                        }
+                                                    playlistId?.let { id ->
+                                                        ActionRow(
+                                                            Icons.Rounded.PlaylistRemove,
+                                                            tr(R.string.remove_from_playlist),
+                                                        ) {
+                                                            app.action {
+                                                                app.library.removeFromPlaylist(
+                                                                    id,
+                                                                    track.id,
+                                                                )
+                                                            }
+                                                            sheet = ""
+                                                        }
+                                                    }
+                                                    if (track.chatId != 0L && track.available)
+                                                        ActionRow(
+                                                            Icons.Rounded.OpenInNew,
+                                                            tr(R.string.open_in_telegram),
+                                                        ) {
+                                                            snackbar.currentSnackbarData?.dismiss()
+                                                            app.action {
+                                                                try {
+                                                                    app.startActivity(
+                                                                        Intent(
+                                                                                Intent.ACTION_VIEW,
+                                                                                Uri.parse(
+                                                                                    app.messageLink(
+                                                                                        track
+                                                                                    )
+                                                                                ),
+                                                                            )
+                                                                            .addFlags(
+                                                                                Intent
+                                                                                    .FLAG_ACTIVITY_NEW_TASK
+                                                                            )
+                                                                    )
+                                                                } catch (
+                                                                    _:
+                                                                        android.content.ActivityNotFoundException) {
+                                                                    error(
+                                                                        tr(
+                                                                            R.string
+                                                                                .telegram_app_missing
+                                                                        )
+                                                                    )
+                                                                }
+                                                            }
+                                                            sheet = ""
+                                                        }
+                                                    Spacer(Modifier.height(12.dp))
                                                 }
                                             }
-                                            sheet = ""
-                                        }
-                                    Spacer(Modifier.height(12.dp))
                                 }
                             }
+                        }
                     }
-                }
-            }
-        if (rename)
-            AlertDialog(
-                onDismissRequest = { rename = false },
-                title = { Text(tr(R.string.playlist_name)) },
-                text = {
-                    OutlinedTextField(
-                        renameText,
-                        { renameText = it.take(80) },
-                        singleLine = true,
-                        label = { Text(tr(R.string.name)) },
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = renameText.isNotBlank(),
-                        onClick = {
-                            val id = managedPlaylist?.id
-                            val name = renameText
-                            if (id != null) app.action { app.library.renamePlaylist(id, name) }
-                            rename = false
+                if (rename)
+                    GlassDialog(
+                        onDismissRequest = { rename = false },
+                        title = { Text(tr(R.string.playlist_name)) },
+                        text = {
+                            OutlinedTextField(
+                                renameText,
+                                { renameText = it.take(80) },
+                                singleLine = true,
+                                label = { Text(tr(R.string.name)) },
+                            )
                         },
-                    ) {
-                        Text(tr(R.string.save))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { rename = false }) { Text(tr(R.string.cancel)) }
-                },
-            )
-        if (delete)
-            AlertDialog(
-                onDismissRequest = { delete = false },
-                title = { Text(tr(R.string.delete_playlist_title)) },
-                text = {
-                    Text(tr(R.string.delete_playlist_help, managedPlaylist?.name))
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val id = managedPlaylist?.id
-                            if (id != null)
-                                app.action {
-                                    app.library.deletePlaylist(id)
-                                    if (playlistId == id) playlistId = null
+                        confirmButton = {
+                            TextButton(
+                                enabled = renameText.isNotBlank(),
+                                onClick = {
+                                    val id = managedPlaylist?.id
+                                    val name = renameText
+                                    if (id != null)
+                                        app.action { app.library.renamePlaylist(id, name) }
+                                    rename = false
+                                },
+                            ) {
+                                Text(tr(R.string.save))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { rename = false }) { Text(tr(R.string.cancel)) }
+                        },
+                    )
+                if (delete)
+                    GlassDialog(
+                        onDismissRequest = { delete = false },
+                        title = { Text(tr(R.string.delete_playlist_title)) },
+                        text = {
+                            Text(tr(R.string.delete_playlist_help, managedPlaylist?.name))
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    val id = managedPlaylist?.id
+                                    if (id != null)
+                                        app.action {
+                                            app.library.deletePlaylist(id)
+                                            if (playlistId == id) playlistId = null
+                                        }
+                                    delete = false
                                 }
-                            delete = false
-                        }
-                    ) {
-                        Text(tr(R.string.delete))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { delete = false }) { Text(tr(R.string.cancel)) }
-                },
-            )
-        if (confirmLogout)
-            AlertDialog(
-                onDismissRequest = { confirmLogout = false },
-                title = { Text(tr(R.string.logout_title)) },
-                text = {
-                    Text(tr(R.string.logout_help))
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            confirmLogout = false
-                            app.action { app.logout() }
-                        }
-                    ) {
-                        Text(tr(R.string.leave))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { confirmLogout = false }) { Text(tr(R.string.cancel)) }
-                },
-            )
-    }
+                            ) {
+                                Text(tr(R.string.delete))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { delete = false }) { Text(tr(R.string.cancel)) }
+                        },
+                    )
+                if (confirmLogout)
+                    GlassDialog(
+                        onDismissRequest = { confirmLogout = false },
+                        title = { Text(tr(R.string.logout_title)) },
+                        text = {
+                            Text(tr(R.string.logout_help))
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    confirmLogout = false
+                                    app.action { app.logout() }
+                                }
+                            ) {
+                                Text(tr(R.string.leave))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { confirmLogout = false }) {
+                                Text(tr(R.string.cancel))
+                            }
+                        },
+                    )
+            }
+        }
     }
 }
 
@@ -755,36 +983,38 @@ private fun MiniPlayer(
     val state = observePlayer(player, positionUpdates = true)
     val narrow = LocalConfiguration.current.screenWidthDp < 360
     Column(
-         Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 12.dp)
-             .liquidGlass(22.dp, strong = true)
-             .clip(RoundedCornerShape(22.dp))
-             .clickable(onClick = onOpen)
+        Modifier.widthIn(max = 720.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .liquidGlass(26.dp, strong = true)
+            .clip(RoundedCornerShape(26.dp))
+            .clickable(onClick = onOpen)
     ) {
         Row(
             Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-             Artwork(track, 44.dp)
+            Artwork(track, if (narrow) 36.dp else 44.dp)
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                 Text(
-                     track.title,
-                     maxLines = if (narrow) 2 else 1,
-                     overflow = TextOverflow.Ellipsis,
-                     style = MaterialTheme.typography.titleMedium,
-                 )
-                 if (!narrow)
-                     Text(
-                         track.subtitle,
-                         maxLines = 1,
-                         overflow = TextOverflow.Ellipsis,
-                         style = MaterialTheme.typography.bodySmall,
-                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                     )
+                Text(
+                    track.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (!narrow)
+                    Text(
+                        track.subtitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
             }
             IconButton(onClick = onPrevious) {
                 Icon(Icons.Rounded.SkipPrevious, tr(R.string.previous_track))
             }
-            IconButton(onClick = onToggle) {
+            GlassIconButton(onClick = onToggle, tint = spectrumAccent(0)) {
                 if (state.loading)
                     CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                 else
@@ -795,12 +1025,12 @@ private fun MiniPlayer(
             }
             IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, tr(R.string.next_track)) }
         }
-         LinearProgressIndicator(
+        LinearProgressIndicator(
             progress = {
                 if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f)
                 else 0f
             },
-             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(2.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(2.dp),
             trackColor = Color.Transparent,
         )
     }

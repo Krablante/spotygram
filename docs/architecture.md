@@ -211,14 +211,30 @@ Russian use Android resources; Android 13+ supports per-app language selection.
 Playlist edits and batch operations use transactions. Track lists are lazy,
 and artwork requests have two concurrent slots with low TDLib priority.
 
-The light and dark appearances share a neutral base with distributed color
-fields, a restrained grid and two full-spectrum light bands. Search, source
-controls, navigation, mini-player, player cover/transport and collection rows
-use translucent surfaces. Their neutral fills and reflective edges draw behind
-content; individual music rows do not run a blur or shader.
-The default appearance follows Android until the user chooses light or dark.
-Settings sheets use a denser surface so text beneath them cannot bleed through.
-Wide layouts keep the music column and bottom controls within 720 dp.
+The light and dark appearances share a near-white/near-black base, small pools
+of incident spectral light, and the same optical control material. `Design.kt`
+owns its geometry, tint, diffusion, refraction, highlights and press response.
+Haze Glass 2.0.1 consumes explicitly captured background and content layers;
+glass consumers are not included in those captures. Artwork supplies a soft
+reflection near the player. There is no animated wallpaper or effect per music,
+chat or playlist row. Lists remain lazy and scroll beneath the floating dock,
+with end padding that keeps their final actions reachable.
+
+Search, source filters, navigation, transport, switches and sheets use that
+material. Dense surfaces fully diffuse the captured text rather than overlaying
+a sharp copy. The secondary refraction-detail pass is disabled; primary edge
+refraction, dispersion and lighting remain. Android 13+ supports the full
+RuntimeShader optics; older Android versions use Haze's tint/lighting/rim
+fallback with denser tint for text-heavy surfaces. Reduced-motion handling comes
+from Compose and Haze's system policy.
+Press/focus optics belong to controls with interaction sources; whole sheets do
+not warp when an inner control is tapped. Sheet glass is attached inside the
+native placement/drag transform, together with its handle and content.
+Playlist name/search fields share a row with the keyboard open and keep their
+composition identity while widths change, so adapting the layout preserves focus.
+The default theme follows Android until the user chooses light or dark.
+At 840 dp, navigation moves into a side rail; landscape players use artwork
+and controls in separate columns. Music lists remain bounded to 720 dp.
 
 SQLite work, import and page parsing run off the UI thread. During indexing,
 library snapshots publish at most twice per second plus completion. Progress

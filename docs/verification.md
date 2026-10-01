@@ -1,5 +1,66 @@
 # Verification record
 
+## 0.12.0 — rebuilt Liquid Glass system
+
+The control layer uses Haze Glass 2.0.1 with explicit background/content captures,
+edge refraction, full diffusion on dense surfaces, spectral dispersion and
+lighting. The near-white/near-black appearances share geometry. The old grid,
+rainbow bands and glass collection-row shells were removed. Incident light is
+bounded to small areas; artwork contributes a reflection near the player.
+Press/focus optics run on interactive controls. No per-track effect or animated
+background was added; there is no database migration.
+
+Debug and minified release assembly, full debug/release Lint and release
+lintVital passed with Gradle 9.3.1, AGP 9.1.1, Kotlin 2.4.20 and SDK 37.
+Lint reported warnings, with no errors. Both APKs passed `apksigner verify`
+with the established certificate
+`b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`.
+ZIP alignment and LOAD segments of both packaged native libraries in both ABIs
+were checked at 16 KB. Manifest: `app.spotygram`, versionCode 22 / versionName
+0.12.0, minSdk 26, targetSdk 36. SHA-256: ARM64
+`1b89a8e055340a39e5950e8b4e3ab65775007354784ef09f4da5eccba1ec61ae`,
+x86-64 `cf1aed76e0d788abcaa65b5d2441f98da78db089a48d95a37ddfccf57ddc56c0`.
+
+Manual Android 16 x86-64 checks used the existing local recordings. The signed
+APK installed over 0.11.1 without clearing data; subsequent iterations retained
+that installation. The installed final `base.apk` hash matched the final
+x86-64 artifact. Before/after SQLite comparisons preserved all three recording
+IDs, titles, artists, paths and favorites, both original playlists and all three
+memberships; schema was 4 and integrity was `ok`. A temporary one-track Glass
+playlist exercised creation from the keyboard and deletion; it was removed.
+Unliking and Undo restored the original favorite. Final local playback reached
+MediaSession `PLAYING` at 156,294 ms and later `PAUSED` at 28,558 ms after a
+track transition. The final inspected AndroidRuntime/ExoPlayer error logs were
+empty.
+
+Full native screenshots were inspected in Russian and English, light and dark,
+at 400 dp width, 320 dp with font scale 1.3, a short 320×517 dp viewport and a
+1067×667 dp wide layout. Checks covered library, favorites, selection, playlists,
+full/mini player, queue, source controls, playlist menu/confirmation, settings, empty
+cache and notices. Artwork/row colors visibly changed the dock during scrolling;
+final list actions remained reachable. Search and playlist creation were checked
+with the keyboard open at narrow width; the phone sign-in field, numeric
+keyboard and Continue were inspected without entering/submitting a phone number.
+Wide navigation used the side rail; the player used separate artwork/controls.
+The README screenshots were refreshed from the installed signed app. The SVG
+banner was rendered in Chromium and inspected.
+
+Iteration corrected white-point washout, sharp text leaking through dense glass,
+a clipped artwork reflection, narrow filters, player action wrapping, keyboard
+fields consuming the list, sheet glass being outside the native placement
+transform, and a standard Snackbar's extra grey layer. No test files, fixture
+suite or extra media were added.
+
+The emulator's recurring cold-boot System UI ANRs were dismissed before app
+checks. Its SwiftShader backend also exited with a host renderer fault; later
+checks used the host Mesa renderer through Xvfb. Builds and emulator ran
+sequentially with two-core limits and bounded memory; the emulator was restored
+to 480×1040/192 dpi, font scale 1.0, Russian and dark appearance, left paused and
+stopped. Physical ARM64 behavior, phone frame time/power use, a large catalog,
+authenticated Telegram playback and the complete updater flow were not checked.
+Full optics require Android 13+; older-Android tint/lighting/rim fallback was
+source-reviewed, not exercised on an older emulator.
+
 ## 0.11.1 — restore the 0.10.3 app
 
 The app source and build configuration match the published `v0.10.3` tag,
