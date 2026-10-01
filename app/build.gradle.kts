@@ -32,8 +32,8 @@ android {
         applicationId = "app.spotygram"
         minSdk = 26
         targetSdk = 36
-        versionCode = 22
-        versionName = "0.12.0"
+        versionCode = 23
+        versionName = "0.12.1"
         buildConfigField("int", "TELEGRAM_API_ID", credential("TELEGRAM_API_ID").ifBlank { "0" })
         buildConfigField("String", "TELEGRAM_API_HASH", "\"${credential("TELEGRAM_API_HASH")}\"")
         buildConfigField("boolean", "TELEGRAM_TEST_DC", "false")

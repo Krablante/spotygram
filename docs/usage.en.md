@@ -98,7 +98,8 @@ continues.
 In **Playlists → New playlist**, enter a name and select songs. You can create
 an empty playlist and add music later through its add-tracks action.
 
-Long-press a song or tap **Select** to choose several songs at once. Taps then
+Long-press a song or tap the checklist icon beside the playback buttons
+(**Select**) to choose several songs at once. Taps then
 select rather than play. Searching does not discard your existing selection.
 Back exits selection first.
 
@@ -114,7 +115,9 @@ By default, a fully downloaded song gains an offline icon and stays on the devic
 you restrict these downloads to Wi-Fi and resume interrupted downloads.
 The Wi-Fi restriction does not apply to ordinary playback.
 
-**On device** shows retained local files, excluding temporary playback copies. When several messages reference one
+The download icon beside the source selector toggles **On device**; its highlight
+and the On device heading show when the filter is active. It shows retained local
+files, excluding temporary playback copies. When several messages reference one
 physical file, it always appears once. With Hide duplicates enabled, matching
 separate copies are grouped too. Storage size in Settings still includes all
 retained files, including hidden copies: hiding rows does not free space.

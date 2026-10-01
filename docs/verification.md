@@ -1,5 +1,59 @@
 # Verification record
 
+## 0.12.1 — mobile action layout and solid RGB mark
+
+The music toolbar now has aligned filter and action rows. A flexible source
+selector sits beside 48 dp local-file and sort controls. Play has a labelled
+primary button; phone layouts use icons for shuffle/random and selection.
+Compact playlists accommodate their additional add-tracks action. The selection
+bar no longer scrolls horizontally: playlist, download and removal actions stay
+visible. On device changes the heading as well as the filter highlight.
+
+One static vector supplies the black equalizer mark with separate saturated red,
+green and blue bars to the header, sign-in and adaptive launcher icon. The banner
+uses the same geometry/colors. No branding shader, animation, new dependency or
+database migration was added. The extra nested glass shell around playback was
+removed; track lists remain lazy.
+
+Debug/release assembly and full debug/release Lint passed. Lint reported warnings
+without errors. Both signed APKs passed `apksigner verify` and 16 KB ZIP alignment
+with the established certificate
+`b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`.
+Manifest: `app.spotygram`, versionCode 23 / versionName 0.12.1, minSdk 26,
+targetSdk 36. SHA-256: ARM64
+`c0cc97c8a3560e47bc3751de1131b2c3fbc5774970b85c7e32a0cc8cb074f012`,
+x86-64 `e35517353c5c5094b70ba88091bed5aa7aefc6edadbf2e8aa3c86d8ccdafbfc2`.
+
+Manual checks used the existing Android 16 x86-64 installation and local
+recordings. The signed update installed over 0.12.0 without clearing data; the
+final installed `base.apk` hash matched the final x86-64 artifact. Before/after
+SQLite comparisons preserved the IDs, titles, artists, paths and favorites of
+all three recordings, both original playlists and all three memberships.
+Schema remained 4 and integrity was `ok`. Primary and random playback actions
+started local music; MediaSession reported PLAYING and then PAUSED at 18,677 ms.
+The inspected AndroidRuntime/ExoPlayer error logs were empty.
+
+Actual screenshots were inspected in Russian/English, light/dark, at 400 dp,
+360 dp, 320 dp with font scale 1.3, and 1067×667 dp. Checks covered normal,
+disabled and selected buttons, local filtering, selection of all/individual
+tracks, the add-to-playlist picker, the playlist add-tracks action and removal
+confirmation with cancellation. At 320 dp, search with the keyboard open kept
+the controls and a matching track visible; a no-results query disabled playback.
+The phone sign-in field and numeric keyboard were inspected at 400 dp without
+entering or submitting a phone number. The RGB mark was inspected in the header,
+sign-in, the actual circular launcher mask and the Chromium-rendered SVG banner.
+Four affected documentation screenshots were refreshed from the signed app.
+
+Iteration fixed clipped phone action labels, the selection download action
+falling outside the narrow viewport, and the default source label truncating at
+increased text size. The emulator's recurring cold-boot System UI ANR was closed
+before app checks. Builds/emulator ran sequentially with two-core limits and
+bounded memory. Display was restored to 480×1040/192 dpi, font scale 1.0, Russian
+and dark; playback remained paused and the emulator was stopped. No test files
+or scaffolds were added. Physical ARM64 behavior, authenticated Telegram flows,
+large-catalog performance, phone power use and the full updater flow were not
+retested.
+
 ## 0.12.0 — rebuilt Liquid Glass system
 
 The control layer uses Haze Glass 2.0.1 with explicit background/content captures,

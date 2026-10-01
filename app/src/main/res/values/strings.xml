@@ -38,6 +38,7 @@
     <string name="add_tracks_count">"Add · %1$s"</string>
     <string name="added_to_playlist">"Added to playlist"</string>
     <string name="all_sources">"All sources"</string>
+    <string name="source_filter">Sources</string>
     <string name="alphabetical">"Alphabetical"</string>
     <string name="app_description">"A personal music player using the Telegram API. No own server, app ads or analytics. Music and your session stay on your phone."</string>
     <string name="appearance">"Appearance"</string>

@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480" role="img" aria-labelledby="title desc">
   <title id="title">Spotygram</title>
-  <desc id="desc">Spotygram. Clear lenses, spectral highlights and music from your chats on a light base.</desc>
+  <desc id="desc">Spotygram. A black equalizer mark with distinct saturated red, green and blue bars, and music from your chats.</desc>
   <defs>
-    <linearGradient id="rainbow"><stop stop-color="#58c9d2"/><stop offset=".18" stop-color="#5e9deb"/><stop offset=".35" stop-color="#a08ce4"/><stop offset=".51" stop-color="#f07175"/><stop offset=".68" stop-color="#f6af58"/><stop offset=".84" stop-color="#e9d96c"/><stop offset="1" stop-color="#72c987"/></linearGradient>
     <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".74"/><stop offset=".5" stop-color="#fff" stop-opacity=".29"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient>
     <linearGradient id="edge" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#9edce7"/><stop offset=".72" stop-color="#f6bd9c"/><stop offset="1" stop-color="#fff"/></linearGradient>
     <radialGradient id="blue"><stop stop-color="#84bedc" stop-opacity=".28"/><stop offset="1" stop-color="#84bedc" stop-opacity="0"/></radialGradient>
@@ -17,9 +16,11 @@
     <ellipse cx="890" cy="490" rx="200" ry="190" fill="url(#green)"/>
     <rect x="52" y="83" width="1176" height="314" rx="64" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
     <path d="M115 91h1035" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2"/>
-    <rect x="93" y="129" width="176" height="176" rx="56" fill="url(#glass)" stroke="url(#edge)" stroke-width="2"/>
-    <g stroke="url(#rainbow)" stroke-linecap="round" stroke-width="12">
-      <path d="M141 201v30M169 181v70M198 163v105M226 195v41"/>
+    <g transform="translate(93 129) scale(1.62963)">
+      <rect width="108" height="108" rx="24" fill="#080a0e"/>
+      <rect x="26" y="38" width="14" height="32" rx="6" fill="#ff2038"/>
+      <rect x="47" y="27" width="14" height="54" rx="6" fill="#30ff70"/>
+      <rect x="68" y="33" width="14" height="42" rx="6" fill="#2864ff"/>
     </g>
     <text x="310" y="237" fill="#20383c" font-family="Arial,Helvetica,sans-serif" font-size="89" font-weight="700" letter-spacing="-5">spotygram</text>
     <text x="316" y="288" fill="#486166" font-family="Arial,Helvetica,sans-serif" font-size="19" letter-spacing="4">MUSIC FROM YOUR CHATS</text>

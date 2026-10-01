@@ -211,6 +211,16 @@ Russian use Android resources; Android 13+ supports per-app language selection.
 Playlist edits and batch operations use transactions. Track lists are lazy,
 and artwork requests have two concurrent slots with low TDLib priority.
 
+Music filters occupy one aligned row: the source selector takes the remaining
+width beside the local-file toggle and sort button. Playback and selection use
+a separate row with a labelled primary action and 48 dp secondary touch targets.
+Narrow screens and increased text size use an icon for shuffle/random play.
+Compact playlists also replace the primary label with its play icon so their
+four actions remain reachable; selection uses the same layout without scrolling.
+The static `spotygram_mark` vector supplies the same sharply separated RGB
+equalizer to the header, sign-in and adaptive launcher icon; no shader or
+animation is needed for branding.
+
 The light and dark appearances share a near-white/near-black base, small pools
 of incident spectral light, and the same optical control material. `Design.kt`
 owns its geometry, tint, diffusion, refraction, highlights and press response.

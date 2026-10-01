@@ -40,6 +40,7 @@
     <string name="add_tracks_count">"Добавить · %1$s"</string>
     <string name="added_to_playlist">"Добавлено в плейлист"</string>
     <string name="all_sources">"Все источники"</string>
+    <string name="source_filter">Источники</string>
     <string name="alphabetical">"По алфавиту"</string>
     <string name="app_description">"Личный музыкальный плеер на Telegram API. Без своего сервера, рекламы приложения и аналитики. Музыка и сессия остаются на телефоне."</string>
     <string name="appearance">"Оформление"</string>

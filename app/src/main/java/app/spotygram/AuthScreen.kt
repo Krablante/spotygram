@@ -1,5 +1,6 @@
 package app.spotygram
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -37,17 +39,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
         }
         if (!keyboardVisible) {
             Spacer(Modifier.height(20.dp))
-            Box(
-                Modifier.size(64.dp).liquidGlass(24.dp, tint = spectrumAccent(0)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.GraphicEq,
-                    null,
-                    Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+            Image(painterResource(R.drawable.spotygram_mark), null, Modifier.size(64.dp))
             Spacer(Modifier.height(16.dp))
             Text("Spotygram", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.height(12.dp))

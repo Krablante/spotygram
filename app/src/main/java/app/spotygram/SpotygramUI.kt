@@ -8,7 +8,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -22,13 +21,13 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -407,19 +406,11 @@ fun SpotygramUI(
                                             .padding(start = 16.dp, end = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Box(
-                                            Modifier.size(28.dp)
-                                                .clip(CircleShape)
-                                                .background(Brush.linearGradient(Spectrum)),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.GraphicEq,
-                                                null,
-                                                Modifier.size(19.dp),
-                                                tint = Color.White,
-                                            )
-                                        }
+                                        Image(
+                                            painterResource(R.drawable.spotygram_mark),
+                                            null,
+                                            Modifier.size(28.dp),
+                                        )
                                         Text(
                                             "Spotygram",
                                             Modifier.weight(1f).padding(start = 8.dp),
