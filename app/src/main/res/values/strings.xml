@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="speed">Speed</string>
+    <string name="playback_speed">Playback speed</string>
+    <string name="decrease_speed">Decrease speed by 0.05</string>
+    <string name="increase_speed">Increase speed by 0.05</string>
+    <string name="close">Close</string>
     <string name="music_cache">Telegram music cache</string>
     <string name="clear_music_cache">Clear music cache</string>
     <string name="cache_settings_help">Review space used by downloaded Telegram audio</string>

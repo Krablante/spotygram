@@ -89,6 +89,17 @@ Repeat one works in all modes. Repeat all works in ordered and shuffled modes;
 random is already endless. Reopening the app restores the queue and position
 without starting playback automatically.
 
+Tap the round speed button between **Download** and **Queue** in the full player.
+The slider covers **0.3×–4×**; **− / +** adjust by 0.05×. Quick choices are
+0.5×, 1×, 1.5×, 2× and 3×. Changes apply immediately without a confirmation
+button; close the panel with its cross, Back or a tap outside it.
+
+The chosen speed keeps the original pitch and applies to subsequent songs,
+including after an app restart. **1×** restores normal speed. The button gains
+a subtle accent and the mini-player shows the value whenever speed differs from 1×.
+
+<img src="screenshots/speed-light.png" width="300" alt="Playback speed panel with slider and quick choices">
+
 ## Favorites and playlists
 
 The heart beside a song adds it to **Favorites**. Tap again to remove the mark;

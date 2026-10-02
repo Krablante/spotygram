@@ -17,6 +17,9 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,6 +38,7 @@ fun PlayerScreen(
     onLike: () -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
+    onSpeed: () -> Unit,
     onShuffle: () -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
@@ -125,6 +129,7 @@ fun PlayerScreen(
                             { scrub = it },
                             { onDownload() },
                             { onQueue() },
+                            onSpeed,
                             { onShuffle() },
                             onRepeat,
                         )
@@ -142,6 +147,7 @@ fun PlayerScreen(
                     { scrub = it },
                     { onDownload() },
                     { onQueue() },
+                    onSpeed,
                     { onShuffle() },
                     onRepeat,
                 )
@@ -196,6 +202,7 @@ private fun PlayerTransport(
     onScrub: (Float?) -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
+    onSpeed: () -> Unit,
     onShuffle: () -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
@@ -322,35 +329,83 @@ private fun PlayerTransport(
             }
         }
         Spacer(Modifier.height(8.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            GlassButton(
-                onClick = onDownload,
-                enabled = !track.local || track.temporary,
-                modifier = Modifier.weight(1f),
-            ) {
-                if (!track.local || track.temporary) {
-                    Icon(Icons.Rounded.Download, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(5.dp))
-                }
-                Text(
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val largeText = LocalConfiguration.current.fontScale > 1.2f
+            val compactActions = maxWidth < 340.dp && largeText
+            val speedLabel = playbackSpeedLabel(state.speed)
+            val speedDescription = tr(R.string.playback_speed)
+            val downloadLabel =
+                tr(
                     when {
-                        track.temporary -> tr(R.string.keep_on_device)
-                        track.local -> tr(R.string.on_device)
-                        else -> tr(R.string.download)
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                        track.temporary -> R.string.keep_on_device
+                        track.local -> R.string.on_device
+                        else -> R.string.download
+                    }
                 )
-            }
-            Spacer(Modifier.width(8.dp))
-            GlassButton(onClick = onQueue, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Rounded.QueueMusic, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(tr(R.string.queue), maxLines = 1)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GlassButton(
+                    onClick = onDownload,
+                    enabled = !track.local || track.temporary,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                ) {
+                    if (!track.local || track.temporary || compactActions) {
+                        Icon(
+                            if (track.local && !track.temporary) Icons.Rounded.OfflinePin
+                            else Icons.Rounded.Download,
+                            if (compactActions) downloadLabel else null,
+                            Modifier.size(20.dp),
+                        )
+                        if (!compactActions) Spacer(Modifier.width(5.dp))
+                    }
+                    if (!compactActions)
+                        Text(
+                            downloadLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                }
+                GlassIconButton(
+                    onClick = onSpeed,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription = speedDescription
+                            stateDescription = speedLabel
+                        },
+                    size = if (largeText) 56.dp else 48.dp,
+                    tint = if (state.speed != 1f) spectrumAccent(0) else Color.Transparent,
+                    enabled =
+                        player?.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH) == true,
+                ) {
+                    Text(
+                        speedLabel,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color =
+                            if (state.speed != 1f) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+                GlassButton(
+                    onClick = onQueue,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.QueueMusic,
+                        if (compactActions) tr(R.string.queue) else null,
+                        Modifier.size(20.dp),
+                    )
+                    if (!compactActions) {
+                        Spacer(Modifier.width(5.dp))
+                        Text(tr(R.string.queue), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
         }
     }

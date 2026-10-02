@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -254,6 +255,7 @@ fun SpotygramUI(
                             onLike = { like(current) },
                             onDownload = { onDownload(listOf(current.id)) },
                             onQueue = { sheet = "queue" },
+                            onSpeed = { sheet = "speed" },
                             onShuffle = { app.playback?.setMode(order = mode.order.next()) },
                             onRepeat = { app.playback?.setMode(repeat = it) },
                         )
@@ -610,11 +612,26 @@ fun SpotygramUI(
                     ) {
                         // Material must travel inside the sheet's native placement/drag transform.
                         Column(Modifier.fillMaxWidth().liquidGlass(30.dp, strong = true)) {
-                            BottomSheetDefaults.DragHandle(
-                                modifier = Modifier.align(Alignment.CenterHorizontally),
-                                color =
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            )
+                            if (sheet == "speed")
+                                Box(
+                                    Modifier.align(Alignment.CenterHorizontally)
+                                        .padding(top = 10.dp, bottom = 2.dp)
+                                        .size(32.dp, 4.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                alpha = 0.4f
+                                            ),
+                                            RoundedCornerShape(2.dp),
+                                        )
+                                )
+                            else
+                                BottomSheetDefaults.DragHandle(
+                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                    color =
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = 0.5f
+                                        ),
+                                )
                             MatchDialogSystemBars()
                             CompositionLocalProvider(
                                 LocalContentColor provides MaterialTheme.colorScheme.onSurface
@@ -677,6 +694,12 @@ fun SpotygramUI(
                                             },
                                         )
                                     "queue" -> QueueSheet(library, playing, app)
+                                    "speed" ->
+                                        PlaybackSpeedSheet(
+                                            playing,
+                                            player,
+                                            onClose = { sheet = "" },
+                                        )
                                     "addPlaylist" ->
                                         AddToPlaylistSheet(
                                             app,
@@ -993,14 +1016,29 @@ private fun MiniPlayer(
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                if (!narrow)
-                    Text(
-                        track.subtitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                if (!narrow || state.speed != 1f)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        if (!narrow)
+                            Text(
+                                track.subtitle,
+                                Modifier.weight(1f, fill = false),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        if (state.speed != 1f)
+                            Text(
+                                playbackSpeedLabel(state.speed),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.secondary,
+                                maxLines = 1,
+                            )
+                    }
             }
             IconButton(onClick = onPrevious) {
                 Icon(Icons.Rounded.SkipPrevious, tr(R.string.previous_track))

@@ -15,6 +15,6 @@ application belongs.
 | [Third-party notices](third-party.md) | Dependencies and licenses |
 
 The first three guides are available in both languages, with a switch at the
-top of each page. The historical verification record and release notes are
-maintained in English. Current downloads and changes are on the
+top of each page. The historical verification record is maintained in English.
+Current downloads and release notes are on the
 [releases page](https://github.com/Krablante/spotygram/releases).

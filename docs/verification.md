@@ -1,5 +1,59 @@
 # Verification record
 
+## 0.13.0 — playback speed
+
+The round button below Play opens the existing glass sheet with a linear
+0.3×–4× slider, 0.05× adjustment and five quick choices. Changed speed has a
+subtle button accent and a compact mini-player indicator. The service uses the
+standard Media3 speed command and retains the default pitch; it coalesces speed
+persistence over 300 ms without rebuilding or serializing the queue. No new
+dependency, service, decoder or database migration was added.
+
+Debug assembly, minified release assembly and full debug/release Lint passed.
+Lint reported warnings without errors. Both APKs passed signature verification
+and 16 KB ZIP alignment with the established certificate
+`b295569f9c5d00f2d54aa1e22d07a8e379ec90a06aa6f2c5c8b288a030b5550a`.
+Manifest: `app.spotygram`, versionCode 24 / versionName 0.13.0, minSdk 26,
+targetSdk 36. SHA-256: ARM64
+`4c4cdd965b83df5821ec793a82bccd0b78a10ceebaf50aa20ef584e438e0c325`,
+x86-64 `7874b361e3d1f024c49c8d899072d5f4b33ec8faa8b6ad916476ec1209afa5e2`.
+
+The signed x86-64 update installed over 0.12.1 without clearing data. The
+installed `base.apk` hash matched the final artifact. Before/after SQLite checks
+preserved all three track IDs, titles, artists, paths and favorite marks, both
+playlists and all three memberships; schema remained 4 and integrity was `ok`.
+
+Manual checks used the existing Android 16 emulator and local recordings:
+
+- MediaSession reported PLAYING at 4× and 0.3× on Fur Elise, including positions
+  59,319 and 63,949 ms. The plus button changed 1.5× to 1.55×; settled speed was
+  present in the service preference. Slider taps and fine adjustment worked.
+- Selecting The-Entertainer retained 1.55×; Home left the same playback speed in
+  the active session. Force-stop/relaunch restored the indicator and queue
+  without automatically starting playback. The debug app also resumed at its
+  restored 1.5×. The 1× preset returned to normal and removed the accent/indicator.
+- Actual screens were inspected at 400 dp in Russian/English and light/dark,
+  at 320 dp with font scale 1.3, and at 1067×667 dp. All five presets fit at the
+  narrow width; 3.95× fit in the larger circle and lower actions used icons.
+  The mini-player retained its title width, with altered speed on its second row.
+  Wide playback kept separate artwork/control columns and a bounded sheet.
+- Cross, outside tap and Back dismissed the panel. Minimum/maximum states
+  disabled their respective adjustment buttons. A tap above the thin visible
+  slider line still changed speed, confirming the expanded touch area.
+- The inspected AndroidRuntime, ExoPlayer and playback-error logs were empty.
+  The compact sheet handle corrected excess height from Material's default
+  handle spacing. The player screenshot and new EN/RU speed-panel images were
+  captured from the final signed APK for documentation.
+
+The emulator's recurring System UI and Pixel Launcher ANRs were dismissed before
+app checks or after display changes. Its Mesa renderer used Xvfb; builds and
+emulator ran sequentially under two-core limits and bounded memory. Display was
+restored to 480×1040/192 dpi, font scale 1.0, Russian and dark, speed 1× and
+playback stopped; the temporary debug speed preference was removed. The emulator
+and Xvfb were stopped. No test files or scaffolds were added. Physical ARM64
+behavior, authenticated Telegram playback, acoustic pitch quality, large-catalog
+performance and phone power use were not measured.
+
 ## 0.12.1 — mobile action layout and solid RGB mark
 
 The music toolbar now has aligned filter and action rows. A flexible source

@@ -65,6 +65,10 @@ Shuffle plays a pass without repeats. The dice mode draws each next song
 independently, so the same song can come up twice in a row. It keeps going
 until you stop it; Previous retraces your recent listening history.
 
+The round speed button below Play opens a **0.3×–4×** slider, fine adjustment
+and quick choices. Speed changes keep the original pitch and carry across songs
+and app restarts. Tap **1×** to return to normal; the mini-player shows altered speed.
+
 Downloaded songs are available under **On device**. The interface comes in
 English and Russian, with light and dark appearances. The initial appearance
 follows the phone until you choose one in Settings.

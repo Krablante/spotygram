@@ -5,7 +5,18 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+
+const val MIN_PLAYBACK_SPEED = 0.3f
+const val MAX_PLAYBACK_SPEED = 4f
+const val PLAYBACK_SPEED_STEP = 0.05f
+
+fun playbackSpeedStep(value: Float): Float =
+    ((value / PLAYBACK_SPEED_STEP).roundToInt() * PLAYBACK_SPEED_STEP).coerceIn(
+        MIN_PLAYBACK_SPEED,
+        MAX_PLAYBACK_SPEED,
+    )
 
 data class Playing(
     val id: String = "",
@@ -16,6 +27,7 @@ data class Playing(
     val shuffle: Boolean = false,
     val random: Boolean = false,
     val repeat: Int = 0,
+    val speed: Float = 1f,
 )
 
 @Composable
@@ -38,6 +50,7 @@ fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
                     player.shuffleModeEnabled,
                     false,
                     player.repeatMode,
+                    player.playbackParameters.speed,
                 )
         }
         val listener =

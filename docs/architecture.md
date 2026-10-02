@@ -33,6 +33,14 @@ automatic retry per foreground entry or explicit playback request. No background
 reconnect loop runs. Generation checks discard obsolete callbacks and release
 old futures. A later foreground entry or song tap can retry a failed connection.
 
+Playback speed uses MediaController's standard Media3 command, preserving pitch.
+The full player's existing sheet offers 0.3×–4× in 0.05× steps; player events
+update both full and mini-player indicators. The service owns persistence: one
+300 ms deferred callback coalesces dragging into a small speed preference in
+`playback_position`, flushed on service destruction and restored before creating
+the media session. Speed changes do not rebuild or serialize the queue. No new
+service, decoder, dependency or progress timer is involved.
+
 Song and random-play requests go through this owner rather than a captured
 nullable controller. During connection, only the latest selected queue/track is
 retained; it runs once after readiness using current catalog records. Leaving

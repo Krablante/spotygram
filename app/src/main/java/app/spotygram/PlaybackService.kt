@@ -105,6 +105,13 @@ class PlaybackService : MediaSessionService() {
 
     private val saves = Channel<Saved>(Channel.CONFLATED)
     private val handler = Handler(Looper.getMainLooper())
+    // Dragging changes audio immediately, but only the settled speed writes a small preference.
+    private val persistSpeed = Runnable {
+        getSharedPreferences("playback_position", MODE_PRIVATE)
+            .edit()
+            .putFloat("speed", exo.playbackParameters.speed)
+            .apply()
+    }
     private val slide = Runnable {
         window(preserve = true)
         changed(false)
@@ -130,6 +137,11 @@ class PlaybackService : MediaSessionService() {
                 .setHandleAudioBecomingNoisy(true)
                 .setWakeMode(C.WAKE_MODE_NETWORK)
                 .build()
+        exo.setPlaybackSpeed(
+            getSharedPreferences("playback_position", MODE_PRIVATE)
+                .getFloat("speed", 1f)
+                .coerceIn(MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED)
+        )
         session =
             MediaSession.Builder(this, exo)
                 .setCallback(
@@ -209,6 +221,11 @@ class PlaybackService : MediaSessionService() {
             }
         exo.addListener(
             object : Player.Listener {
+                override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                    handler.removeCallbacks(persistSpeed)
+                    handler.postDelayed(persistSpeed, 300)
+                }
+
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     positionSaving?.cancel()
                     positionSaving =
@@ -654,6 +671,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(slide)
+        handler.removeCallbacks(persistSpeed)
+        persistSpeed.run()
         save()
         saves.close()
         positionSaving?.cancel()
