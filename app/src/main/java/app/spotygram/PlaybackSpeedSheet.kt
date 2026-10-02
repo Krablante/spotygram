@@ -139,23 +139,6 @@ fun PlaybackSpeedSheet(state: Playing, player: Player?, onClose: () -> Unit) {
                 }
             },
         )
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(24.dp)) {
-            listOf(0.3f, 1f, 2f, 3f, 4f).forEach { tick ->
-                val fraction =
-                    (tick - MIN_PLAYBACK_SPEED) / (MAX_PLAYBACK_SPEED - MIN_PLAYBACK_SPEED)
-                Box(
-                    Modifier.offset(x = (maxWidth - 28.dp) * fraction).width(28.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        playbackSpeedLabel(tick),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
         Row(
             Modifier.fillMaxWidth().padding(top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -1,5 +1,24 @@
 # Verification record
 
+## 0.13.1 — remove speed scale captions
+
+Removed the text scale below the speed slider, including its 24 dp row.
+Signed release assembly and full release Lint passed; both APKs passed signature
+verification with the established certificate and 16 KB ZIP alignment.
+VersionCode 25 / versionName 0.13.1. ARM64 SHA-256:
+`0cfe9ac950d12b352de71e14ce43c318ce40f2490de71274faf76fad4ed2da17`;
+x86-64 `65f769b49c1d01c4a4964dc9e1906732dafd26d1bfa04439c8fce1cbda51a320`.
+
+The signed update installed over 0.13.0 without clearing data; its installed
+APK hash matched. Actual Android 16 screens were inspected at 400 dp in both
+themes and at 320 dp with font scale 1.3. The scale captions were absent and
+the compact panel fit; the 1.5× preset applied successfully. Updated EN/RU
+documentation screenshots came from this APK. Inspected app/player error logs
+were empty. The emulator's recurring boot System UI ANR was dismissed before
+checks. Display, font scale and locale were restored, speed returned to 1×,
+and the emulator/Xvfb stopped. No tests or scaffolds were added. Physical-device
+and authenticated Telegram behavior were not retested for this UI deletion.
+
 ## 0.13.0 — playback speed
 
 The round button below Play opens the existing glass sheet with a linear
