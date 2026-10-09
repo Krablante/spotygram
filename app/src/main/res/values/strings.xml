@@ -54,6 +54,13 @@
     <string name="auth_privacy_help">"An unofficial Telegram API app. Signing in creates a session with account access; only selected chats are indexed for music. The session stays on this device."</string>
     <string name="back">"Back"</string>
     <string name="cancel">"Cancel"</string>
+    <string name="resume_long_audio">Remember audio positions</string>
+    <string name="resume_long_audio_help">Resume long recordings where you left off.</string>
+    <string name="resume_threshold">Audio duration threshold</string>
+    <string name="resume_threshold_minutes">%1$d min and longer</string>
+    <string name="resume_threshold_help">Save positions for recordings at least this long. Finished recordings start over. Playback speed does not affect the threshold.</string>
+    <string name="resume_minutes_label">Minutes</string>
+    <string name="resume_minutes_error">Enter a positive whole number of minutes.</string>
     <string name="change_order">"Change order"</string>
     <string name="channel_name_required">"Enter the @username of a public channel"</string>
     <string name="chat_search_complete">"Search in selected chats completed"</string>

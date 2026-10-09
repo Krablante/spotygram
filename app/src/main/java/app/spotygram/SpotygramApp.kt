@@ -26,6 +26,10 @@ class SpotygramApp : Application() {
     val downloading = MutableStateFlow(DownloadState())
     val theme = MutableStateFlow("system")
     val hideDuplicates by lazy { MutableStateFlow(prefs.getBoolean("hide_duplicates", true)) }
+    val resumeLongAudio by lazy { MutableStateFlow(prefs.getBoolean("resume_long_audio", true)) }
+    val resumeMinutes by lazy {
+        MutableStateFlow(prefs.getInt("resume_minutes", 30).coerceAtLeast(1))
+    }
 
     private val scanning = Mutex()
     private var scanJob: Job? = null
@@ -104,6 +108,21 @@ class SpotygramApp : Application() {
 
     fun localMode() {
         prefs.edit().putBoolean("local_mode", true).apply()
+    }
+
+    fun changeResumeLongAudio(value: Boolean) {
+        playback?.savePosition()
+        prefs.edit().putBoolean("resume_long_audio", value).apply()
+        resumeLongAudio.value = value
+        playback?.savePosition()
+    }
+
+    fun changeResumeMinutes(value: Int) {
+        if (value < 1) return
+        playback?.savePosition()
+        prefs.edit().putInt("resume_minutes", value).apply()
+        resumeMinutes.value = value
+        playback?.savePosition()
     }
 
     fun track(id: String) = library.state.value.byId[id]
@@ -621,6 +640,7 @@ class SpotygramApp : Application() {
         listeningCache.exclusive {
             scanJob?.cancelAndJoin()
             playback?.clear()
+            playback?.forgetTelegramProgress()
             stopService(Intent(this, DownloadService::class.java))
             telegram.request(json("logOut"))
             prefs.edit().putBoolean("telegram_connected", false).apply()

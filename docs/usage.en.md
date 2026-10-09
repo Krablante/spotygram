@@ -100,6 +100,33 @@ a subtle accent and the mini-player shows the value whenever speed differs from 
 
 <img src="screenshots/speed-light.png" width="300" alt="Playback speed panel with slider and quick choices">
 
+## Continue long recordings
+
+**Settings → Remember audio positions** is enabled by default for audio
+**30 minutes or longer**. Tap **Audio duration threshold** to enter your own positive
+whole number of minutes. The threshold uses the recording's original duration,
+regardless of playback speed, and includes recordings exactly at the threshold.
+
+Each library entry keeps its own position. Selecting it from Music, a playlist
+or the queue, or returning with Previous/Next, resumes there. Pausing and seeking
+update the position; listening in the background also saves it periodically.
+Reopening restores the queue without starting playback automatically. Short
+tracks retain the existing current-queue restoration, but a fresh selection
+starts them from the beginning.
+
+Finished recordings and repeat-one loops start from the beginning. To restart
+an unfinished recording, move its seek slider to the beginning or use the full
+player's Previous button while more than three seconds into it. Changing the
+threshold or disabling the feature retains existing positions for later use;
+disabled playback does not save new ones. Finishing a recording still clears its
+old position. Deleting a Telegram download leaves its position intact; removing
+the library entry or signing out removes the corresponding positions.
+
+Positions are saved about every five seconds while playing and immediately on
+pause, seek and track changes. An abrupt process kill can lose progress since the
+last completed save. Recordings with unknown duration qualify once the player
+learns their length. Positions stay on this device, without cloud synchronization.
+
 ## Favorites and playlists
 
 The heart beside a song adds it to **Favorites**. Tap again to remove the mark;

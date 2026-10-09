@@ -6,16 +6,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -33,6 +38,9 @@ fun SettingsSheet(
 ) {
     val theme by app.theme.collectAsStateWithLifecycle()
     val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
+    val resumeLongAudio by app.resumeLongAudio.collectAsStateWithLifecycle()
+    val resumeMinutes by app.resumeMinutes.collectAsStateWithLifecycle()
+    var editingResume by rememberSaveable { mutableStateOf(false) }
     var wifi by remember { mutableStateOf(app.prefs.getBoolean("wifi_only", false)) }
     val download by app.downloading.collectAsStateWithLifecycle()
     Column(
@@ -92,6 +100,38 @@ fun SettingsSheet(
             Modifier.padding(horizontal = 12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HorizontalDivider(
+            Modifier.padding(vertical = 16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        Row(
+            Modifier.fillMaxWidth()
+                .toggleable(
+                    value = resumeLongAudio,
+                    role = Role.Switch,
+                    onValueChange = app::changeResumeLongAudio,
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(tr(R.string.resume_long_audio))
+                Text(
+                    tr(R.string.resume_long_audio_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            GlassSwitch(checked = resumeLongAudio, onCheckedChange = null)
+        }
+        ListItem(
+            headlineContent = { Text(tr(R.string.resume_threshold)) },
+            supportingContent = { Text(tr(R.string.resume_threshold_minutes, resumeMinutes)) },
+            leadingContent = { Icon(Icons.Rounded.History, null) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+            modifier = Modifier.clickable { editingResume = true },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         HorizontalDivider(
             Modifier.padding(vertical = 16.dp),
@@ -235,5 +275,53 @@ fun SettingsSheet(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
+    }
+    if (editingResume) {
+        var value by rememberSaveable { mutableStateOf(resumeMinutes.toString()) }
+        val minutes = value.toIntOrNull()?.takeIf { it > 0 }
+        val apply = {
+            if (minutes != null) {
+                app.changeResumeMinutes(minutes)
+                editingResume = false
+            }
+        }
+        GlassDialog(
+            onDismissRequest = { editingResume = false },
+            title = { Text(tr(R.string.resume_threshold)) },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(tr(R.string.resume_threshold_help))
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { input ->
+                            if (input.length <= 10 && input.all { it in '0'..'9' }) value = input
+                        },
+                        label = { Text(tr(R.string.resume_minutes_label)) },
+                        singleLine = true,
+                        isError = minutes == null,
+                        supportingText =
+                            if (minutes == null) {
+                                { Text(tr(R.string.resume_minutes_error)) }
+                            } else null,
+                        keyboardOptions =
+                            KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Done,
+                            ),
+                        keyboardActions = KeyboardActions(onDone = { apply() }),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = apply, enabled = minutes != null) { Text(tr(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingResume = false }) { Text(tr(R.string.cancel)) }
+            },
+        )
     }
 }

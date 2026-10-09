@@ -160,6 +160,34 @@ a snapshot version. One conflated IO writer persists them. Reopening restores
 the position paused; neither a progress tick nor a random transition rewrites
 the full song list.
 
+Long-recording progress belongs to `PlaybackService`, alongside queue persistence.
+SQLite schema 5 adds `playback_progress`, keyed by catalog track ID with cascading
+deletion. It stores position, observed duration and file identity/size, without
+adding fields to UI library snapshots. Only entries with an unfinished position
+are loaded into the service's lookup. Fresh selections and Media3 transitions
+resume eligible entries; the default inclusive threshold is 30 minutes, with
+an enable switch and positive integer minutes in existing settings.
+Selection waits for the initial progress load, retaining only the latest start
+request; leaving the Activity cancels a start that has not yet run.
+
+The existing five-second playback checkpoint and pause/seek/lifecycle events
+capture progress. Before replacing a queue, the outgoing item is saved; native
+transitions use the old `PositionInfo`, before advancing the logical cursor.
+Completion, including repeat-one, retires that bookmark. Unknown lengths use
+the player's duration when available. Changed file identity/size and positions
+outside the current duration cannot resume. Removed restored queue entries do
+not transfer their old position to a replacement song.
+
+Dirty entries accompany immutable queue saves through the existing conflated IO
+writer. Each batch writes only changed progress rows in one transaction, and
+acknowledges only values still unchanged in the pending map. Coalescing therefore
+retains outgoing-track updates while avoiding full-catalog or queue rewrites.
+No additional timer, service, dependency or library reload runs on progress ticks.
+Disabling or raising the threshold retains bookmarks; completion and catalog
+deletion still remove them. Logout clears the service's Telegram lookup too.
+The seek slider owns its mutable drag value locally so a tap can read the new
+value on release without waiting for parent recomposition.
+
 ## Files and account state
 
 `TelegramDataSource` reads available ranges directly from TDLib's downloaded

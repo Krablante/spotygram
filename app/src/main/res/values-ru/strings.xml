@@ -56,6 +56,13 @@
     <string name="auth_privacy_help">"Неофициальное приложение на Telegram API. Вход создаёт сессию с доступом к аккаунту; музыку добавляем только из выбранных чатов. Сессия хранится на этом устройстве."</string>
     <string name="back">"Назад"</string>
     <string name="cancel">"Отмена"</string>
+    <string name="resume_long_audio">Запоминать позицию</string>
+    <string name="resume_long_audio_help">Длинные записи продолжаются с места остановки.</string>
+    <string name="resume_threshold">Порог длительности</string>
+    <string name="resume_threshold_minutes">От %1$d мин</string>
+    <string name="resume_threshold_help">Сохранять позицию записей такой длины и дольше. Дослушанные начинаются заново. Скорость не влияет на порог.</string>
+    <string name="resume_minutes_label">Минуты</string>
+    <string name="resume_minutes_error">Введите целое число минут больше нуля.</string>
     <string name="change_order">"Изменить порядок"</string>
     <string name="channel_name_required">"Укажите @имя публичного канала"</string>
     <string name="chat_search_complete">"Поиск в выбранных чатах завершён"</string>

@@ -32,6 +32,13 @@ data class Track(
         }
 }
 
+data class PlaybackProgress(
+    val position: Long,
+    val duration: Long,
+    val fileKey: String,
+    val size: Long,
+)
+
 data class Source(
     val id: Long,
     val title: String,

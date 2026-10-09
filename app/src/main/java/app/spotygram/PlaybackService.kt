@@ -87,6 +87,10 @@ class PlaybackService : MediaSessionService() {
     private var positionSaving: Job? = null
     private var restoringJob: Job? = null
     private var cleanupPosition: Long? = null
+    private var pendingStart: Job? = null
+    private val progress = mutableMapOf<String, PlaybackProgress>()
+    private val progressUpdates = mutableMapOf<String, PlaybackProgress?>()
+    private var observedDuration = 0L
     private lateinit var writer: Job
     private val mode
         get() = app.playbackMode.value
@@ -101,6 +105,7 @@ class PlaybackService : MediaSessionService() {
         val cursor: Int,
         val position: Long,
         val mode: PlaybackMode,
+        val progress: Map<String, PlaybackProgress?> = emptyMap(),
     )
 
     private val saves = Channel<Saved>(Channel.CONFLATED)
@@ -190,6 +195,15 @@ class PlaybackService : MediaSessionService() {
                 val queuePrefs = getSharedPreferences("playback_queue", MODE_PRIVATE)
                 val positionPrefs = getSharedPreferences("playback_position", MODE_PRIVATE)
                 for (s in saves) {
+                    if (s.progress.isNotEmpty()) {
+                        app.library.savePlaybackProgress(s.progress)
+                        withContext(Dispatchers.Main.immediate) {
+                            for ((id, value) in s.progress) {
+                                if (progressUpdates.containsKey(id) && progressUpdates[id] == value)
+                                    progressUpdates.remove(id)
+                            }
+                        }
+                    }
                     if (written != s.version) {
                         queuePrefs
                             .edit()
@@ -241,6 +255,7 @@ class PlaybackService : MediaSessionService() {
                 }
 
                 override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
+                    observedDuration = 0
                     if (editing || restoring || ids.isEmpty()) return
                     if (
                         reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
@@ -250,12 +265,34 @@ class PlaybackService : MediaSessionService() {
                             (cursor + exo.currentMediaItemIndex - anchor).coerceIn(path.indices)
                         // MediaSession must finish observing this transition before timeline edits.
                         anchor = exo.currentMediaItemIndex
+                        val resume = item?.mediaId?.let(::resumePosition) ?: 0
+                        if (resume > 0) exo.seekTo(resume)
                         handler.removeCallbacks(slide)
                         handler.post(slide)
                     }
                 }
 
+                override fun onPositionDiscontinuity(
+                    oldPosition: Player.PositionInfo,
+                    newPosition: Player.PositionInfo,
+                    reason: Int,
+                ) {
+                    if (editing || restoring) return
+                    val leftItem =
+                        oldPosition.mediaItemIndex != newPosition.mediaItemIndex ||
+                            oldPosition.mediaItem?.mediaId != newPosition.mediaItem?.mediaId
+                    if (leftItem || reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                        rememberPosition(
+                            oldPosition.mediaItem?.mediaId,
+                            oldPosition.positionMs,
+                            observedDuration,
+                            completed = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION,
+                        )
+                    }
+                }
+
                 override fun onEvents(player: Player, events: Player.Events) {
+                    if (exo.duration > 0) observedDuration = exo.duration
                     if (
                         events.containsAny(
                             Player.EVENT_POSITION_DISCONTINUITY,
@@ -291,6 +328,7 @@ class PlaybackService : MediaSessionService() {
         val initialGeneration = generation
         restoringJob = scope.launch {
             app.library.reload()
+            progress.putAll(app.library.playbackProgress())
             val restored = withContext(Dispatchers.IO) { restore() }
             if (generation == initialGeneration && restored != null) {
                 ids = restored.ids
@@ -309,6 +347,15 @@ class PlaybackService : MediaSessionService() {
     fun start(tracks: List<Track>, index: Int, order: PlaybackOrder = mode.order) {
         if (blockedByCleanup()) return
         if (index !in tracks.indices) return
+        if (restoring) {
+            pendingStart?.cancel()
+            pendingStart = scope.launch {
+                restoringJob?.join()
+                start(tracks, index, order)
+            }
+            return
+        }
+        savePosition()
         generation++
         restoring = false
         ids = tracks.map { it.id }
@@ -348,7 +395,7 @@ class PlaybackService : MediaSessionService() {
         cursor = path.indexOf(selected).coerceAtLeast(0)
     }
 
-    private fun window(preserve: Boolean = false, position: Long = 0) {
+    private fun window(preserve: Boolean = false, position: Long? = null) {
         handler.removeCallbacks(slide)
         if (ids.isEmpty()) {
             app.listeningCache.setWindow(emptyList())
@@ -405,7 +452,7 @@ class PlaybackService : MediaSessionService() {
                 exo.setMediaItems(
                     listOfNotNull(previous, item, next),
                     if (previous == null) 0 else 1,
-                    position,
+                    position ?: resumePosition(item.mediaId),
                 )
             }
             anchor = if (previous == null) 0 else 1
@@ -445,6 +492,7 @@ class PlaybackService : MediaSessionService() {
     fun select(index: Int) {
         if (blockedByCleanup()) return
         if (index !in ids.indices) return
+        savePosition()
         if (mode.random) resetOrder(index)
         else {
             val start = cursor / ids.size * ids.size
@@ -493,6 +541,7 @@ class PlaybackService : MediaSessionService() {
     private fun removeIndices(removed: Set<Int>) {
         if (blockedByCleanup()) return
         if (removed.isEmpty()) return
+        savePosition()
         val selected = current
         val retained = ids.indices.filter { it !in removed }
         val replacement = path.drop(cursor).firstOrNull { it !in removed } ?: retained.firstOrNull()
@@ -528,6 +577,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     fun clear() {
+        savePosition()
+        cancelPendingStart()
         generation++
         restoring = false
         ids = emptyList()
@@ -546,6 +597,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     fun pauseForCacheCleanup() {
+        savePosition()
         cleanupPosition = exo.currentPosition.coerceAtLeast(0)
         exo.pause()
         exo.stop()
@@ -565,7 +617,7 @@ class PlaybackService : MediaSessionService() {
         cleanupPosition = null
         val missing = ids.indices.filter { app.track(ids[it]) == null }.toSet()
         if (missing.isNotEmpty()) removeIndices(missing)
-        window(position = if (selected == ids.getOrNull(current)) position else 0)
+        window(position = if (selected == ids.getOrNull(current)) position else null)
         changed(false)
     }
 
@@ -575,8 +627,74 @@ class PlaybackService : MediaSessionService() {
         save()
     }
 
+    private fun eligible(duration: Long) =
+        app.resumeLongAudio.value && duration >= app.resumeMinutes.value * 60_000L
+
+    private fun resumePosition(id: String): Long {
+        val saved = progress[id] ?: return 0
+        val track = app.track(id) ?: return 0
+        val duration = (track.duration * 1000L).takeIf { it > 0 } ?: saved.duration
+        if (
+            !eligible(duration) ||
+                saved.position >= duration ||
+                (saved.fileKey.isNotEmpty() &&
+                    track.fileKey.isNotEmpty() &&
+                    saved.fileKey != track.fileKey) ||
+                (saved.size > 0 && track.size > 0 && saved.size != track.size)
+        )
+            return 0
+        return saved.position.coerceAtLeast(0)
+    }
+
+    private fun rememberPosition(
+        id: String?,
+        position: Long,
+        duration: Long,
+        completed: Boolean = false,
+    ) {
+        val track = id?.let(app::track) ?: return
+        val length =
+            duration.takeIf { it > 0 }
+                ?: (track.duration * 1000L).takeIf { it > 0 }
+                ?: progress[id]?.duration
+                ?: 0
+        // Completion also retires an older bookmark while the feature is disabled.
+        if (!completed && !eligible(length)) return
+        val value =
+            if (completed || position <= 0 || position >= length) null
+            else PlaybackProgress(position, length, track.fileKey, track.size)
+        if (progress[id] == value) return
+        if (value == null) progress.remove(id) else progress[id] = value
+        progressUpdates[id] = value
+    }
+
+    fun savePosition() {
+        save()
+    }
+
+    fun cancelPendingStart() {
+        pendingStart?.cancel()
+        pendingStart = null
+    }
+
+    fun forgetTelegramProgress() {
+        val removed = progress.keys.filter { app.track(it)?.chatId != 0L }
+        for (id in removed) {
+            progress.remove(id)
+            progressUpdates[id] = null
+        }
+        save()
+    }
+
     private fun save() {
-        if (!restoring && !editing)
+        if (!restoring && !editing) {
+            if (cleanupPosition == null)
+                rememberPosition(
+                    exo.currentMediaItem?.mediaId,
+                    exo.currentPosition,
+                    exo.duration,
+                    completed = exo.playbackState == Player.STATE_ENDED,
+                )
             saves.trySend(
                 Saved(
                     version,
@@ -587,8 +705,10 @@ class PlaybackService : MediaSessionService() {
                         if (exo.duration > 0 && it >= exo.duration) 0 else it
                     },
                     mode,
+                    progressUpdates.toMap(),
                 )
             )
+        }
     }
 
     private fun restore(): Saved? {
@@ -646,8 +766,17 @@ class PlaybackService : MediaSessionService() {
                 else restoredPath.indexOf(remap[rawOrder.optInt(rawCursor, -1)]).coerceAtLeast(0)
             }
         val c = oldCursor.coerceIn(restoredPath.indices)
+        val selectedId = restoredIds[restoredPath[c]]
+        val originalId =
+            raw.optString(
+                if (legacy) source.getInt("queue_index", 0)
+                else rawOrder.optInt(progress.getInt("cursor", 0), -1)
+            )
         val duration = (app.track(restoredIds[restoredPath[c]])?.duration ?: 0) * 1000L
-        val pos = progress.getLong(if (legacy) "queue_position" else "position", 0).coerceAtLeast(0)
+        val pos =
+            if (originalId == selectedId)
+                progress.getLong(if (legacy) "queue_position" else "position", 0).coerceAtLeast(0)
+            else resumePosition(selectedId)
         return Saved(
             version,
             restoredIds,
@@ -677,6 +806,7 @@ class PlaybackService : MediaSessionService() {
         saves.close()
         positionSaving?.cancel()
         restoringJob?.cancel()
+        cancelPendingStart()
         scope.launch {
             writer.join()
             scope.cancel()

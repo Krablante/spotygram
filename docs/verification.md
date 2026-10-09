@@ -1,5 +1,77 @@
 # Verification record
 
+## 0.14.0 — positions for long recordings
+
+The default inclusive threshold is 30 minutes, with an enable switch and a
+positive whole-minute setting. Per-track positions use SQLite schema 5 and the
+existing queue IO writer and five-second checkpoint. Pause, seek, selection,
+native transitions and Activity exit capture positions; completion clears them.
+No new dependency, service, timer, test file or fixture suite was added.
+
+Debug assembly and full debug Lint passed during implementation; final minified
+release assembly and full release Lint passed. Both
+release APKs use versionCode 26 / versionName 0.14.0 and the established signing
+certificate. The signed x86-64 update installed over 0.13.1 without clearing data.
+Migration 4 → 5 preserved all three complete track rows, favorite flags and paths,
+both playlists and all three memberships; SQLite integrity was `ok`.
+Both final APKs passed signature verification and 16 KB ZIP alignment. The
+installed final `base.apk` matched the x86-64 artifact. SHA-256: ARM64
+`d1924f007e9bc84bd22ad9fc98c5156a706922908ee774d8b71ee8a29f2118ab`;
+x86-64 `183b944689c2570d09a6de570706780a187b4607ff1f10a7abe35ac22c779849`.
+
+Manual Android 16 x86-64 checks used existing recordings and one temporary,
+30-minute silent Opus import in the separate debug installation:
+
+- The actual player duration was 1,800,006 ms. The default 30-minute threshold
+  saved its position; library selection and Previous/Next resumed it around
+  18:35 in the initial checks and 19:20 with the final playback code. Cold launch
+  retained the saved queue position without automatically playing.
+- A 31-minute threshold with saving enabled started that recording from zero.
+  Returning the threshold to 30 while another recording was selected retained
+  the earlier bookmark and resumed it. Disabling saving started a fresh selection
+  at zero, survived force-stop/relaunch and retained the earlier bookmark for
+  re-enabling from another recording.
+- Natural completion advanced to the next recording and removed the old position;
+  selecting the completed recording started at zero. Repeat-one passed through
+  the end and stayed on that recording near the beginning, rather than restoring
+  its earlier position. Seeking back to zero removed its bookmark.
+- In the signed installation, entering one minute applied the new threshold.
+  Fur Elise saved a paused position at 112,738 ms; selecting The-Entertainer and
+  then Fur Elise through the queue resumed at 112,746 ms. Restoring 30 minutes
+  made a fresh selection of the short recording start at zero.
+- A short seek-slider tap reached about 86 seconds in Fur Elise and 19:20 in the
+  30-minute recording. The previous slider captured a stale nullable parent value
+  on a tap; the transport now reads its own mutable state when the gesture ends.
+- Zero showed a validation message and disabled Save; a valid value applied only
+  on confirmation. The enable preference and changed minute value persisted.
+
+Final signed screens were inspected in English at 400 dp and Russian at 320 dp
+with font scale 1.3, in both light and dark appearances. Shortened labels kept the
+whole threshold row visible at the narrow size. The dialog's input, validation
+message and buttons remained reachable with the numeric keyboard open; empty
+input visibly disabled Save. The existing Settings documentation image was
+refreshed from the final APK.
+
+File replacement/size validation, unknown-duration fallback, logout, cache
+cleanup and restoration with a removed current queue entry were reviewed in
+source, rather than simulated as authenticated Telegram cases. Five-second
+checkpoints bound routine writes; an abrupt process kill can lose progress since
+the last completed save. No claim is made about physical ARM64 behavior, OEM
+background restrictions, large-catalog performance, phone power use or real
+Telegram seeking in this cycle.
+
+The temporary import and its shared Downloads copy were removed. All four
+original debug track rows matched their baseline and the progress table was
+empty, with integrity `ok`. Only the two newly created diagnostic positions in
+the signed installation were cleared after checks; library content was retained.
+The emulator's recurring cold-boot System UI ANR was dismissed before app checks.
+Inspected AndroidRuntime and Spotygram playback-error logs were empty. Builds and
+emulator ran sequentially with two-core limits and bounded memory.
+The final signed catalog still matched the original track, playlist and membership
+rows exactly. Saving was left enabled at 30 minutes; density 192, font scale 1.0,
+the original English app locale and dark appearance were restored. Android data
+was synchronized before gracefully stopping the emulator; Xvfb was stopped too.
+
 ## 0.13.1 — remove speed scale captions
 
 Removed the text scale below the speed slider, including its 24 dp row.

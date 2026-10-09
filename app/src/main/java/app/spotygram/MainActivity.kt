@@ -74,6 +74,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        app.playback?.cancelPendingStart()
+        app.playback?.savePosition()
         playerConnection.stop()
         super.onStop()
     }

@@ -69,6 +69,10 @@ The round speed button below Play opens a **0.3×–4×** slider, fine adjustmen
 and quick choices. Speed changes keep the original pitch and carry across songs
 and app restarts. Tap **1×** to return to normal; the mini-player shows altered speed.
 
+Recordings **30 minutes or longer** remember where you stopped, including after
+switching tracks or reopening the app. Change the duration threshold or turn this
+off in Settings. Finished recordings start over.
+
 Downloaded songs are available under **On device**. The interface comes in
 English and Russian, with light and dark appearances. The initial appearance
 follows the phone until you choose one in Settings.

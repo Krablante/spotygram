@@ -43,7 +43,6 @@ fun PlayerScreen(
     onRepeat: (Int) -> Unit,
 ) {
     val progress = observePlayer(player, positionUpdates = true)
-    var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
     val largeText = LocalConfiguration.current.fontScale > 1.2f
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val wide = maxWidth >= 600.dp && maxWidth > maxHeight
@@ -125,8 +124,6 @@ fun PlayerScreen(
                             state,
                             progress,
                             player,
-                            scrub,
-                            { scrub = it },
                             { onDownload() },
                             { onQueue() },
                             onSpeed,
@@ -143,8 +140,6 @@ fun PlayerScreen(
                     state,
                     progress,
                     player,
-                    scrub,
-                    { scrub = it },
                     { onDownload() },
                     { onQueue() },
                     onSpeed,
@@ -198,14 +193,13 @@ private fun PlayerTransport(
     state: Playing,
     progress: Playing,
     player: Player?,
-    scrub: Float?,
-    onScrub: (Float?) -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
     onSpeed: () -> Unit,
     onShuffle: () -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
+    var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
     Column(Modifier.fillMaxWidth()) {
         Spacer(Modifier.height(16.dp))
         val duration = progress.duration.takeIf { it > 0 } ?: track.duration * 1000L
@@ -215,10 +209,10 @@ private fun PlayerTransport(
                     ?: progress.position
                         .toFloat()
                         .coerceIn(0f, duration.toFloat().coerceAtLeast(1f)),
-            onValueChange = { onScrub(it) },
+            onValueChange = { scrub = it },
             onValueChangeFinished = {
                 scrub?.let { player?.seekTo(it.toLong()) }
-                onScrub(null)
+                scrub = null
             },
             valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
             enabled = duration > 0,

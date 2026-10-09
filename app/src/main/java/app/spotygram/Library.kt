@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 4) {
+class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 5) {
     val state = MutableStateFlow(LibraryState())
     private val publishing = Mutex()
 
@@ -31,9 +31,11 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
         )
         db.execSQL("CREATE TABLE downloads(track TEXT PRIMARY KEY,position INTEGER)")
         createTemporaryStorage(db)
+        createPlaybackProgress(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 5) createPlaybackProgress(db)
         if (oldVersion < 4) {
             db.execSQL("ALTER TABLE tracks ADD COLUMN file_key TEXT DEFAULT ''")
             db.execSQL("ALTER TABLE tracks ADD COLUMN remote_id TEXT DEFAULT ''")
@@ -53,6 +55,54 @@ class Library(context: Context) : SQLiteOpenHelper(context, "library.db", null, 
             db.execSQL("ALTER TABLE sources ADD COLUMN documents_complete INTEGER DEFAULT 0")
         }
     }
+
+    private fun createPlaybackProgress(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE playback_progress(track TEXT PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,position INTEGER NOT NULL,duration INTEGER NOT NULL,file_key TEXT NOT NULL,size INTEGER NOT NULL)"
+        )
+    }
+
+    suspend fun playbackProgress(): Map<String, PlaybackProgress> =
+        withContext(Dispatchers.IO) {
+            buildMap {
+                readableDatabase
+                    .rawQuery(
+                        "SELECT track,position,duration,file_key,size FROM playback_progress",
+                        null,
+                    )
+                    .use { c ->
+                        while (c.moveToNext()) put(
+                            c.getString(0),
+                            PlaybackProgress(
+                                c.getLong(1),
+                                c.getLong(2),
+                                c.getString(3),
+                                c.getLong(4),
+                            ),
+                        )
+                    }
+            }
+        }
+
+    suspend fun savePlaybackProgress(updates: Map<String, PlaybackProgress?>) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                for ((id, progress) in updates) {
+                    if (progress == null) delete("playback_progress", "track=?", arrayOf(id))
+                    else
+                        execSQL(
+                            "INSERT OR REPLACE INTO playback_progress(track,position,duration,file_key,size) SELECT id,?,?,?,? FROM tracks WHERE id=?",
+                            arrayOf<Any>(
+                                progress.position,
+                                progress.duration,
+                                progress.fileKey,
+                                progress.size,
+                                id,
+                            ),
+                        )
+                }
+            }
+        }
 
     private fun createTemporaryStorage(db: SQLiteDatabase) {
         db.execSQL("CREATE INDEX tracks_key ON tracks(file_key)")
