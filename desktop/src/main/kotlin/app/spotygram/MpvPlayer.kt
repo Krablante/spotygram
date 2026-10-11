@@ -291,7 +291,7 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     }
     override fun play() {
         wanted = true
-        if (prepared && state == Player.STATE_READY) Mpv.api.mpv_set_property_string(handle, "pause", "no")
+        if (prepared && readyGeneration == generation) Mpv.api.mpv_set_property_string(handle, "pause", "no")
         emit(Player.EVENT_PLAY_WHEN_READY_CHANGED)
     }
     override fun pause() {

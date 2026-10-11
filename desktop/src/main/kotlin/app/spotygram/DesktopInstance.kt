@@ -13,7 +13,8 @@ import org.json.JSONArray
 class DesktopInstance(private val directory: File) : AutoCloseable {
     private val channel = FileChannel.open(File(directory, "application.lock").toPath(),
         StandardOpenOption.CREATE, StandardOpenOption.WRITE)
-    private val lock: FileLock? = runCatching { channel.tryLock() }.getOrNull()
+    private val lock: FileLock? = try { channel.tryLock() }
+        catch (error: Exception) { channel.close(); throw error }
     val primary get() = lock != null
     private val requests = File(directory, "requests").apply { mkdirs() }
     private var watcher: java.nio.file.WatchService? = null

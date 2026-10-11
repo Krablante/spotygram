@@ -14,20 +14,27 @@ import org.json.JSONObject
 
 class SpotygramApp(val platform: Platform) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    val filesDir get() = platform.filesDir
-    val cacheDir get() = platform.cacheDir
+    val filesDir
+        get() = platform.filesDir
+
+    val cacheDir
+        get() = platform.cacheDir
+
     val backActions = BackActions()
     val language = MutableStateFlow(platform.locale.language)
     val languagePicker = MutableStateFlow(false)
     val updateRestartRequested = MutableStateFlow(false)
     val updateApplyRequested = MutableStateFlow(false)
-    fun getSharedPreferences(name: String, mode: Int = 0) = platform.preferences(name)
+
+    fun getSharedPreferences(name: String) = platform.preferences(name)
+
     lateinit var library: Library
     lateinit var telegram: Telegram
     val prefs by lazy { platform.preferences("settings") }
     val notices = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val playbackCheckpoints = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val busy = MutableStateFlow(false)
+    val startupError = MutableStateFlow("")
     val downloading = MutableStateFlow(DownloadState())
     val theme = MutableStateFlow("system")
     val hideDuplicates by lazy { MutableStateFlow(prefs.getBoolean("hide_duplicates", true)) }
@@ -37,8 +44,9 @@ class SpotygramApp(val platform: Platform) {
     }
 
     private val scanning = Mutex()
+    private val updating = Mutex()
     private var scanJob: Job? = null
-    private lateinit var libraryReady: Job
+    private lateinit var libraryReady: Deferred<Unit>
     private val artworkSlots = Semaphore(2)
     private val thumbnails = ConcurrentHashMap<String, Int>()
     private val resolvedFiles = ConcurrentHashMap<String, Int>()
@@ -55,16 +63,44 @@ class SpotygramApp(val platform: Platform) {
     fun start() {
         AppText.initialize(platform)
         library = Library(platform)
-        telegram = Telegram(platform, scope)
+        telegram =
+            Telegram(platform, scope) {
+                scanJob?.cancelAndJoin()
+                updating.withLock {
+                    while (telegram.updates.tryReceive().isSuccess) {
+                        /* Drop events from the closed client. */
+                    }
+                    val bound = resolvedFiles.isNotEmpty()
+                    resolvedFiles.clear()
+                    thumbnails.clear()
+                    artworkFiles.clear()
+                    if (bound) {
+                        try {
+                            awaitLibrary()
+                            library.clearFileBindings()
+                        } catch (e: Exception) {
+                            notices.tryEmit(friendly(e))
+                        }
+                    }
+                }
+            }
         theme.value = prefs.getString("theme", "system") ?: "system"
-        libraryReady = action {
-            library.reload()
-            library.verifyFiles()
+        libraryReady = scope.async {
+            try {
+                library.verifyFiles()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                startupError.value = tr(R.string.library_open_failed)
+                throw e
+            }
         }
         scope.launch {
             for (update in telegram.updates) {
                 try {
-                    handleUpdate(update)
+                    updating.withLock {
+                        awaitLibrary()
+                        handleUpdate(update)
+                    }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                 }
@@ -100,7 +136,9 @@ class SpotygramApp(val platform: Platform) {
         }
     }
 
-    suspend fun awaitLibrary() { libraryReady.join() }
+    suspend fun awaitLibrary() {
+        libraryReady.await()
+    }
 
     suspend fun close() {
         scanJob?.cancelAndJoin()
@@ -227,7 +265,7 @@ class SpotygramApp(val platform: Platform) {
     }
 
     suspend fun refresh() = scanning.withLock {
-        libraryReady.join()
+        awaitLibrary()
         if (telegram.auth.value.type != "authorizationStateReady") return@withLock
         scanJob = currentCoroutineContext().job
         busy.value = true
@@ -305,10 +343,13 @@ class SpotygramApp(val platform: Platform) {
                     messages.getJSONObject(it).getLong("id")
                 } ?: 0L
             newest = maxOf(newest, pageNewest)
+            val sourceTitle =
+                library.state.value.sources.firstOrNull { it.id == source.id }?.title
+                    ?: source.title
             val tracks =
                 withContext(Dispatchers.Default) {
                     (0 until messages.length()).mapNotNull {
-                        parseTrack(messages.getJSONObject(it), source.title)
+                        parseTrack(messages.getJSONObject(it), sourceTitle)
                     }
                 }
             library.upsert(tracks)
@@ -406,11 +447,17 @@ class SpotygramApp(val platform: Platform) {
 
     private suspend fun handleUpdate(update: JSONObject) {
         when (update.kind()) {
+            "updateChatTitle" -> {
+                val id = update.getLong("chat_id")
+                val title = update.getString("title")
+                if (library.state.value.sources.any { it.id == id && it.title != title })
+                    library.sourceTitle(id, title)
+            }
             "spotygramFileComplete" -> {
                 val id = update.getInt("id")
                 val path = update.getString("path")
                 val artwork = artworkFiles.remove(id)
-                if (artwork != null) artwork.forEach { library.art(it, path) }
+                if (artwork != null) library.art(artwork, path)
                 else if (library.state.value.tracks.any { it.fileId == id }) {
                     library.file(id, path)
                     listeningCache.signal()
@@ -426,9 +473,11 @@ class SpotygramApp(val platform: Platform) {
                                     it.copy(
                                         duration = (metadata.duration / 1000).toInt(),
                                         title =
-                                            metadata.title.takeIf { s -> s.isNotBlank() } ?: it.title,
+                                            metadata.title.takeIf { s -> s.isNotBlank() }
+                                                ?: it.title,
                                         artist =
-                                            metadata.artist.takeIf { s -> s.isNotBlank() } ?: it.artist,
+                                            metadata.artist.takeIf { s -> s.isNotBlank() }
+                                                ?: it.artist,
                                     )
                                 }
                             )
@@ -449,10 +498,7 @@ class SpotygramApp(val platform: Platform) {
             }
             "updateMessageContent" -> {
                 val existing =
-                    library.state.value.tracks.firstOrNull {
-                        it.chatId == update.optLong("chat_id") &&
-                            it.messageId == update.optLong("message_id")
-                    } ?: return
+                    track("${update.getLong("chat_id")}:${update.getLong("message_id")}") ?: return
                 val message =
                     telegram.request(
                         json(
@@ -565,45 +611,64 @@ class SpotygramApp(val platform: Platform) {
 
     suspend fun importAudio(name: String, open: () -> InputStream) =
         withContext(Dispatchers.IO) {
+            awaitLibrary()
             val dir = File(filesDir, "imports").apply { mkdirs() }
             val id = UUID.randomUUID().toString()
             val file = File(dir, id)
+            val artwork = File(dir, "$id.jpg")
+            var stored = false
             try {
                 open().use { input ->
-                    file.outputStream().use { input.copyTo(it) }
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                        }
+                    }
                 }
                 val metadata = platform.metadata(file.path, name)
                 require(metadata.duration > 0) { tr(R.string.audio_read_failed) }
                 val art =
                     metadata.artwork
                         ?.takeIf { it.size < 8 * 1024 * 1024 }
-                        ?.let { data -> File(dir, "$id.jpg").apply { writeBytes(data) }.path }
+                        ?.let { data -> artwork.apply { writeBytes(data) }.path }
                         .orEmpty()
-                library.upsert(
-                    listOf(
-                        Track(
-                            "local:$id",
-                            0,
-                            0,
-                            0,
-                            metadata.title.takeIf { it.isNotBlank() }
-                                ?: name.substringBeforeLast('.').ifBlank {
-                                    tr(R.string.audio_recording)
-                                },
-                            metadata.artist,
-                            (metadata.duration / 1000).toInt(),
-                            file.length(),
-                            tr(R.string.from_device),
-                            System.currentTimeMillis() / 1000,
-                            art,
-                            file.path,
+                currentCoroutineContext().ensureActive()
+                // Once SQLite owns the entry, cancellation or a failed reload must keep its files.
+                withContext(NonCancellable) {
+                    library.upsert(
+                        listOf(
+                            Track(
+                                "local:$id",
+                                0,
+                                0,
+                                0,
+                                metadata.title.takeIf { it.isNotBlank() }
+                                    ?: name.substringBeforeLast('.').ifBlank {
+                                        tr(R.string.audio_recording)
+                                    },
+                                metadata.artist,
+                                (metadata.duration / 1000).toInt(),
+                                file.length(),
+                                tr(R.string.from_device),
+                                System.currentTimeMillis() / 1000,
+                                art,
+                                file.path,
+                            )
                         )
                     )
-                )
+                    stored = true
+                }
                 library.reload()
                 notices.emit(tr(R.string.import_complete))
             } catch (e: Exception) {
-                file.delete()
+                if (!stored) {
+                    file.delete()
+                    artwork.delete()
+                }
                 throw e
             }
         }

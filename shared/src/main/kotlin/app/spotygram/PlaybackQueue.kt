@@ -235,24 +235,32 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         )
         val initialGeneration = generation
         restoringJob = scope.launch {
-            app.library.reload()
-            progress.putAll(app.library.playbackProgress())
-            val restored = withContext(Dispatchers.IO) { restore() }
-            if (generation == initialGeneration && restored != null) {
-                ids = restored.ids
-                path = restored.path
-                cursor = restored.cursor
-                app.playbackMode.value = restored.mode
-                if (app.musicCache.state.value.clearing) cleanupPosition = restored.position
-                else window(position = restored.position)
+            try {
+                app.awaitLibrary()
+                progress.putAll(app.library.playbackProgress())
+                val restored = withContext(Dispatchers.IO) { restore() }
+                if (generation == initialGeneration && restored != null) {
+                    ids = restored.ids
+                    path = restored.path
+                    cursor = restored.cursor
+                    app.playbackMode.value = restored.mode
+                    if (app.musicCache.state.value.clearing) cleanupPosition = restored.position
+                    else window(position = restored.position)
+                }
+                restoring = false
+                changed()
+                app.listeningCache.ready()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                cancelPendingStart()
+                restoring = false
+                app.notices.emit(friendly(e))
             }
-            restoring = false
-            changed()
-            app.listeningCache.ready()
         }
     }
 
     fun start(tracks: List<Track>, index: Int, order: PlaybackOrder = mode.order) {
+        if (app.startupError.value.isNotEmpty()) return
         if (blockedByCleanup()) return
         if (index !in tracks.indices) return
         if (restoring) {
@@ -595,7 +603,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
     }
 
     private fun save() {
-        if (!restoring && !editing) {
+        if (!restoring && !editing && app.startupError.value.isEmpty()) {
             if (cleanupPosition == null)
                 rememberPosition(
                     exo.currentMediaItem?.mediaId,

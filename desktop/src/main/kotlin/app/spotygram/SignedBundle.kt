@@ -105,6 +105,8 @@ object SignedBundle {
             hardLinks.forEach { (name, source) ->
                 val from = destination(directory, source)
                 require(Files.isRegularFile(from, LinkOption.NOFOLLOW_LINKS))
+                expanded += Files.size(from)
+                require(expanded <= MAX_EXPANDED)
                 val to = destination(directory, name)
                 Files.createDirectories(to.parent)
                 Files.copy(from, to)

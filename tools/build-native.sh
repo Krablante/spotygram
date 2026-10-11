@@ -2,6 +2,9 @@
 set -euo pipefail
 ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 : "${SPOTYGRAM_STATE:?Set SPOTYGRAM_STATE to a directory outside the source tree}"
+SPOTYGRAM_STATE=$(realpath -m "$SPOTYGRAM_STATE")
+export SPOTYGRAM_STATE
+case "$SPOTYGRAM_STATE/" in "$ROOT/"*) printf 'SPOTYGRAM_STATE must be outside source.\n' >&2; exit 2 ;; esac
 : "${ANDROID_HOME:?Set ANDROID_HOME to your Android SDK}"
 NDK="$ANDROID_HOME/ndk/28.2.13676358"
 JOBS=${SPOTYGRAM_JOBS:-2}

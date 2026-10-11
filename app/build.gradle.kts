@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-val buildState = providers.environmentVariable("SPOTYGRAM_STATE").orElse("${rootDir}/native").get()
+val buildState = rootProject.extra["spotygramState"] as String
 val credentials =
     Properties().apply {
         val file = file("$buildState/telegram.env")
@@ -33,7 +33,7 @@ android {
         applicationId = "app.spotygram"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
+        versionCode = 28
         versionName = rootProject.version.toString()
         buildConfigField("int", "TELEGRAM_API_ID", credential("TELEGRAM_API_ID").ifBlank { "0" })
         buildConfigField("String", "TELEGRAM_API_HASH", "\"${credential("TELEGRAM_API_HASH")}\"")

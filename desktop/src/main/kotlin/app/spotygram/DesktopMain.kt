@@ -46,9 +46,13 @@ fun main(arguments: Array<String>) {
         JOptionPane.showMessageDialog(null, error.message, "Spotygram", JOptionPane.ERROR_MESSAGE)
         return
     }
-    val instance = DesktopInstance(platform.filesDir)
+    val instance = try { DesktopInstance(platform.filesDir) } catch (error: Exception) {
+        platform.close()
+        JOptionPane.showMessageDialog(null, error.message, "Spotygram", JOptionPane.ERROR_MESSAGE)
+        return
+    }
     if (!instance.primary) {
-        instance.forward(arguments.toList())
+        if (arguments.firstOrNull() != "--update-job") instance.forward(arguments.toList())
         instance.close()
         platform.close()
         return
@@ -56,8 +60,11 @@ fun main(arguments: Array<String>) {
     var started: SpotygramApp? = null
     try {
         prepareDesktopGraphics(platform.cacheDir)
+        val model = SpotygramApp(platform).also { started = it }.apply { start() }
+        // The updater may acknowledge only a catalog that actually opened and reconciled.
+        kotlinx.coroutines.runBlocking { model.awaitLibrary() }
         application {
-            val app = remember { SpotygramApp(platform).also { started = it }.apply { start() } }
+            val app = remember { model }
             val engine = remember { MpvPlayer(app) }
             val queue = remember { PlaybackQueue(app, engine) }
             val controls = remember { PlaybackControls(app, engine) }
@@ -86,31 +93,39 @@ fun main(arguments: Array<String>) {
                 owner.lifecycle.currentState = Lifecycle.State.DESTROYED
                 scope.launch {
                     media?.close()
-                    instance.close()
                     app.close()
                     withContext(Dispatchers.IO) { platform.close() }
+                    instance.close()
                     exitApplication()
                 }
             }
-            fun importFile(address: String) {
+            fun importAddresses(addresses: List<String>) {
                 app.action {
-                    val file = if (address.startsWith("file:")) File(URI(address)) else File(address)
-                    require(file.isFile) { tr(R.string.file_unavailable) }
-                    app.importAudio(file.name) { file.inputStream() }
-                    app.localMode()
+                    for (address in addresses) {
+                        try {
+                            val file = if (address.startsWith("file:")) File(URI(address)) else File(address)
+                            require(file.isFile) { tr(R.string.file_unavailable) }
+                            app.importAudio(file.name) { file.inputStream() }
+                            app.localMode()
+                        } catch (error: Exception) {
+                            if (error is kotlinx.coroutines.CancellationException) throw error
+                            app.notices.emit(friendly(error))
+                        }
+                    }
                 }
             }
+            fun importFile(address: String) = importAddresses(listOf(address))
             fun importFiles() {
                 FileDialog(null as java.awt.Frame?, tr(R.string.import_files), FileDialog.LOAD).apply {
                     isMultipleMode = true
                     isVisible = true
-                    files.forEach { importFile(it.absolutePath) }
+                    importAddresses(files.map { it.absolutePath })
                     dispose()
                 }
             }
             fun activate(values: List<String>) {
                 show()
-                values.filterNot { it.startsWith("--") }.forEach(::importFile)
+                importAddresses(values.filterNot { it.startsWith("--") })
             }
             LaunchedEffect(Unit) {
                 owner.lifecycle.currentState = Lifecycle.State.STARTED
@@ -131,8 +146,8 @@ fun main(arguments: Array<String>) {
             LaunchedEffect(applyUpdate) { if (applyUpdate) quit() }
             Window(
                 onCloseRequest = {
-                    if (engine.playWhenReady && engine.playbackState != Player.STATE_ENDED || app.downloading.value.queued > 0 ||
-                        app.updates.installer.state.value.phase == InstallPhase.DOWNLOADING) {
+                    if (engine.playWhenReady && engine.playbackState != Player.STATE_ENDED || app.downloadService?.running == true ||
+                        app.updates.installer.state.value.phase in setOf(InstallPhase.DOWNLOADING, InstallPhase.VERIFYING)) {
                         if (traySupported) visible = false else windowState.isMinimized = true
                     } else quit()
                 },

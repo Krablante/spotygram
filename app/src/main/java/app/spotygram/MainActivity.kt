@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        receiveShared(intent)
+        if (savedInstanceState == null) receiveShared(intent)
         setContent {
             val mode by app.theme.collectAsStateWithLifecycle()
             val dark = mode == "dark" || (mode == "system" && isSystemInDarkTheme())
@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         receiveShared(intent)
     }
 

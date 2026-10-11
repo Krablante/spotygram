@@ -14,6 +14,7 @@ import zipfile
 
 TD_VERSION = "0.1008067.0"
 MPV_RELEASE = "20260906162952"
+ROOT = Path(__file__).resolve().parent.parent
 TARGETS = {
     "linux-x64": (
         "linux-x64-glibc",
@@ -87,6 +88,8 @@ def unpack(archive, directory):
 
 
 def prepare(target, state):
+    if state == ROOT or ROOT in state.parents:
+        raise RuntimeError("Build state must be outside the source checkout")
     package, td_integrity, mpv_name, mpv_sha = TARGETS[target]
     destination = state / "desktop" / "deps" / target
     identity = json.dumps([TD_VERSION, td_integrity, mpv_name, mpv_sha])

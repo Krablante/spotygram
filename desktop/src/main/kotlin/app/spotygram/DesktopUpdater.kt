@@ -58,12 +58,22 @@ object DesktopUpdater {
         return Helper(job, process)
     }
     fun abort(helper: Helper) {
-        helper.process.destroy()
-        if (!helper.process.waitFor(5, TimeUnit.SECONDS)) {
-            helper.process.destroyForcibly()
-            check(helper.process.waitFor(5, TimeUnit.SECONDS))
-        }
+        stop(helper.process)
         SignedBundle.remove(helper.directory)
+    }
+    private fun stop(process: Process) {
+        // Windows jpackage launchers can host the JVM in a child process.
+        // Capture descendants before stopping the launcher, while ownership is still known.
+        val family = process.toHandle().descendants().use { it.toList() }.asReversed() + process.toHandle()
+        family.filter { it.isAlive }.forEach { it.destroy() }
+        for (member in family) {
+            if (!member.isAlive) continue
+            try { member.onExit().get(5, TimeUnit.SECONDS) }
+            catch (_: java.util.concurrent.TimeoutException) {
+                member.destroyForcibly()
+                member.onExit().get(5, TimeUnit.SECONDS)
+            }
+        }
     }
     fun finishHelper(job: File): Boolean {
         if (!job.isDirectory) return true
@@ -109,18 +119,19 @@ object DesktopUpdater {
                 Files.move(backup.toPath(), installed.toPath(), StandardCopyOption.ATOMIC_MOVE)
                 throw error
             }
-            val process = launcher(installed, "--update-job", job.absolutePath).start()
-            val deadline = System.nanoTime() + 60_000_000_000L
-            while (!File(job, "acknowledged").isFile && process.isAlive && System.nanoTime() < deadline)
-                Thread.sleep(200)
-            if (!File(job, "acknowledged").isFile) {
-                process.destroy()
-                process.waitFor(10, TimeUnit.SECONDS)
-                if (process.isAlive) process.destroyForcibly().waitFor(10, TimeUnit.SECONDS)
+            var process: Process? = null
+            try {
+                process = launcher(installed, "--update-job", job.absolutePath).start()
+                val deadline = System.nanoTime() + 60_000_000_000L
+                while (!File(job, "acknowledged").isFile && process.isAlive && System.nanoTime() < deadline)
+                    Thread.sleep(200)
+                check(File(job, "acknowledged").isFile) { "Updated application did not acknowledge startup" }
+            } catch (error: Throwable) {
+                process?.let(::stop)
                 SignedBundle.remove(installed)
                 Files.move(backup.toPath(), installed.toPath(), StandardCopyOption.ATOMIC_MOVE)
                 launcher(installed).start()
-                error("Updated application did not acknowledge startup; restored the previous version")
+                throw IllegalStateException("Restored the previous application after failed startup", error)
             }
             SignedBundle.remove(backup)
             File(job, "finished").writeText("installed")

@@ -51,6 +51,7 @@ fun SpotygramUI(
     val mode by app.playbackMode.collectAsStateWithLifecycle()
     val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
     val cache by app.musicCache.state.collectAsStateWithLifecycle()
+    val startupError by app.startupError.collectAsStateWithLifecycle()
     val playing =
         observePlayer(player)
             .copy(shuffle = mode.shuffle, random = mode.random, repeat = mode.repeat)
@@ -209,6 +210,10 @@ fun SpotygramUI(
                     }
                 }
                 when {
+                    startupError.isNotEmpty() ->
+                        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text(startupError, style = MaterialTheme.typography.bodyLarge)
+                        }
                     authVisible ->
                         AuthScreen(
                             app,

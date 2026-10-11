@@ -18,7 +18,8 @@
 | java-keyring | 1.0.0 | BSD-3-Clause |
 | jaudiotagger | 3.0.1 | LGPL 2.1+ |
 | Nucleus media-control / core-runtime | 2.5.0, [Nucleus](https://github.com/NucleusFramework/Nucleus/tree/v2.5.0) | MIT; встроенный код сохраняет свои уведомления |
-| Apache Commons Compress / ZXing core | 1.27.1 / 3.5.4 | Apache 2.0 |
+| Apache Commons Compress | 1.28.0; Commons Lang 3.18.0, IO 2.20.0 и Codec 1.19.0 | Apache 2.0 |
+| ZXing core | 3.5.4 | Apache 2.0 |
 | JSON-java | 20250517 | Public domain |
 | Встроенный Java-рантайм desktop | JDK 21 сборочного runner | GPL 2 с Classpath Exception и уведомления компонентов |
 

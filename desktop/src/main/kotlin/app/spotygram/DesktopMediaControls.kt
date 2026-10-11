@@ -19,7 +19,11 @@ class DesktopMediaControls(private val app: SpotygramApp, private val player: Pl
     init {
         MediaControlService.configure("org.mpris.MediaPlayer2.app.spotygram", "Spotygram")
         MediaControlService.attach { event -> when (event) {
-            MediaControlEvent.Play -> if (!player.isPlaying) togglePlayback(player)
+            MediaControlEvent.Play -> {
+                if (player.playbackState == Player.STATE_ENDED) player.seekToDefaultPosition()
+                player.prepare()
+                player.play()
+            }
             MediaControlEvent.Pause -> player.pause()
             MediaControlEvent.Toggle -> togglePlayback(player)
             MediaControlEvent.Next -> player.seekToNextMediaItem()

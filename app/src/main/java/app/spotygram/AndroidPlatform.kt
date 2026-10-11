@@ -129,13 +129,18 @@ class AndroidPlatform(val context: AndroidApplication) : Platform {
         val prefs = preferences("settings")
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         val alias = "spotygram.database"
-        val key = (store.getKey(alias, null) as? SecretKey)
+        val saved = prefs.getString("database_key", null)
+        val existing = store.getKey(alias, null) as? SecretKey
+        check((saved == null || existing != null) &&
+            (saved != null || !java.io.File(filesDir, "telegram/db").isDirectory)) {
+            tr(R.string.database_key_error)
+        }
+        val key = existing
             ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
                 init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                     .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
             }.generateKey()
-        val saved = prefs.getString("database_key", null)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         if (saved != null) {
             val data = Base64.decode(saved, Base64.NO_WRAP)

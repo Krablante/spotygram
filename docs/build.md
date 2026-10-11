@@ -13,6 +13,10 @@ Use Linux, JDK 21 (a full JDK, not only a JRE), Android SDK platform 37, build t
 
 Keep generated data outside the checkout. `SPOTYGRAM_STATE` holds native sources,
 build outputs, caches and private configuration; it is not a second source repository.
+Both Gradle modules use this same directory. Without an explicit value, Gradle
+uses `~/.local/state/spotygram`; the Android wrapper also honors `XDG_STATE_HOME`.
+Set `SPOTYGRAM_STATE` explicitly when switching tools. Build scripts reject state
+inside the checkout before generating or unpacking anything there.
 
 Run heavy operations sequentially: finish native compilation before Gradle, and stop the emulator during builds. Native builds default to two workers (`SPOTYGRAM_JOBS`); Gradle defaults to two workers and a 2 GB heap. On shared hosts use an additional CPU/memory limit for the build process.
 
@@ -108,7 +112,7 @@ python3 tools/build-desktop.py
 
 Archives are written to `$SPOTYGRAM_STATE/releases/VERSION/`. Each contains the
 complete application, a file manifest and an Ed25519 signature. The packager rejects
-a private key that does not match the application's trusted public key. Extract the
+a missing private key or one that does not match the application's trusted public key. Extract the
 whole archive when installing it; the app retains music and settings in separate
 per-user storage.
 

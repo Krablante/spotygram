@@ -2,6 +2,9 @@
 set -euo pipefail
 ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 export SPOTYGRAM_STATE=${SPOTYGRAM_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/spotygram}
+SPOTYGRAM_STATE=$(realpath -m "$SPOTYGRAM_STATE")
+export SPOTYGRAM_STATE
+case "$SPOTYGRAM_STATE/" in "$ROOT/"*) printf 'SPOTYGRAM_STATE must be outside source.\n' >&2; exit 2 ;; esac
 : "${ANDROID_HOME:?Set ANDROID_HOME to the Android SDK directory}"
 MODE=${1:-debug}
 case "$MODE" in debug) TASK=assembleDebug ;; release) TASK=assembleRelease ;; *) printf 'Usage: %s [debug|release]\n' "$0"; exit 2 ;; esac

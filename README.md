@@ -7,12 +7,13 @@
 </p>
 
 <p align="center">
-  <strong>The songs are in your chats. This is where you listen.</strong>
+  <strong>A music player for your Telegram chats and local files.</strong><br>
+  Android · Windows · Linux · macOS
 </p>
 
 <p align="center">
   <a href="https://github.com/Krablante/spotygram/releases/latest"><strong>Download Spotygram</strong></a> ·
-  <a href="docs/usage.en.md">User guide</a> ·
+  <a href="docs/usage.md">User guide</a> ·
   <a href="docs/README.md">Documentation</a>
 </p>
 

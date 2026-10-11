@@ -26,6 +26,8 @@ def openssl():
 
 
 def signing_key(state):
+    if state == ROOT or ROOT in state.parents:
+        raise RuntimeError("Signing state must be outside the source checkout")
     directory = state / "desktop" / "signing"
     directory.mkdir(parents=True, exist_ok=True)
     private = directory / "release-private.pem"
@@ -53,7 +55,11 @@ def checksum(file):
 
 
 def package(image, target, version, state, destination):
-    private = signing_key(state)
+    if state == ROOT or ROOT in state.parents or destination == ROOT or ROOT in destination.parents:
+        raise RuntimeError("Signing state and release output must be outside the source checkout")
+    private = state / "desktop/signing/release-private.pem"
+    if not private.is_file():
+        raise RuntimeError("Desktop release key is missing; restore it or use --init-key for a new fork")
     expected_public = (ROOT / "desktop/src/main/resources/update-key.pub").read_text()
     if public_der(public_key(private)) != public_der(expected_public):
         raise RuntimeError("Desktop release key differs from the application's trusted key")

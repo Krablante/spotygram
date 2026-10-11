@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="library_open_failed">"Не удалось открыть библиотеку. Закройте Spotygram и попробуйте снова. Данные сохранены; не очищайте их для исправления ошибки запуска."</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
     <string name="show_window">Открыть Spotygram</string>

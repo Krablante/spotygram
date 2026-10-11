@@ -10,8 +10,7 @@ plugins {
 }
 
 version = rootProject.version
-val buildState = providers.environmentVariable("SPOTYGRAM_STATE")
-    .orElse("${System.getProperty("user.home")}/.local/state/spotygram").get()
+val buildState = rootProject.extra["spotygramState"] as String
 val definitions = layout.buildDirectory.dir("generated/definitions")
 val generateDefinitions = tasks.register("generateDesktopDefinitions") {
     val strings = rootProject.file("shared/src/main/res/values/strings.xml")
@@ -124,7 +123,7 @@ dependencies {
     implementation("net.java.dev.jna:jna-platform:5.17.0")
     implementation("com.github.javakeyring:java-keyring:1.0.0")
     implementation("net.jthink:jaudiotagger:3.0.1")
-    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("dev.nucleusframework:nucleus.media-control:2.5.0")
     implementation("org.slf4j:slf4j-nop:2.0.17")
 }

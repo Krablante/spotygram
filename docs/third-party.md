@@ -20,7 +20,7 @@
 | java-keyring | 1.0.0 | BSD-3-Clause |
 | jaudiotagger | 3.0.1 | LGPL 2.1+ |
 | Nucleus media-control / core-runtime | 2.5.0, [Nucleus](https://github.com/NucleusFramework/Nucleus/tree/v2.5.0) | MIT; bundled code retains its notices |
-| Apache Commons Compress | 1.27.1 | Apache 2.0 |
+| Apache Commons Compress | 1.28.0; Commons Lang 3.18.0, IO 2.20.0 and Codec 1.19.0 | Apache 2.0 |
 | ZXing core | 3.5.4 | Apache 2.0 |
 | JSON-java | 20250517 | Public domain |
 | Bundled desktop Java runtime | JDK 21 distribution used by the build runner | GPL 2 with Classpath Exception and component notices |

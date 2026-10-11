@@ -9,7 +9,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import org.json.JSONObject
 
-class Telegram(private val platform: Platform, private val scope: CoroutineScope) {
+class Telegram(
+    private val platform: Platform,
+    private val scope: CoroutineScope,
+    private val clearFileBindings: suspend () -> Unit,
+) {
     val auth = MutableStateFlow(AuthState())
     val connection = MutableStateFlow("")
     val files = ConcurrentHashMap<Int, FileState>()
@@ -19,10 +23,12 @@ class Telegram(private val platform: Platform, private val scope: CoroutineScope
     val updates = Channel<JSONObject>(Channel.UNLIMITED)
     private val requests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
     private val sequence = AtomicLong()
-    private var client = 0
+    @Volatile private var client = 0
     private var receiving: Job? = null
     private val prefs = platform.preferences("settings")
-    private val native get() = platform.tdlib
+    private val native
+        get() = platform.tdlib
+
     private var networkObserver: AutoCloseable? = null
 
     private fun reportNetwork(type: String) {
@@ -56,17 +62,33 @@ class Telegram(private val platform: Platform, private val scope: CoroutineScope
                         "updateFile" -> updateFile(obj.getJSONObject("file"))
                         "updateNewChat" -> {
                             val chat = obj.getJSONObject("chat")
-                            if (chat.getJSONObject("type").kind() != "chatTypeSecret")
+                            if (chat.getJSONObject("type").kind() != "chatTypeSecret") {
                                 chats[chat.getLong("id")] =
                                     ChatChoice(chat.getLong("id"), chat.getString("title"))
+                                updates.send(
+                                    json(
+                                        "updateChatTitle",
+                                        "chat_id" to chat.getLong("id"),
+                                        "title" to chat.getString("title"),
+                                    )
+                                )
+                            }
                         }
                         "updateChatTitle" -> {
                             val id = obj.getLong("chat_id")
                             chats.computeIfPresent(id) { _, chat ->
                                 chat.copy(title = obj.getString("title"))
                             }
+                            updates.send(obj)
                         }
-                        else -> if (obj.kind().startsWith("update")) updates.send(obj)
+                        "updateNewMessage" -> {
+                            val content =
+                                obj.getJSONObject("message").optJSONObject("content")?.kind()
+                            if (content == "messageAudio" || content == "messageDocument")
+                                updates.send(obj)
+                        }
+                        "updateMessageContent",
+                        "updateDeleteMessages" -> updates.send(obj)
                     }
                     when (obj.kind()) {
                         "updateNewChat",
@@ -104,7 +126,7 @@ class Telegram(private val platform: Platform, private val scope: CoroutineScope
         }
     }
 
-    private fun authorization(state: JSONObject) {
+    private suspend fun authorization(state: JSONObject) {
         val type = state.kind()
         val detail =
             when (type) {
@@ -116,7 +138,7 @@ class Telegram(private val platform: Platform, private val scope: CoroutineScope
                 "authorizationStateWaitOtherDeviceConfirmation" -> state.optString("link")
                 else -> ""
             }
-        auth.value = AuthState(type, detail)
+        if (type != "authorizationStateClosed") auth.value = AuthState(type, detail)
         when (type) {
             "authorizationStateWaitTdlibParameters" ->
                 scope.launch {
@@ -164,14 +186,19 @@ class Telegram(private val platform: Platform, private val scope: CoroutineScope
                 }
             }
             "authorizationStateClosed" -> {
-                client = 0
-                receiving?.cancel()
-                requests.values.forEach { it.cancel() }
+                requests.values.forEach {
+                    it.completeExceptionally(TelegramException(401, tr(R.string.telegram_required)))
+                }
                 requests.clear()
                 files.clear()
                 chats.clear()
                 networkObserver?.close()
                 networkObserver = null
+                // A new native client may reuse numeric IDs even within this application process.
+                withContext(NonCancellable) { clearFileBindings() }
+                client = 0
+                auth.value = AuthState(type)
+                receiving?.cancel()
             }
         }
     }
@@ -210,7 +237,8 @@ class Telegram(private val platform: Platform, private val scope: CoroutineScope
     }
 
     suspend fun usePhoneAuthentication() {
-        if (auth.value.type != "authorizationStateWaitOtherDeviceConfirmation" || auth.value.busy) return
+        if (auth.value.type != "authorizationStateWaitOtherDeviceConfirmation" || auth.value.busy)
+            return
         // TDLib cannot replace a pending QR login with setAuthenticationPhoneNumber.
         // End only this unfinished authorization; the Spotygram catalog stays intact.
         auth.value = auth.value.copy(busy = true, error = "")

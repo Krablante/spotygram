@@ -10,12 +10,21 @@ import kotlinx.coroutines.withContext
 class Library(private val platform: Platform) : AutoCloseable {
     val state = MutableStateFlow(LibraryState())
     private val publishing = Mutex()
-    private val database by lazy {
+    private val storage = lazy {
         platform.openDatabase("library.db", 5, ::onCreate, ::onUpgrade, ::onOpen)
     }
-    private val readableDatabase get() = database
-    private val writableDatabase get() = database
-    override fun close() { database.close() }
+    private val database
+        get() = storage.value
+
+    private val readableDatabase
+        get() = database
+
+    private val writableDatabase
+        get() = database
+
+    override fun close() {
+        if (storage.isInitialized()) database.close()
+    }
 
     private fun onCreate(db: SqlDatabase) {
         db.execSQL(
@@ -119,6 +128,12 @@ class Library(private val platform: Platform) : AutoCloseable {
         db.execSQL("UPDATE tracks SET file=0 WHERE chat!=0 AND file!=0")
     }
 
+    suspend fun clearFileBindings() =
+        withContext(Dispatchers.IO) {
+            onOpen(writableDatabase)
+            reload()
+        }
+
     suspend fun reload() = publishing.withLock {
         withContext(Dispatchers.IO) {
             val db = readableDatabase
@@ -141,6 +156,7 @@ class Library(private val platform: Platform) : AutoCloseable {
                         )
                 }
             val tracks = mutableListOf<Track>()
+            val sourceTitles = sources.associate { it.id to it.title }
             db.rawQuery(
                     "SELECT tracks.*,CASE WHEN temporary_audio.file_key IS NULL THEN 0 ELSE 1 END FROM tracks LEFT JOIN temporary_audio ON tracks.file_key=temporary_audio.file_key WHERE chat=0 OR tracks.path!='' OR liked=1 OR id IN (SELECT track FROM playlist_tracks) OR chat IN (SELECT id FROM sources) ORDER BY date DESC,id DESC",
                     null,
@@ -156,7 +172,7 @@ class Library(private val platform: Platform) : AutoCloseable {
                             c.getString(5),
                             c.getInt(6),
                             c.getLong(7),
-                            c.getString(8),
+                            sourceTitles[c.getLong(1)] ?: c.getString(8),
                             c.getLong(9),
                             c.getString(10),
                             c.getString(11),
@@ -170,18 +186,28 @@ class Library(private val platform: Platform) : AutoCloseable {
                         )
                 }
             val lists = mutableListOf<Playlist>()
+            val members = mutableMapOf<Long, MutableList<String>>()
+            db.rawQuery(
+                    "SELECT playlist,track FROM playlist_tracks ORDER BY playlist,position",
+                    null,
+                )
+                .use { c ->
+                    while (c.moveToNext()) members
+                        .getOrPut(c.getLong(0)) { mutableListOf() }
+                        .add(c.getString(1))
+                }
             db.rawQuery("SELECT id,name FROM playlists ORDER BY name", null).use { c ->
                 while (c.moveToNext()) {
-                    val ids = mutableListOf<String>()
-                    db.rawQuery(
-                            "SELECT track FROM playlist_tracks WHERE playlist=? ORDER BY position",
-                            arrayOf(c.getLong(0).toString()),
-                        )
-                        .use { p -> while (p.moveToNext()) ids += p.getString(0) }
-                    lists += Playlist(c.getLong(0), c.getString(1), ids)
+                    lists += Playlist(c.getLong(0), c.getString(1), members[c.getLong(0)].orEmpty())
                 }
             }
-            state.value = LibraryState(tracks, sources, lists)
+            val snapshot = LibraryState(tracks, sources, lists)
+            if (snapshot != state.value) {
+                snapshot.byId
+                if (platform.preferences("settings").getBoolean("hide_duplicates", true))
+                    snapshot.duplicates
+                state.value = snapshot
+            }
         }
     }
 
@@ -252,6 +278,25 @@ class Library(private val platform: Platform) : AutoCloseable {
                     SqlDatabase.CONFLICT_IGNORE,
                 )
             else writableDatabase.delete("sources", "id=?", arrayOf(choice.id.toString()))
+            reload()
+        }
+
+    suspend fun sourceTitle(id: Long, title: String) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                update(
+                    "sources",
+                    Values().apply { put("title", title) },
+                    "id=?",
+                    arrayOf(id.toString()),
+                )
+                update(
+                    "tracks",
+                    Values().apply { put("source", title) },
+                    "chat=?",
+                    arrayOf(id.toString()),
+                )
+            }
             reload()
         }
 
@@ -337,24 +382,31 @@ class Library(private val platform: Platform) : AutoCloseable {
             reload()
         }
 
-    suspend fun art(id: String, path: String) =
+    suspend fun art(id: String, path: String) = art(listOf(id), path)
+
+    suspend fun art(ids: Collection<String>, path: String) =
         withContext(Dispatchers.IO) {
-            writableDatabase.update(
-                "tracks",
-                Values().apply { put("art", path) },
-                "id=?",
-                arrayOf(id),
-            )
+            writableDatabase.transaction {
+                compileStatement("UPDATE tracks SET art=? WHERE id=?").use { statement ->
+                    for (id in ids) {
+                        statement.bindString(1, path)
+                        statement.bindString(2, id)
+                        statement.executeUpdateDelete()
+                    }
+                }
+            }
             reload()
         }
 
     suspend fun unavailable(chat: Long, messages: List<Long>) =
         withContext(Dispatchers.IO) {
-            messages.forEach {
-                writableDatabase.execSQL(
-                    "UPDATE tracks SET available=0 WHERE chat=? AND message=?",
-                    arrayOf(chat, it),
-                )
+            writableDatabase.transaction {
+                compileStatement("UPDATE tracks SET available=0 WHERE id=?").use { statement ->
+                    for (message in messages) {
+                        statement.bindString(1, "$chat:$message")
+                        statement.executeUpdateDelete()
+                    }
+                }
             }
             reload()
         }
@@ -527,10 +579,16 @@ class Library(private val platform: Platform) : AutoCloseable {
     suspend fun removeLocal(track: Track) =
         withContext(Dispatchers.IO) {
             if (track.chatId == 0L) {
-                File(track.path).delete()
-                if (track.art.isNotEmpty()) File(track.art).delete()
-                writableDatabase.delete("tracks", "id=?", arrayOf(track.id))
-                writableDatabase.delete("playlist_tracks", "track=?", arrayOf(track.id))
+                val audio = File(track.path)
+                check(!audio.exists() || audio.delete()) { tr(R.string.file_unavailable) }
+                if (track.art.isNotEmpty()) {
+                    val artwork = File(track.art)
+                    check(!artwork.exists() || artwork.delete()) { tr(R.string.file_unavailable) }
+                }
+                writableDatabase.transaction {
+                    delete("playlist_tracks", "track=?", arrayOf(track.id))
+                    delete("tracks", "id=?", arrayOf(track.id))
+                }
             } else
                 writableDatabase.transaction {
                     update(
@@ -550,11 +608,16 @@ class Library(private val platform: Platform) : AutoCloseable {
     suspend fun verifyFiles() =
         withContext(Dispatchers.IO) {
             val missing = mutableListOf<Triple<String, String, Long>>()
+            val checked = mutableMapOf<Pair<String, Long>, Boolean>()
             readableDatabase.rawQuery("SELECT id,path,size FROM tracks WHERE path!=''", null).use {
                 c ->
                 while (c.moveToNext()) {
                     val path = c.getString(1)
-                    if (!validAudioCopy(path, c.getLong(2)))
+                    if (
+                        !checked.getOrPut(path to c.getLong(2)) {
+                            validAudioCopy(path, c.getLong(2))
+                        }
+                    )
                         missing += Triple(c.getString(0), path, c.getLong(2))
                 }
             }
@@ -575,13 +638,15 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     suspend fun clearTelegram() =
         withContext(Dispatchers.IO) {
-            writableDatabase.execSQL(
-                "DELETE FROM playlist_tracks WHERE track IN (SELECT id FROM tracks WHERE chat!=0)"
-            )
-            writableDatabase.execSQL("DELETE FROM tracks WHERE chat!=0")
-            writableDatabase.delete("sources", null, null)
-            writableDatabase.delete("downloads", null, null)
-            writableDatabase.delete("temporary_audio", null, null)
+            writableDatabase.transaction {
+                execSQL(
+                    "DELETE FROM playlist_tracks WHERE track IN (SELECT id FROM tracks WHERE chat!=0)"
+                )
+                execSQL("DELETE FROM tracks WHERE chat!=0")
+                delete("sources", null, null)
+                delete("downloads", null, null)
+                delete("temporary_audio", null, null)
+            }
             reload()
         }
 

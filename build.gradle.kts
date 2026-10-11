@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.compose") version "1.12.0" apply false
 }
 
-version = "0.15.0"
+version = "0.15.1"
 
 subprojects {
     plugins.withId("org.jetbrains.kotlin.plugin.compose") {
@@ -20,10 +20,11 @@ subprojects {
     }
 }
 
-val buildState = providers.environmentVariable("SPOTYGRAM_STATE")
-
-if (buildState.isPresent) {
-    val directory = buildState.get()
-    layout.buildDirectory.set(file("$directory/build/root"))
-    subprojects { layout.buildDirectory.set(file("$directory/build/$name")) }
+val buildState = file(providers.environmentVariable("SPOTYGRAM_STATE")
+    .orElse("${System.getProperty("user.home")}/.local/state/spotygram").get()).canonicalFile
+require(!buildState.toPath().startsWith(rootDir.canonicalFile.toPath())) {
+    "SPOTYGRAM_STATE must be outside the source checkout"
 }
+extra["spotygramState"] = buildState.absolutePath
+layout.buildDirectory.set(buildState.resolve("build/root"))
+subprojects { layout.buildDirectory.set(buildState.resolve("build/$name")) }

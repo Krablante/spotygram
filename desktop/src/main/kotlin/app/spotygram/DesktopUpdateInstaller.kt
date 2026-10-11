@@ -54,6 +54,7 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
             return
         }
         installAfterDownload = true
+        state.value = InstallState(InstallPhase.DOWNLOADING, asset.version, total = asset.size)
         work = app.scope.launch {
             try {
                 withContext(Dispatchers.IO) {
@@ -153,9 +154,12 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
     }
     private fun clearDownload() {
         val old = UpdateAsset.fromJson(prefs.getString("asset", null))
-        if (old != null) { archive(old).delete(); partial(old).delete() }
+        if (old != null) {
+            java.nio.file.Files.deleteIfExists(archive(old).toPath())
+            java.nio.file.Files.deleteIfExists(partial(old).toPath())
+        }
         SignedBundle.remove(staging)
-        prefs.edit().remove("asset").commit()
+        check(prefs.edit().remove("asset").commit())
     }
     fun confirmInstall() {
         if (work?.isActive == true || state.value.phase != InstallPhase.READY) return

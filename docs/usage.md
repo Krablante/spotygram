@@ -1,282 +1,304 @@
-# Как пользоваться Spotygram
+# Using Spotygram
 
-[Документация](README.ru.md) · [English](usage.en.md) · **Русский**
+[Documentation](README.md) · **English** · [Русский](usage.ru.md)
 
-Spotygram собирает аудио из выбранных чатов в музыкальную библиотеку.
-Сообщения остаются в Telegram; любимые песни, плейлисты и скачанные копии
-хранятся на твоём устройстве.
+Spotygram brings audio from selected chats into a music library. Messages stay
+in Telegram; favorites, playlists and downloaded copies live on your device.
 
-## Первый запуск
+## First launch
 
-На Android установи ARM64 APK из [последнего релиза](https://github.com/Krablante/spotygram/releases/latest).
-При установке Android может попросить разрешить установку приложений
-из браузера или файлового менеджера. Нужен Android 8.0 или новее.
+On Android, install the ARM64 APK from the [latest release](https://github.com/Krablante/spotygram/releases/latest).
+Android may ask you to allow installation from the browser or file manager
+opening the APK. Android 8.0 or newer is required.
 
-На Windows, Linux или macOS выбери подходящий архив и распакуй всё приложение.
-Имена файлов и требования систем есть в [инструкции по установке](../README.ru.md#установить-на-компьютер).
-Java и нативные библиотеки уже включены.
+On Windows, Linux or macOS, choose the matching archive and extract the whole
+application. The [installation instructions](../README.md#put-it-on-your-computer)
+give the file names and system requirements. Java and the native libraries are included.
 
-Войди в Telegram по номеру телефона или отсканируй QR-код через
-**Настройки → Устройства → Подключить устройство** в Telegram. Код входа по номеру может прийти в уже открытый
-Telegram, а не в SMS. Если включён облачный пароль, введи его следующим
-шагом. API-ключи разработчика для готовых пакетов не нужны.
+Sign in to Telegram with your phone number or scan the QR code from Telegram's
+**Settings → Devices → Link Desktop Device**. The code for phone sign-in may arrive in an existing
+Telegram session rather than by SMS. If you use a two-step verification
+password, enter it next. Published packages do not require developer API keys.
 
-Можно выбрать «Пока без Telegram» и начать с локальных файлов.
-**Настройки → Добавить файлы с устройства** открывает системный выбор аудио.
-На Android ещё можно поделиться файлом из другого приложения. Desktop принимает
-файлы, переданные launcher; **Ctrl/⌘+O** открывает выбор файлов.
-Импорт создаёт отдельную копию в библиотеке плеера.
+You can skip Telegram and start with local files. **Settings → Import audio files**
+opens the system file picker. Android also accepts audio shared from another
+app; desktop accepts files passed to its launcher and **Ctrl/⌘+O** opens its picker.
+Importing creates a separate copy in the player's library.
 
-## Добавить музыку из чатов
+## Add music from chats
 
-Открой **Чаты → Добавить чаты**, выбери «Избранное», группы или каналы
-и нажми «Готово». Доступный публичный канал можно добавить по `@имени`.
-Spotygram не подписывает тебя на канал автоматически.
+Open **Chats → Add chats**, choose Saved Messages, groups or channels, then
+confirm your selection. An accessible public channel can also be added by
+`@username`. Spotygram does not automatically subscribe you to it.
 
-Приватные каналы, доступные подключённому аккаунту, можно выбрать по названию —
-публичное имя им не требуется. Поиск сразу показывает загруженные чаты,
-а затем дополняет их результатами из сети. Ввод не останавливает загрузку
-списка; новые чаты могут появляться, пока окно открыто. Для повторной загрузки
-и поиска нажми обновление **внутри окна «Добавить чаты»**. Без сети уже
-загруженные чаты остаются доступны для выбора. Обновление на основном экране
-«Чаты» пересканирует музыку в ранее выбранных источниках.
+Private channels accessible to the connected account can be selected by name;
+they do not need a public username. The picker searches loaded chats immediately
+and adds online matches when available. Typing does not stop the chat list from
+loading, and newly received chats can appear while the picker stays open.
+Use the refresh icon **inside Add chats** to retry directory loading and search.
+Offline, already loaded chats remain selectable. The refresh button on the
+main Chats screen updates music in sources you have already selected.
 
-История загружается постепенно: первые песни можно слушать, пока остальные
-ещё появляются в списке. Приложение просматривает всю доступную историю,
-а не только последние сто сообщений. При обрыве связи загрузка продолжится
-с сохранённого места. Обновить список можно кнопкой обновления или жестом
-вниз; при незавершённой загрузке доступно её продолжение.
+History loads progressively: you can listen to the first songs while more
+appear. The app scans all accessible history, not just the last hundred
+messages. Interrupted loading resumes from its saved position. Use refresh
+or pull down to update the list; unfinished history can be resumed.
 
-Поиск в библиотеке работает по уже найденной музыке. Если нужной песни
-пока нет, кнопка **Поискать в выбранных чатах** запускает поиск в Telegram.
-Секретные чаты, голосовые сообщения и видео в музыкальную библиотеку не входят.
+Library search uses music already found. If a song is missing, **Search selected
+chats** searches Telegram. Secret chats, voice notes and videos are excluded
+from the music library.
 
-## Слушать
+## Listen
 
-**Настройки → Скрывать дубли** включено по умолчанию. В «Музыке», «Любимых»
-и «На устройстве» повторяющиеся записи показываются одной строкой. Выключи
-переключатель, чтобы снова видеть отдельные записи. Ничего не удаляется.
+**Settings → Hide duplicates** is on by default. Music, Favorites and On device
+show one entry per matching recording. Turn it off to see separate entries
+again; nothing is deleted.
 
-Совпадением считается один файл Telegram, общий локальный путь либо одинаковые
-название, исполнитель, длительность и размер файла. Регистр и лишние пробелы
-не учитываются; одного названия недостаточно. Содержимое файлов не сравнивается,
-поэтому это не распознавание музыки на слух. Поиск и источник применяются до
-группировки; из подходящих копий предпочитается сохранённая локальная.
+Tracks match by Telegram file identity, a shared local path, or equal title,
+artist, duration and file size. Case and extra whitespace are ignored; a title
+alone is insufficient. File contents are not compared, so this is not acoustic
+recognition. Search and source filters run first; a retained local copy is
+preferred among matching candidates.
 
-Сердечко учитывает любимые среди всех дублей. Снятие сердечка убирает их вместе,
-а «Отменить» восстанавливает прежние отметки. Новая очередь из списка получает
-по одному представителю каждой группы. Готовые плейлисты и текущая очередь
-не переписываются; в режиме абсолютного рандома повторные случайные выборы
-по-прежнему возможны.
+The heart reflects favorites across the group. Removing it clears those marks
+together; Undo restores the exact previous marks. New queues launched from the
+list get one representative per group. Existing playlists and the current queue
+are not rewritten; independent draws in absolute random can still repeat.
 
-Четыре раздела внизу — **Чаты**, **Любимые**, **Плейлисты**, **Музыка**.
-Приложение запоминает последний открытый раздел. Нажатие на песню начинает
-воспроизведение; нижняя панель открывает полный плеер. Управлять музыкой
-можно с экрана блокировки Android и через системное медиоуправление компьютера.
-На широком окне навигация переходит в боковую панель.
+The four bottom destinations are **Music**, **Favorites**, **Playlists** and
+**Chats**. Your last destination is remembered. Tap a song to play; the small
+bottom player opens the full player. Android lock-screen and desktop system media
+controls work too. Wide windows move navigation to the side.
 
-На desktop **Esc** закрывает текущую панель или плеер. Закрытие окна во время
-воспроизведения или скачивания скрывает его в трее, а при отсутствии трея
-сворачивает. **Ctrl/⌘+Q** завершает приложение и сохраняет состояние. После
-повторного входа музыка не запускается автоматически.
+Desktop **Esc** closes the current panel or player. Closing the window while
+playing or downloading hides it in the tray, or minimizes it when a tray is
+unavailable. **Ctrl/⌘+Q** quits and saves state; playback never starts automatically
+after the next launch.
 
-В мини-плеере есть кнопки предыдущего трека, паузы/воспроизведения и следующего
-трека. «Назад» здесь сразу переключает песню, не открывая полный плеер.
+The mini-player has previous, play/pause and next buttons. Previous switches
+directly to the previous song without opening the full player.
 
-Если после возвращения плеер ещё подключается, выбранная песня начнёт играть
-после подключения. При нескольких нажатиях учитывается последний выбор.
-Если подключиться не удалось, сообщение предложит нажать на песню для повтора;
-перезапуск приложения для этого не требуется. Уход из приложения отменяет
-ожидающий запуск, но уже играющую музыку не останавливает.
+If the player is still connecting after you return, the selected song starts
+when it is ready. Repeated taps keep the latest selection. If connection fails,
+the message asks you to tap a song to retry; restarting the app is not required.
+Leaving the app cancels a waiting start, but does not stop music already playing.
 
-В плеере доступны перемотка, очередь и повтор. Кнопка порядка слева от
-«Предыдущий трек» переключает три режима:
+The full player has seeking, a queue and repeat controls. The order button to
+the left of Previous cycles through three modes:
 
-| Режим | Как выбирается следующая песня |
+| Mode | How the next song is chosen |
 | --- | --- |
-| По порядку | Следующая запись в подборке |
-| Перемешивание | Случайный порядок без повторов внутри одного прохода |
-| Абсолютный рандом, значок кубика | Каждый раз независимый выбор; возможны повторы даже подряд |
+| In order | The next entry in the collection |
+| Shuffle | A random order with no repeats within a pass |
+| Absolute random, the dice icon | An independent draw every time; even consecutive repeats are possible |
 
-В рандоме музыка играет, пока не остановишь её. «Назад» возвращает к недавно
-прослушанным песням, а очередь показывает подборку для выбора и ближайшую
-следующую запись. Это не расписание проигрывания всей подборки.
-**Слушать следующим** в меню трека имеет приоритет над случайным выбором.
+Random mode continues until stopped. Previous retraces recent listening
+history. The queue shows the selection pool and the next prepared song, not
+a promise to play the whole collection in order. **Play next** in a song's menu
+takes priority over the random choice.
 
-Повтор одного трека доступен во всех режимах. Повтор всей подборки —
-в последовательном и перемешанном; рандом и так бесконечный.
-После перезапуска восстанавливаются очередь и позиция, но музыка сама
-не включается.
+Repeat one works in all modes. Repeat all works in ordered and shuffled modes;
+random is already endless. Reopening the app restores the queue and position
+without starting playback automatically.
 
-Нажми круглую кнопку скорости между **Скачать** и **Очередь** в полном плеере.
-Ползунок работает от **0,3× до 4×**, а **− / +** меняют темп на 0,05×.
-Быстрые значения — 0,5×, 1×, 1,5×, 2× и 3×. Изменения применяются сразу,
-без подтверждения; панель закрывается крестиком, кнопкой «Назад» или нажатием
-снаружи.
+Tap the round speed button between **Download** and **Queue** in the full player.
+The slider covers **0.3×–4×**; **− / +** adjust by 0.05×. Quick choices are
+0.5×, 1×, 1.5×, 2× and 3×. Changes apply immediately without a confirmation
+button; close the panel with its cross, Back or a tap outside it.
 
-Высота голоса сохраняется. Выбранный темп действует и для следующих песен,
-в том числе после перезапуска приложения. **1×** возвращает обычную скорость.
-При другом значении кнопка получает лёгкий акцент, а мини-плеер показывает темп.
+The chosen speed keeps the original pitch and applies to subsequent songs,
+including after an app restart. **1×** restores normal speed. The button gains
+a subtle accent and the mini-player shows the value whenever speed differs from 1×.
 
-<img src="screenshots/speed-light-ru.png" width="300" alt="Панель скорости с ползунком и быстрыми значениями">
+<img src="screenshots/speed-light.png" width="300" alt="Playback speed panel with slider and quick choices">
 
-## Продолжить длинную запись
+## Continue long recordings
 
-**Настройки → Запоминать позицию** включено по умолчанию для
-записей **от 30 минут**. В пункте **Порог длительности** можно задать
-своё целое число минут больше нуля. Порог относится к исходной длительности,
-независимо от скорости воспроизведения. Записи ровно на границе тоже подходят.
+**Settings → Remember audio positions** is enabled by default for audio
+**30 minutes or longer**. Tap **Audio duration threshold** to enter your own positive
+whole number of minutes. The threshold uses the recording's original duration,
+regardless of playback speed, and includes recordings exactly at the threshold.
 
-У каждой записи библиотеки своя позиция. Выбор из музыки, плейлиста или очереди,
-а также возврат кнопками «Назад» и «Вперёд» продолжают её с этого места. Пауза
-и перемотка обновляют позицию; фоновое воспроизведение тоже периодически её
-сохраняет. При повторном входе очередь восстанавливается без автозапуска.
-Для коротких треков сохраняется прежнее восстановление текущей очереди,
-а новый выбор трека начинает его с начала.
+Each library entry keeps its own position. Selecting it from Music, a playlist
+or the queue, or returning with Previous/Next, resumes there. Pausing and seeking
+update the position; listening in the background also saves it periodically.
+Reopening restores the queue without starting playback automatically. Short
+tracks retain the existing current-queue restoration, but a fresh selection
+starts them from the beginning.
 
-Дослушанные записи и циклы повтора одного трека начинаются заново. Чтобы
-начать незавершённую запись сначала, передвинь ползунок к началу или нажми
-«Назад» в полном плеере, когда прошло больше трёх секунд. Смена порога и
-отключение функции оставляют прежние позиции для дальнейшего использования;
-при отключённой функции новые не сохраняются. Дослушивание всё равно сбрасывает
-старую позицию. Удаление скачанной копии Telegram сохраняет место остановки,
-а удаление записи из библиотеки или выход из аккаунта удаляют связанные позиции.
+Finished recordings and repeat-one loops start from the beginning. To restart
+an unfinished recording, move its seek slider to the beginning or use the full
+player's Previous button while more than three seconds into it. Changing the
+threshold or disabling the feature retains existing positions for later use;
+disabled playback does not save new ones. Finishing a recording still clears its
+old position. Deleting a Telegram download leaves its position intact; removing
+the library entry or signing out removes the corresponding positions.
 
-Во время воспроизведения сохранение происходит примерно раз в пять секунд,
-а при паузе, перемотке и смене трека — сразу. При внезапном завершении процесса
-можно потерять прогресс после последнего завершённого сохранения. Если длительность
-неизвестна, запись начинает подходить после того, как плеер узнает её длину.
-Позиции хранятся на этом устройстве и не синхронизируются через облако.
+Positions are saved about every five seconds while playing and immediately on
+pause, seek and track changes. An abrupt process kill can lose progress since the
+last completed save. Recordings with unknown duration qualify once the player
+learns their length. Positions stay on this device, without cloud synchronization.
 
-## Любимые и плейлисты
+## Favorites and playlists
 
-Сердечко справа от песни добавляет её в **Любимые**. Повторное нажатие
-снимает отметку; это действие можно отменить в появившемся сообщении.
-Файл остаётся на месте, воспроизведение не прерывается.
+The heart beside a song adds it to **Favorites**. Tap again to remove the mark;
+the resulting message offers Undo. The file stays in place and playback
+continues.
 
-В **Плейлисты → Новый плейлист** введи название и выбери песни. Можно
-создать пустой плейлист, а затем наполнить его кнопкой списка с плюсом
-рядом с воспроизведением (**Добавить треки**).
+In **Playlists → New playlist**, enter a name and select songs. You can create
+an empty playlist and add music later through its add-tracks action.
 
-Чтобы добавить несколько песен сразу, зажми одну из них или нажми
-значок списка с галочками справа от кнопок воспроизведения (**Выбрать**).
-Дальше нажатия отмечают песни, а не запускают их. Поиск
-не сбрасывает уже выбранное. «Назад» сначала выходит из выделения.
+Long-press a song or tap the checklist icon beside the playback buttons
+(**Select**) to choose several songs at once. Taps then
+select rather than play. Searching does not discard your existing selection.
+Back exits selection first.
 
-Меню плейлиста открывается кнопкой действий или долгим нажатием. В нём
-можно переименовать плейлист, удалить его или выбрать **Изменить порядок**.
-Для перестановки зажми ручку справа от песни и перетащи; есть и стрелки
-вверх/вниз. Удаление плейлиста или песни из него не удаляет сами аудиофайлы.
+Open a playlist's action menu, or long-press the playlist, to rename, delete
+or reorder it. In the ordering view, hold the handle beside a song and drag;
+up/down arrows are also available. Removing a song from a playlist or deleting
+the playlist does not delete the audio files.
 
-## Музыка без интернета
+## Listen offline
 
-По умолчанию после полной загрузки песня получает значок офлайна и остаётся на устройстве.
-Чтобы подготовить музыку заранее, нажми **Скачать** у трека или подборки.
-В настройках можно ограничить эти загрузки Wi-Fi и возобновить прерванные.
-Ограничение Wi-Fi не относится к обычному прослушиванию.
+By default, a fully downloaded song gains an offline icon and stays on the device. Use
+**Download** on a song or collection to save music in advance. Settings lets
+you restrict these downloads to Wi-Fi and resume interrupted downloads.
+The Wi-Fi restriction does not apply to ordinary playback.
 
-Значок загрузки рядом с выбором источника включает фильтр **На устройстве**;
-подсветка и заголовок «На устройстве» показывают, что он включён. Фильтр показывает
-сохранённые локальные файлы, без временного буфера. Если несколько
-сообщений ссылаются на один физический файл, он всегда отображается один раз.
-При включённом «Скрывать дубли» подходящие отдельные копии тоже объединяются.
-Объём в настройках учитывает все сохранённые файлы, включая скрытые копии:
-скрытие строк не освобождает место. Поиск и выбор источника могут
-дополнительно сузить этот список.
+The download icon beside the source selector toggles **On device**; its highlight
+and the On device heading show when the filter is active. It shows retained local
+files, excluding temporary playback copies. When several messages reference one
+physical file, it always appears once. With Hide duplicates enabled, matching
+separate copies are grouped too. Storage size in Settings still includes all
+retained files, including hidden copies: hiding rows does not free space.
+Search and source filters may narrow the list further.
 
-## Слушать, не сохраняя каждую песню
+## Listen without keeping every song
 
-Включи **Настройки → Не сохранять прослушанное**, чтобы использовать временные
-копии для прослушивания. По умолчанию режим выключен. Старые локальные файлы,
-явные скачивания и импорт сохраняются. У временной копии появляется значок
-часов. **Сохранить на устройстве** в плеере или меню песни оставляет эту копию
-без повторного скачивания.
+Enable **Settings → Do not keep played tracks** to use temporary playback copies.
+It is off by default. Previously saved files, explicit downloads and imported
+audio remain saved. Temporary copies have a clock icon; **Save on device** in
+the player or song menu keeps a copy without downloading it again.
 
-Текущий, предыдущий и подготовленный следующий файлы остаются, пока нужны
-плееру. Более старые временные копии удаляются, когда их никто не читает.
-Для возврата дальше назад могут потребоваться интернет и повторная загрузка.
-Telegram всё равно использует временные файлы на диске: это не воспроизведение
-только из памяти и не строгий лимит объёма. Если очистка отложена, в настройках
-появится повторная попытка. Отключение режима сохраняет оставшиеся копии,
-но не возвращает уже удалённые.
+The current, previous and prepared next files remain while the player needs
+them. Older temporary copies are removed when no reader uses them. Going
+further back may require another download and internet access. Telegram still
+uses temporary disk files; this is not RAM-only playback or a strict storage cap.
+If cleanup is deferred, Settings offers Retry. Turning the mode off keeps the
+remaining copies; it cannot restore those already deleted.
 
-## Освободить место
+## Free up space
 
-**Удалить с устройства** в меню песни убирает её локальную копию. Сообщение
-в Telegram не удаляется. Файлы в рабочем окне плеера или с открытым чтением
-удалить нельзя.
+**Remove from device** in a song's menu removes its local copy, not the Telegram
+message. Files still in the player's working window or being read cannot be removed.
 
-**Настройки → Очистить кэш музыки** показывает место, занятое скачанными
-аудиофайлами Telegram. Импортированные файлы в эту цифру не входят.
+**Settings → Clear music cache** shows space occupied by downloaded Telegram
+audio. Imported files are excluded from that total.
 
-**Очистка удаляет и музыку, специально сохранённую кнопкой «Скачать».**
-Временные копии и такие загрузки используют общее хранилище Telegram.
-Эта ручная команда удаляет больше, чем автоматическая очистка временных копий.
-Перед удалением появится подтверждение «Остановить и очистить»:
-воспроизведение и загрузки остановятся, а после очистки будет показан
-освободившийся объём.
+**Cleanup also removes songs you explicitly saved with Download.** Playback
+copies and explicit downloads share Telegram's storage. This manual action has
+a broader scope than automatic removal of temporary copies. The confirmation
+asks to stop playback and clear them; playback and downloads stop, and the
+result reports the space freed.
 
-Любимые, плейлисты, импортированные файлы и вход сохраняются. Для повторного
-скачивания нужен доступ к исходному сообщению: если его больше нет,
-удалённую копию может не получиться вернуть. Для очистки требуется
-подключённый Telegram-аккаунт.
+Favorites, playlists, imported files and sign-in remain. Downloading again
+requires access to the original message: if it is gone, the deleted copy may
+not be recoverable. Cleanup requires a connected Telegram account.
 
-## Язык и оформление
+## Language and appearance
 
-Интерфейс следует языку системы: русский или английский, для остальных
-языков — английский. На Android 13 и новее **Настройки → Язык** позволяет
-выбрать язык только для Spotygram. На более старых версиях Android он
-меняется вместе с языком телефона. На desktop **Настройки → Язык** предлагает
-русский, английский или язык системы. Названия песен и чатов не переводятся.
+The interface follows your system language: English or Russian, with English
+for other languages. On Android 13+, **Settings → Language** opens a per-app
+language setting. Earlier Android versions follow the phone's language. Desktop
+**Settings → Language** offers English, Russian or the system language.
+Song and chat names are not translated.
 
-В настройках можно выбрать светлое или тёмное оформление. До выбора приложение
-следует настройке системы.
-Переключение не останавливает музыку.
+Choose light or dark appearance in Settings. Until then, the app follows your
+system. Switching appearance does not interrupt playback.
 
-## Обновления и сохранность данных
+## Updates and keeping your data
 
-Автоматическая проверка включена по умолчанию. Она происходит только при
-открытии или возврате в приложение, не чаще раза в сутки. Ошибка проверки
-тоже считается попыткой. Когда новой версии нет, приложение молчит.
+Automatic checks are enabled by default. They happen only when opening or
+returning to the app, at most once a day. Failed checks count as attempts.
+When there is no newer version, the app stays silent.
 
-В строке с новой версией есть **Скачать и установить**. Такая же кнопка
-доступна в настройках. Крестик скрывает напоминание именно об этой версии;
-предложение остаётся в настройках. Там же можно выключить автоматику или
-нажать **Проверить обновления**.
-Повторная ручная попытка доступна не чаще раза в минуту, при ограничениях
-GitHub — позже. Предварительные релизы не предлагаются.
+The update banner offers **Download and install**, also available in Settings.
+Its close button dismisses that version; the offer remains in Settings.
+Settings also lets you disable automatic checks or **Check for updates** manually. Repeated
+manual attempts have a one-minute minimum interval, longer if GitHub limits
+requests. Prereleases are excluded.
 
-После нажатия системный DownloadManager скачивает APK для устройства.
-В приложении видны прогресс и отмена; загрузка может продолжаться при закрытом
-Spotygram. Когда вернёшься, приложение подхватит её состояние.
+After you tap the button, Android's DownloadManager fetches the APK for your
+device. The app shows progress and cancellation; the transfer can continue
+while Spotygram is closed. Reopening picks up its current state.
 
-Перед установкой проверяются размер, SHA-256, пакет, версия и подпись APK.
-Если Android попросит разрешить установку из Spotygram, включи разрешение
-и вернись назад — приложение продолжит установку. Отказ не вызывает повторных
-окон: можно вернуться к кнопке **Установить обновление** позже. Саму установку
-всё равно подтверждаешь в системном окне Android.
+Before installation, the app checks size, SHA-256, package, version and signing
+certificate. If Android asks to allow installation from Spotygram, enable it
+and return; the app continues to the installer. Denying permission does not
+cause repeated prompts. **Install update** lets you try again later. Android
+still requires your confirmation to install.
 
-Готовый APK можно установить повторно без скачивания или удалить кнопкой
-в настройках. При отмене загрузки временные файлы удаляются; после успешного
-обновления APK очищается при следующем открытии приложения. Ссылка
-**Открыть релиз** остаётся для просмотра изменений на GitHub.
+A ready APK can be installed again without another download, or deleted in
+Settings. Cancellation removes temporary files; a successful update cleans up
+the APK on the next launch. **View release** remains available for reading the
+changes on GitHub. Automatic checks only offer updates: they never start a
+download or installer by themselves.
 
-Desktop скачивает подходящий архив и проверяет digest, подпись релиза и содержимое.
-Готовая загрузка предлагает подтвердить перезапуск. Приложение закрывается,
-заменяет свои файлы и открывается с теми же данными, на паузе. Папка должна быть
-доступна для записи; если настройки сообщают обратное, перенеси всё приложение
-в свою папку. Скрытие окна сохраняет загрузку. После полного выхода прерванная
-загрузка продолжается при следующем запуске, а отмена удаляет её.
+Desktop downloads the matching archive and verifies its digest, release signature
+and contents. A completed download offers a restart confirmation. The app closes,
+replaces its program files and reopens with the same data, paused. Its folder must
+be writable; move the whole application to your own folder if Settings reports
+otherwise. Hiding the window keeps a transfer running. After quitting, an incomplete
+transfer resumes on launch, and Cancel removes it.
 
-**Открыть сообщение в Telegram** использует обычную ссылку на сообщение, когда
-она доступна. Личные переписки на desktop открываются в Telegram Web K;
-для просмотра выбранного сообщения войди там в тот же аккаунт.
+**Open message in Telegram** uses the normal message link where available.
+Personal chats on desktop open Telegram Web K; sign in there with the same account
+to see the selected message.
 
-Автоматика предлагает обновление, но сама не запускает скачивание или установку.
-Установка нового официального APK поверх старого сохраняет данные. **Удаление приложения Android
-удаляет его библиотеку и настройки.** Удаление распакованного desktop-приложения
-оставляет отдельные пользовательские данные. Плейлисты не синхронизируются
-с облаком или между устройствами.
+Installing a new official APK
+over the old one preserves data. **Uninstalling the Android app removes its library
+and settings.** Deleting the extracted desktop application leaves its separate
+user data in place. Playlists are not synced to the cloud or between devices.
 
-Вход создаёт полноценную сессию Telegram, а не доступ только к выбранным
-чатам. Завершить её можно в разделе устройств официального Telegram.
+Telegram sign-in creates a full account session, not access restricted to the
+chosen chats. You can revoke it from the official Telegram app's device settings.
+
+## Where your data lives
+
+Desktop keeps its profile outside the application folder:
+
+| System | Profile |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\Spotygram` |
+| Linux | `$XDG_DATA_HOME/spotygram`, or `~/.local/share/spotygram` when unset |
+| macOS | `~/Library/Application Support/Spotygram` |
+
+The profile contains `library.db`, `imports/`, `preferences/` and `telegram/`.
+Update downloads use the OS cache folder. Android keeps its profile in private
+app storage and disables system backup; uninstalling removes it.
+
+To back up a desktop profile, quit Spotygram first and copy the whole profile
+to private storage. Restore it at the same path while the app is closed.
+The Telegram database key stays in the OS credential store and is not included
+in that folder copy. A profile backup is therefore not a portable Telegram
+session, and cannot recover a session whose credential-store key is lost.
+Keep your original imported files too. There is no in-app export or device sync.
+`SPOTYGRAM_STATE` controls developer build files, not this user profile.
+
+## When something goes wrong
+
+| Symptom | What to do |
+| --- | --- |
+| Telegram sign-in on Linux reports a key-store error | Start and unlock a Secret Service provider, such as GNOME Keyring or KeePassXC with Secret Service enabled. Restart Spotygram and retry. |
+| macOS blocks first launch | Use **Privacy & Security → Open Anyway**, as described in the [installation guide](../README.md#put-it-on-your-computer). |
+| A song is absent | Refresh its selected source. Use **Search selected chats** if the library has not found it yet. Check that it is audio or an audio document, not a voice note. |
+| An interrupted download stays paused | Check connectivity and the Wi-Fi-only setting, then resume downloads in Settings. |
+| Remove from device reports that audio is in use | Select another collection so that file leaves the player's current, previous and next working set. Retry removal. |
+| Desktop cannot install an update | Quit and move the whole application into a folder whose parent you can write to. Relaunch it there and retry. |
+| The library cannot open | Close and reopen the app. Keep its profile and the error details; do not clear app data as a troubleshooting step. An older app cannot open a newer database schema. |
+
+For a reproducible problem, include the app version, operating system, action
+and displayed error in a [GitHub issue](https://github.com/Krablante/spotygram/issues).
+Keep phone numbers, Telegram sessions, private chat names and your library out
+of public reports. Developers can collect runtime logs as described in the
+[build guide](build.md#manual-development).
