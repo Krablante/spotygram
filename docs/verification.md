@@ -33,6 +33,13 @@ library/player screenshots were inspected. OS credential stores persisted, rerea
 and removed a temporary key. Linux and all three native desktop targets verified
 signed archives and rejected changed application bytes.
 
+After publication, Linux 0.15.0 fetched the actual GitHub Latest release through
+Check for updates → Download and install → Restart and install. The running app
+became 0.15.1; both recordings, the favorite and playlist membership matched the
+original database. The paused position remained 1,172,086 ms, integrity was `ok`
+and the app removed download, staging and helper files. All six uploaded binaries
+and `SHA256SUMS` matched GitHub's server digests.
+
 Windows and both macOS architectures passed installation with startup acknowledgement
 and three rollback cases: blocked acknowledgement, an unlaunchable signed image and
 a corrupt catalog. The Windows checks exposed a child JVM retaining application
