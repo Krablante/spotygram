@@ -25,10 +25,19 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: () -> Unit) {
-    var value by rememberSaveable(auth.type) { mutableStateOf("") }
+    var value by rememberSaveable(auth.type, auth.editingPhone) { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    val phone = auth.type == "authorizationStateWaitPhoneNumber"
+    val phone = auth.type == "authorizationStateWaitPhoneNumber" || auth.editingPhone
     val keyboardVisible = imeVisible()
+    val back = {
+        if (!auth.busy) {
+            if (auth.canChangePhone && !phone)
+                app.action { app.telegram.usePhoneAuthentication() }
+            else onBack()
+        }
+        Unit
+    }
+    BackHandler { back() }
     Column(
         Modifier.widthIn(max = 480.dp)
             .fillMaxSize()
@@ -39,7 +48,9 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            GlassIconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, tr(R.string.back)) }
+            GlassIconButton(onClick = back, enabled = !auth.busy) {
+                Icon(Icons.Rounded.ArrowBack, tr(R.string.back))
+            }
         }
         if (!keyboardVisible) {
             Spacer(Modifier.height(20.dp))
@@ -83,7 +94,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 Text(tr(R.string.continue_without_telegram))
             }
         } else {
-            val supported =
+            val supported = phone ||
                 auth.type in
                     listOf(
                         "authorizationStateWaitPhoneNumber",
@@ -92,7 +103,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                         "authorizationStateWaitEmailAddress",
                         "authorizationStateWaitEmailCode",
                     )
-            val password = auth.type == "authorizationStateWaitPassword"
+            val password = !phone && auth.type == "authorizationStateWaitPassword"
             Text(
                 if (phone) tr(R.string.enter_phone_help) else when (auth.type) {
                     "authorizationStateWaitPhoneNumber" -> tr(R.string.enter_phone_help)
@@ -169,7 +180,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                         CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                     else Text(tr(R.string.continue_action))
                 }
-                if (auth.type == "authorizationStateWaitCode")
+                if (!phone && auth.type == "authorizationStateWaitCode")
                     TextButton(
                         onClick = {
                             app.action {
@@ -177,7 +188,8 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                                     json("resendAuthenticationCode", "reason" to null)
                                 )
                             }
-                        }
+                        },
+                        enabled = !auth.busy,
                     ) {
                         Text(tr(R.string.resend_code))
                     }
@@ -200,6 +212,10 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 }
             } else if (auth.busy || auth.type == "starting")
                 CircularProgressIndicator(Modifier.padding(16.dp))
+            if (auth.canChangePhone && !phone && auth.type != "authorizationStateWaitOtherDeviceConfirmation")
+                TextButton(onClick = back, enabled = !auth.busy) {
+                    Text(tr(R.string.change_phone_number))
+                }
             if (auth.error.isNotBlank())
                 Text(
                     auth.error,

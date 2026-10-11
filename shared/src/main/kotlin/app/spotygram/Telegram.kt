@@ -215,9 +215,11 @@ class Telegram(
     }
 
     fun submit(value: String) {
-        val type = auth.value.type
+        if (auth.value.busy) return
+        val state = auth.value
+        val type = if (state.editingPhone) "authorizationStateWaitPhoneNumber" else state.type
+        auth.value = state.copy(busy = true, error = "")
         scope.launch {
-            auth.value = auth.value.copy(busy = true, error = "")
             val request =
                 when (type) {
                     "authorizationStateWaitPhoneNumber" ->
@@ -242,14 +244,20 @@ class Telegram(
                 }
             if (request != null)
                 runCatching { request(request) }
+                    .onSuccess { auth.value = auth.value.copy(editingPhone = false) }
                     .onFailure { auth.value = auth.value.copy(error = friendly(it)) }
             auth.value = auth.value.copy(busy = false)
         }
     }
 
     suspend fun usePhoneAuthentication() {
-        if (auth.value.type != "authorizationStateWaitOtherDeviceConfirmation" || auth.value.busy)
+        if (!auth.value.canChangePhone || auth.value.busy) return
+        if (auth.value.type != "authorizationStateWaitOtherDeviceConfirmation") {
+            // TDLib accepts another phone number at the code, password and email stages.
+            // Keep its real authorization state until the user submits the new number.
+            auth.value = auth.value.copy(editingPhone = true, error = "")
             return
+        }
         // TDLib cannot replace a pending QR login with setAuthenticationPhoneNumber.
         // End only this unfinished authorization; the Spotygram catalog stays intact.
         auth.value = auth.value.copy(busy = true, error = "")

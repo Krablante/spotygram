@@ -21,6 +21,11 @@ Sign in to Telegram with your phone number or scan the QR code from Telegram's
 Telegram session rather than by SMS. If you use a two-step verification
 password, enter it next. Published packages do not require developer API keys.
 
+Entered the wrong number? On the code, password or email screen, use the back arrow,
+Android Back, desktop Esc or **Change phone number**. Enter the other number and
+choose **Continue** to request its code. An invalid number stays editable with an
+error message. **Open local music** leaves sign-in for the local library.
+
 You can skip Telegram and start with local files. **Settings → Import audio files**
 opens the system file picker. Android also accepts audio shared from another
 app; desktop accepts files passed to its launcher and **Ctrl/⌘+O** opens its picker.

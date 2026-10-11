@@ -176,6 +176,13 @@ separate per-file encryption. Telegram sign-in grants a full account session; so
 selection limits indexing, not account permissions. Logout clears Telegram catalog
 records and playlist references while keeping imports. Network payloads are not logged.
 
+During unfinished phone sign-in, Back opens phone entry while retaining TDLib's
+actual code, password or email state. Submitting another number uses
+`setAuthenticationPhoneNumber`; it does not log out or reset the catalog. Failed
+submissions keep phone entry and show the error. Pending QR login uses the existing
+unfinished-client restart because TDLib cannot directly replace that state with a
+phone number. Android Back, desktop Esc and the screen arrow share this behavior.
+
 ## Visual system and idle work
 
 English/Russian strings and the RGB brand vector are shared XML resources. Android

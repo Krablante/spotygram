@@ -170,7 +170,7 @@ fun SpotygramUI(
         playlistId = null
     }
     BackHandler(
-        enabled = !editor && (fullPlayer || sourceId != null || playlistId != null || connect)
+        enabled = !editor && !authVisible && (fullPlayer || sourceId != null || playlistId != null || connect)
     ) {
         when {
             fullPlayer -> fullPlayer = false

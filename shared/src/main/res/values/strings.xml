@@ -227,6 +227,7 @@
     <string name="reorder_help">"Hold and drag the handle on the right, or use the arrow buttons."</string>
     <string name="repeat_mode">"Repeat"</string>
     <string name="resend_code">"Resend code"</string>
+    <string name="change_phone_number">"Change phone number"</string>
     <string name="resume_downloads">"Resume downloads"</string>
     <string name="resume_history">"Resume loading history"</string>
     <string name="save">"Save"</string>

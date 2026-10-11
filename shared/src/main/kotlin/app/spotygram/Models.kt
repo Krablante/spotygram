@@ -94,7 +94,19 @@ data class AuthState(
     val detail: String = "",
     val busy: Boolean = false,
     val error: String = "",
-)
+    val editingPhone: Boolean = false,
+) {
+    val canChangePhone: Boolean
+        get() = type in listOf(
+            "authorizationStateWaitCode",
+            "authorizationStateWaitPassword",
+            "authorizationStateWaitEmailAddress",
+            "authorizationStateWaitEmailCode",
+            "authorizationStateWaitRegistration",
+            "authorizationStateWaitPremiumPurchase",
+            "authorizationStateWaitOtherDeviceConfirmation",
+        )
+}
 
 internal fun validAudioCopy(path: String, expectedSize: Long): Boolean {
     if (path.isEmpty()) return false

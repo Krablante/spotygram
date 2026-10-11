@@ -229,6 +229,7 @@
     <string name="reorder_help">"Зажми ручку справа и перетащи. Можно также нажимать стрелки."</string>
     <string name="repeat_mode">"Повтор"</string>
     <string name="resend_code">"Отправить код ещё раз"</string>
+    <string name="change_phone_number">"Изменить номер телефона"</string>
     <string name="resume_downloads">"Продолжить загрузки"</string>
     <string name="resume_history">"Продолжить загрузку истории"</string>
     <string name="save">"Сохранить"</string>
