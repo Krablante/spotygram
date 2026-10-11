@@ -7,17 +7,23 @@ in Telegram; favorites, playlists and downloaded copies live on your device.
 
 ## First launch
 
-Install the ARM64 APK from the [latest release](https://github.com/Krablante/spotygram/releases/latest).
+On Android, install the ARM64 APK from the [latest release](https://github.com/Krablante/spotygram/releases/latest).
 Android may ask you to allow installation from the browser or file manager
 opening the APK. Android 8.0 or newer is required.
 
-Sign in to Telegram with your phone number. The code may arrive in an existing
+On Windows, Linux or macOS, choose the matching archive and extract the whole
+application. The [installation instructions](../README.md#put-it-on-your-computer)
+give the file names and system requirements. Java and the native libraries are included.
+
+Sign in to Telegram with your phone number or scan the QR code from Telegram's
+**Settings → Devices → Link Desktop Device**. The code for phone sign-in may arrive in an existing
 Telegram session rather than by SMS. If you use a two-step verification
-password, enter it next. The published APK does not require developer API keys.
+password, enter it next. Published packages do not require developer API keys.
 
 You can skip Telegram and start with local files. **Settings → Import audio files**
-opens Android's file picker. You can also share audio to Spotygram from another
-app. Importing creates a separate copy in the player's library.
+opens the system file picker. Android also accepts audio shared from another
+app; desktop accepts files passed to its launcher and **Ctrl/⌘+O** opens its picker.
+Importing creates a separate copy in the player's library.
 
 ## Add music from chats
 
@@ -61,7 +67,13 @@ are not rewritten; independent draws in absolute random can still repeat.
 
 The four bottom destinations are **Chats**, **Favorites**, **Playlists** and
 **Music**. Your last destination is remembered. Tap a song to play; the small
-bottom player opens the full player. Lock-screen controls work too.
+bottom player opens the full player. Android lock-screen and desktop system media
+controls work too. Wide windows move navigation to the side.
+
+Desktop **Esc** closes the current panel or player. Closing the window while
+playing or downloading hides it in the tray, or minimizes it when a tray is
+unavailable. **Ctrl/⌘+Q** quits and saves state; playback never starts automatically
+after the next launch.
 
 The mini-player has previous, play/pause and next buttons. Previous switches
 directly to the previous song without opening the full player.
@@ -195,13 +207,14 @@ not be recoverable. Cleanup requires a connected Telegram account.
 
 ## Language and appearance
 
-The interface follows your phone language: English or Russian, with English
+The interface follows your system language: English or Russian, with English
 for other languages. On Android 13+, **Settings → Language** opens a per-app
-language setting. Earlier Android versions follow the phone's language.
+language setting. Earlier Android versions follow the phone's language. Desktop
+**Settings → Language** offers English, Russian or the system language.
 Song and chat names are not translated.
 
 Choose light or dark appearance in Settings. Until then, the app follows your
-phone. Switching appearance does not interrupt playback.
+system. Switching appearance does not interrupt playback.
 
 ## Updates and keeping your data
 
@@ -231,9 +244,21 @@ the APK on the next launch. **View release** remains available for reading the
 changes on GitHub. Automatic checks only offer updates: they never start a
 download or installer by themselves.
 
+Desktop downloads the matching archive and verifies its digest, release signature
+and contents. A completed download offers a restart confirmation. The app closes,
+replaces its program files and reopens with the same data, paused. Its folder must
+be writable; move the whole application to your own folder if Settings reports
+otherwise. Hiding the window keeps a transfer running. After quitting, an incomplete
+transfer resumes on launch, and Cancel removes it.
+
+**Open message in Telegram** uses the normal message link where available.
+Personal chats on desktop open Telegram Web K; sign in there with the same account
+to see the selected message.
+
 Installing a new official APK
-over the old one preserves data. **Uninstalling the app removes its library
-and settings.** Playlists are not synced to the cloud.
+over the old one preserves data. **Uninstalling the Android app removes its library
+and settings.** Deleting the extracted desktop application leaves its separate
+user data in place. Playlists are not synced to the cloud or between devices.
 
 Telegram sign-in creates a full account session, not access restricted to the
 chosen chats. You can revoke it from the official Telegram app's device settings.

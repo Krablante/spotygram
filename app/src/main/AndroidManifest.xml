@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <application android:name=".SpotygramApp" android:label="Spotygram"
+    <application android:name=".AndroidApplication" android:label="Spotygram"
         android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher"
         android:allowBackup="false" android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false"

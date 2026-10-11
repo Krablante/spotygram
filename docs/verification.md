@@ -1,5 +1,84 @@
 # Verification record
 
+## 0.15.0 — Android, Windows, Linux and macOS
+
+Screens, resources, Haze Glass, catalog, Telegram, cache policy and queue now
+compile from `shared/` into Android and desktop. Android keeps Media3; all desktop
+targets use the same libmpv adapter. Desktop dependencies are pinned prebuilt
+libraries. Application images include Java 21 and licenses; users do not build
+native code or install Java. SQLite remains at schema 5.
+
+Debug and minified Android release assembly and full debug/release Lint passed.
+The signed x86-64 APK installed over 0.14.0 without resetting data. All original
+track, playlist, membership and source rows matched their baseline, with integrity
+`ok`. Manual playback covered MP3 and Opus, the speed limits 0.3× and 4×, native
+media controls, settings and the saved-file list. A raw-string formatting crash
+in the Android settings adapter was fixed and the new APK checked again. Actual
+screens were inspected in English at 400 dp and Russian at 320 dp with font scale
+1.3, in light and dark appearances. App crash logs were empty after the fix.
+The emulator's recurring cold-boot System UI ANR preceded app verification.
+
+Packaged Windows x64, macOS x64 and macOS ARM64 applications ran on their native
+GitHub runners. Three local WAV recordings were imported, playback advanced,
+the full player opened and a long recording persisted its position. Actual PNGs
+were inspected for layout, text, controls and glass. Temporary packaged-runtime
+checks used each bundled JRE to create, reread and remove an OS credential-store
+key; verify a signed archive; and reject modified application bytes. Both Mac
+bundles passed strict deep ad-hoc signature verification after those checks.
+Temporary inspection sources and media live outside the public checkout.
+
+On Windows and both Mac architectures, the production updater replaced an
+application image and received the new process's catalog-startup acknowledgement.
+An intentionally held profile lock prevented acknowledgement in a separate run;
+the updater restored the previous image. Catalog and long-recording progress
+survived successful replacement. Windows jpackage marks its launcher read-only;
+cleanup now clears that DOS attribute before removing the old bundle. Repeated
+native checks passed after this correction.
+
+Linux additionally completed the normal Install update → Restart and install UI
+flow from a temporary 0.14.0 desktop image to the signed 0.15.0 image. Both local
+recordings, the favorite, a newly created playlist and its member, and the paused
+long-recording position matched exactly after restart; SQLite integrity was `ok`.
+The application cache contained no remaining transfer, staging or helper files.
+The initial helper launch exposed OpenJDK's inherited `_JPACKAGE_LAUNCHER` flag;
+all updater child launchers now clear it so application arguments reach Spotygram.
+Closing the Linux window while an uncached recording waited in a network namespace
+kept the process and media service alive; Raise restored the window and Quit
+closed it. Background continuation now uses the requested playback state during
+buffering, while a finished queue can still close normally.
+
+Linux ran with hardware Mesa rendering through VirtualGL. A separate Spotygram
+Telegram session completed phone and two-step sign-in; phone → QR → phone also
+worked. A chosen real chat indexed 536 recordings, including large documents and
+long books. Playback began before a book's complete download. A 40-minute seek,
+speed limits, saved positions, natural completion, repeat-one and repeat-all were
+observed. Explicitly saving a temporary book retained it; replacing the queue
+removed the older temporary copy. A saved book played after a fresh launch in a
+network namespace with no usable external route, retaining position and speed.
+
+A process-specific systemd IP filter blocked Telegram traffic while checking an
+incomplete 1.6 GB recording. A move into unavailable data retained its position;
+after timeout the player stopped without advancing the queue or clearing the
+bookmark. Restoring network access and choosing Play resumed that recording.
+The adapter now handles reader failures explicitly and observes native seeking
+as well as cache buffering. Previously a pending seek could still appear to be
+playing; a read failure must not be treated as successful end-of-file.
+
+Resource samples are process RSS, not just Java heap. Native Windows/macOS runner
+samples were about 240–320 MiB; paused CPU was 0–1.5% of one core. Visible playback
+cost more, including about 29% on the Windows software-rendered runner. On Linux
+with the real catalog, RSS was about 597 MiB, Java heap about 19 MiB, minimized
+pause about 0.2% CPU and hidden playback about 2%. Graphics, TDLib and other native
+allocations account for most of that RSS. These are observed configurations, not
+cross-hardware benchmarks or battery measurements. Native Image was not needed
+for this release and was not evaluated.
+
+No physical ARM64 Android device, OEM background limits, speaker quality, battery
+use or physical Windows/macOS hardware was checked. Authenticated Telegram checks
+were performed on Linux; the Windows/macOS checks used local recordings. Actual
+Wi-Fi interface changes and every possible audio container were not exercised.
+These limits do not change the shared application feature set.
+
 ## 0.14.0 — positions for long recordings
 
 The default inclusive threshold is 30 minutes, with an enable switch and a

@@ -2,17 +2,19 @@
 
 [Documentation](README.md) · **English** · [Русский](architecture.ru.md)
 
-Spotygram runs in one Android process and one app module. It connects directly
-to Telegram and reads audio from local files. There is no backend or local
-HTTP proxy between the player and its data.
+Spotygram uses the same Kotlin/Compose screens and application rules on Android,
+Windows, Linux and macOS. `shared/` holds the UI, resources, catalog, Telegram,
+queue and cache code. `app/` and `desktop/` compile that source with small OS
+adapters. Telegram connections and audio stay in the application process;
+there is no backend or local HTTP proxy.
 
 ```text
 Compose UI ── SpotygramApp ── Library / SQLite
                    │
                    ├── Telegram / TDLib ── Telegram servers
                    │
-                   ├── PlaybackService / Media3
-                   │         └── TelegramDataSource ── downloaded file ranges
+                    ├── PlaybackQueue ── Media3 (Android) / libmpv (desktop)
+                    │                        └── TrackReader ── downloaded file ranges
                    │
                    └── AppUpdates ── GitHub releases
 ```
@@ -24,8 +26,11 @@ owns the TDLib instance, authorization, JSON requests and update stream.
 `Library` owns the music index and publishes immutable snapshots to the UI.
 Screens do not read TDLib's database.
 
-`PlaybackService` owns ExoPlayer and the queue. The UI uses MediaController
-for transport controls and the in-process service for full-queue edits.
+`PlaybackQueue` owns all queue, speed and progress rules. A small `Player`
+contract carries transport commands and native events; `AndroidPlayer` adapts
+Media3 and `MpvPlayer` adapts libmpv. Android's `PlaybackService` owns ExoPlayer
+and the shared queue. Its UI uses MediaController for transport and the
+in-process queue for edits. Desktop uses the same queue in its application process.
 `PlayerConnection` owns the Activity's controller from `onStart` to `onStop`;
 releasing this UI connection does not pause background playback. It handles
 disconnects, bounds each connection attempt to ten seconds and permits one
@@ -33,13 +38,13 @@ automatic retry per foreground entry or explicit playback request. No background
 reconnect loop runs. Generation checks discard obsolete callbacks and release
 old futures. A later foreground entry or song tap can retry a failed connection.
 
-Playback speed uses MediaController's standard Media3 command, preserving pitch.
+Android playback speed uses MediaController's standard Media3 command, preserving pitch.
 The full player's existing sheet offers 0.3×–4× in 0.05× steps; player events
-update both full and mini-player indicators. The service owns persistence: one
+update both full and mini-player indicators. The shared queue owns persistence: one
 300 ms deferred callback coalesces dragging into a small speed preference in
-`playback_position`, flushed on service destruction and restored before creating
-the media session. Speed changes do not rebuild or serialize the queue. No new
-service, decoder, dependency or progress timer is involved.
+`playback_position`, flushed on queue closure and restored at startup. Desktop
+uses libmpv's speed with pitch correction; neither platform rebuilds or serializes
+the queue for a speed change.
 
 Song and random-play requests go through this owner rather than a captured
 nullable controller. During connection, only the latest selected queue/track is
@@ -55,9 +60,14 @@ not include their captured values. This could keep a dead row handler even
 while the mini-player was connected. The same correction covers group-aware
 favorite actions and the add-to-playlist callback.
 
-`DownloadService` handles explicitly requested downloads sequentially, as
-a visible foreground service. No extra service is needed for updates or
-cache cleanup.
+`Downloads` owns one sequential explicit-download queue. Android exposes it
+through the foreground `DownloadService`; desktop keeps it in the app while its
+window can be hidden. No extra service is needed for updates or cache cleanup.
+
+`Platform` supplies preferences, SQLite, key storage, metadata, files, links,
+network information and installation. SQLiteOpenHelper and SQLite JDBC use the
+same schema and library operations. Desktop preferences write atomic JSON files
+through one writer. Platform adapters contain no screen layouts or ordering rules.
 
 ## From messages to tracks
 
@@ -92,8 +102,9 @@ that may have been replaced by a thumbnail after an ID collision. Explicit
 file removal resolves the current ID rather than trusting a persisted one.
 
 Personal-chat navigation uses Telegram Android's `tg://openmessage` URI with
-the user, server message and account IDs; these chats have no HTTPS message
-link. Other chats retain TDLib's link lookup. Transient notices replace older
+the user, server message and account IDs. Desktop opens Telegram Web K at the
+user and server message, because Telegram Desktop has no openmessage handler.
+Other chats retain TDLib's link lookup. Transient notices replace older
 pending notices, and playback errors use localized text rather than raw
 extractor exceptions. The app's own diagnostic event records only the playback
 error code.
@@ -138,7 +149,7 @@ message rows; On device still groups references to one physical path.
 
 ## A large queue, a small media session
 
-The full logical queue stays inside the service. Android's media session sees
+The full logical queue stays inside `PlaybackQueue`. Android's media session sees
 at most three physical items: previous, current and next. Sliding this window
 is posted after Media3's transition callback; mutating it synchronously there
 can expose an inconsistent timeline to controllers.
@@ -160,11 +171,11 @@ a snapshot version. One conflated IO writer persists them. Reopening restores
 the position paused; neither a progress tick nor a random transition rewrites
 the full song list.
 
-Long-recording progress belongs to `PlaybackService`, alongside queue persistence.
+Long-recording progress belongs to `PlaybackQueue`, alongside queue persistence.
 SQLite schema 5 adds `playback_progress`, keyed by catalog track ID with cascading
 deletion. It stores position, observed duration and file identity/size, without
 adding fields to UI library snapshots. Only entries with an unfinished position
-are loaded into the service's lookup. Fresh selections and Media3 transitions
+are loaded into the queue's lookup. Fresh selections and native transitions
 resume eligible entries; the default inclusive threshold is 30 minutes, with
 an enable switch and positive integer minutes in existing settings.
 Selection waits for the initial progress load, retaining only the latest start
@@ -190,8 +201,10 @@ value on release without waiting for parent recomposition.
 
 ## Files and account state
 
-`TelegramDataSource` reads available ranges directly from TDLib's downloaded
-file. Missing ranges wait for file updates with a timeout. There is no second
+`TrackReader` reads available ranges directly from TDLib's downloaded file.
+Android's `TelegramDataSource` and libmpv's read/seek/cancel stream callbacks use
+that same reader. Missing ranges wait for file updates with a timeout; closing
+or replacing a stream cancels its wait. There is no second
 media cache. By default, fully downloaded files remain available offline;
 TDLib's automatic storage optimizer is disabled.
 
@@ -234,16 +247,19 @@ catalog entry. Removing a Telegram copy retains its message reference.
 Removing a source hides remote-only tracks except favorites and playlist
 members. An inaccessible original cannot restore a deleted local copy.
 
-TDLib's database key is random and wrapped by Android Keystore AES-GCM.
-Android backups are disabled. Audio and catalog data use app-private storage,
-not separate per-file encryption. Logout removes Telegram catalog records and
+TDLib's database key is random. Android wraps it with Keystore AES-GCM; desktop
+stores it in Windows Credential Manager, macOS Keychain or Linux Secret Service.
+An existing database never gets a replacement key when its stored key is
+unavailable. Android backups are disabled. Audio and catalog data use private
+per-user storage, not separate per-file encryption. Logout removes Telegram catalog records and
 their playlist references; imports remain. No other app's session is used,
 and network payloads are not logged.
 
 ## UI and resource use
 
 Compose renders four destinations with a saved last destination. English and
-Russian use Android resources; Android 13+ supports per-app language selection.
+Russian use the same XML resources; desktop reads them directly, while Android
+uses its resource system and Android 13+ per-app language selection.
 Playlist edits and batch operations use transactions. Track lists are lazy,
 and artwork requests have two concurrent slots with low TDLib priority.
 
@@ -270,7 +286,7 @@ Search, source filters, navigation, transport, switches and sheets use that
 material. Dense surfaces fully diffuse the captured text rather than overlaying
 a sharp copy. The secondary refraction-detail pass is disabled; primary edge
 refraction, dispersion and lighting remain. Android 13+ supports the full
-RuntimeShader optics; older Android versions use Haze's tint/lighting/rim
+RuntimeShader optics; desktop uses Haze's Skia glass renderer. Older Android versions use Haze's tint/lighting/rim
 fallback with denser tint for text-heavy surfaces. Reduced-motion handling comes
 from Compose and Haze's system policy.
 Press/focus optics belong to controls with interaction sources; whole sheets do
@@ -285,16 +301,27 @@ and controls in separate columns. Music lists remain bounded to 720 dp.
 SQLite work, import and page parsing run off the UI thread. During indexing,
 library snapshots publish at most twice per second plus completion. Progress
 timers belong to visible player components, not the entire app screen.
-Android's network callback informs TDLib of connectivity changes; there is
-no network polling loop. Playback buffers target 15–30 seconds, with a
-one-second start and two-second rebuffer threshold. These are configuration
-values, not measured promises about a phone or connection.
+Android's network callback informs TDLib of connectivity changes; desktop TDLib
+manages reconnection itself. Desktop Wi-Fi detection runs only for an active
+download queue. There is no idle network polling loop. Media3 buffers target
+15–30 seconds, with a one-second start and two-second rebuffer threshold.
+libmpv reads ahead up to 30 seconds within an 8 MiB demuxer limit, with a
+one-second initial cache wait. These are configuration values, not measured promises.
+
+Desktop has a single-instance file lock and event-driven file activation, native
+import dialogs, system key storage and Nucleus media controls: MPRIS on Linux,
+SMTC on Windows and MPNowPlayingInfoCenter on macOS. Its visible window owns a
+lifecycle; minimizing/hiding stops UI progress observations and chat-picker work.
+Audio and explicit downloads continue. Quit flushes the queue and preferences,
+closes TDLib and releases the audio engine. A bundled jlink runtime avoids a
+system Java requirement. The 256 MiB heap limit does not cap native memory;
+resource observations are kept in the verification record.
 
 ## Release checks
 
 `AppUpdates` owns a small StateFlow and separate preferences. Activity
 `onStart` may trigger one unauthenticated request to the fixed GitHub latest
-release endpoint. Automatic attempts have a persisted 24-hour interval;
+release endpoint; desktop foreground entry does the same. Automatic attempts have a persisted 24-hour interval;
 manual attempts have a one-minute floor and respect a saved rate-limit
 cooldown. The timestamp is committed on IO before the request. One main-thread
 reservation prevents overlap, and failures do not trigger retries. A backward
@@ -303,7 +330,7 @@ clock change rebases the timestamp and suppresses that attempt.
 ETag/304 reuses saved release metadata. Connect/read timeouts are 5/8 seconds,
 the response is limited to 256 KiB, and redirects are rejected. Accepted
 releases must be non-draft, non-prerelease, tagged `vMAJOR.MINOR.PATCH`, with
-an uploaded APK for the device ABI. Version comparison is numeric. Release
+an uploaded application asset for the host target. Version comparison is numeric. Release
 links are constructed under the fixed repository, not taken from arbitrary
 response URLs. The naming contract is in the [build guide](build.md).
 
@@ -337,10 +364,21 @@ without downloading, with verification repeated before handoff. Cancel joins
 in-flight work before removing the DownloadManager entry and private files.
 After a successful app update, the next launch clears the old APK and metadata.
 
+Desktop's installer resumes a requested transfer, checks the SHA-256 and detached
+Ed25519 manifest signature, then checks every extracted file and its target/version.
+Extraction bounds paths, expanded size, entry count and links. After an explicit
+restart confirmation, a cache-owned helper waits for the old process, copies the
+verified replacement into the same filesystem and replaces the installation.
+The new app acknowledges catalog startup; failed startup restores the previous
+application. Data and credentials are outside this tree. macOS code signing is
+ad hoc; the manifest's release signature supplies the update channel's publisher
+identity independently of Apple notarization.
+
 ## Verification and limits
 
 The [verification record](verification.md) keeps concrete observations and
 untested cases separately. Source review does not substitute for a successful
 account login, a real remote download or a physical-device measurement.
-The app currently supports one Telegram account and two Android ABIs;
-secret chats, voice notes and playlist sync are outside its scope.
+The app supports one Telegram account on each installation, Android ARM64/x86-64,
+Windows/Linux x86-64 and macOS x86-64/ARM64. Secret chats, voice notes and playlist
+sync are outside its scope.

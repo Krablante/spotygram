@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 
 /** Foreground Activity connection. Playback itself remains owned by PlaybackService. */
 class PlayerConnection(private val activity: ComponentActivity, private val app: SpotygramApp) {
-    val controller = MutableStateFlow<MediaController?>(null)
+    val controller = MutableStateFlow<Player?>(null)
     val waiting = MutableStateFlow(false)
     private var future: ListenableFuture<MediaController>? = null
     private var deadline: Job? = null
@@ -112,7 +112,7 @@ class PlayerConnection(private val activity: ComponentActivity, private val app:
                         }
                         deadline?.cancel()
                         deadline = null
-                        controller.value = ready
+                        controller.value = AndroidPlayer(ready)
                         if (!dispatch()) failed(ticket, "missing service")
                     } catch (e: Exception) {
                         failed(ticket, e.javaClass.simpleName)

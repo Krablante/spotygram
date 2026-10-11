@@ -16,7 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
     private val app
-        get() = application as SpotygramApp
+        get() = (application as AndroidApplication).model
 
     private val playerConnection by lazy { PlayerConnection(this, app) }
 
@@ -46,7 +46,13 @@ class MainActivity : ComponentActivity() {
                 }
             val permission =
                 rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-            SpotygramTheme(mode) {
+            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+            CompositionLocalProvider(
+                LocalApp provides app,
+                LocalConfiguration provides ViewConfiguration(configuration.screenWidthDp,
+                    configuration.screenHeightDp, configuration.fontScale,
+                    listOf(configuration.locales[0])),
+            ) { SpotygramTheme(mode) {
                 SpotygramUI(
                     app,
                     controller,
@@ -63,7 +69,7 @@ class MainActivity : ComponentActivity() {
                         app.action { app.download(ids) }
                     },
                 )
-            }
+            } }
         }
     }
 
@@ -82,11 +88,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        app.updates.installer.resume(this)
+        (app.updates.installer as UpdateInstaller).resume(this)
     }
 
     override fun onPause() {
-        app.updates.installer.pause(this)
+        (app.updates.installer as UpdateInstaller).pause(this)
         super.onPause()
     }
 

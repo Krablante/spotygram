@@ -16,67 +16,9 @@ import java.lang.ref.WeakReference
 import java.security.MessageDigest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.json.JSONObject
-
-data class UpdateAsset(val version: String, val size: Long, val sha256: String, val abi: String) {
-    val url
-        get() =
-            "https://github.com/Krablante/spotygram/releases/download/v$version/spotygram-$version-$abi.apk"
-
-    fun valid() =
-        Regex("[0-9]{1,6}\\.[0-9]{1,6}\\.[0-9]{1,6}").matches(version) &&
-            size in 1..268_435_456L &&
-            Regex("[0-9a-f]{64}").matches(sha256) &&
-            abi in setOf("arm64", "x86_64")
-
-    fun newerThanInstalled(): Boolean {
-        val a = version.split('.').map { it.toInt() }
-        val b = BuildConfig.VERSION_NAME.split('.').map { it.toInt() }
-        for (i in 0..2) if (a[i] != b[i]) return a[i] > b[i]
-        return false
-    }
-
-    fun toJson() =
-        JSONObject()
-            .put("version", version)
-            .put("size", size)
-            .put("sha256", sha256)
-            .put("abi", abi)
-            .toString()
-
-    companion object {
-        fun fromJson(text: String?): UpdateAsset? = runCatching {
-            val j = JSONObject(text ?: return null)
-            UpdateAsset(
-                    j.getString("version"),
-                    j.getLong("size"),
-                    j.getString("sha256"),
-                    j.getString("abi"),
-                )
-                .takeIf { it.valid() }
-        }
-            .getOrNull()
-    }
-}
-
-enum class InstallPhase {
-    IDLE,
-    DOWNLOADING,
-    VERIFYING,
-    READY,
-    CANCELLING,
-}
-
-data class InstallState(
-    val phase: InstallPhase = InstallPhase.IDLE,
-    val version: String = "",
-    val downloaded: Long = 0,
-    val total: Long = 0,
-    val error: Int = 0,
-)
 
 /** DownloadManager owns background transfer. Only the resumed activity polls progress. */
-class UpdateInstaller(private val app: SpotygramApp) {
+class UpdateInstaller(private val app: AndroidApplication) : UpdateInstallation {
     private val prefs = app.getSharedPreferences("update_install", Context.MODE_PRIVATE)
     private val downloads = app.getSystemService(DownloadManager::class.java)
     private val directory = File(app.cacheDir, "updates")
@@ -87,7 +29,7 @@ class UpdateInstaller(private val app: SpotygramApp) {
     private var monitor: Job? = null
     private var restored = false
     private var installAfterDownload = false
-    val state = MutableStateFlow(InstallState())
+    override val state = MutableStateFlow(InstallState())
 
     fun resume(owner: Activity) {
         activity = WeakReference(owner)
@@ -134,7 +76,7 @@ class UpdateInstaller(private val app: SpotygramApp) {
         monitor = null
     }
 
-    fun start(asset: UpdateAsset?) {
+    override fun start(asset: UpdateAsset?) {
         if (
             work?.isActive == true ||
                 state.value.phase in
@@ -179,7 +121,7 @@ class UpdateInstaller(private val app: SpotygramApp) {
             }
     }
 
-    fun cancel() {
+    override fun cancel() {
         if (state.value.phase == InstallPhase.CANCELLING) return
         installAfterDownload = false
         val previousMonitor = monitor

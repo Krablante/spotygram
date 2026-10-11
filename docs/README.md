@@ -3,7 +3,7 @@
 [Spotygram](../README.md) · **English** · [Русский](README.ru.md)
 
 To install the player and listen to music, start with the user guide. The
-development guides explain how to build an APK and where each part of the
+development guides explain how to build Android and desktop packages and where each part of the
 application belongs.
 
 | Guide | What you will find |
@@ -14,7 +14,7 @@ application belongs.
 | [Verification record](verification.md) | What was actually checked, how, and what remains unverified |
 | [Third-party notices](third-party.md) | Dependencies and licenses |
 
-The first three guides are available in both languages, with a switch at the
+The user, build, architecture and license guides are available in both languages, with a switch at the
 top of each page. The historical verification record is maintained in English.
 Current downloads and release notes are on the
 [releases page](https://github.com/Krablante/spotygram/releases).

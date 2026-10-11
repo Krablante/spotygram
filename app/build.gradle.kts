@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.compose")
 }
 
 val buildState = providers.environmentVariable("SPOTYGRAM_STATE").orElse("${rootDir}/native").get()
@@ -32,8 +33,8 @@ android {
         applicationId = "app.spotygram"
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
-        versionName = "0.14.0"
+        versionCode = 27
+        versionName = rootProject.version.toString()
         buildConfigField("int", "TELEGRAM_API_ID", credential("TELEGRAM_API_ID").ifBlank { "0" })
         buildConfigField("String", "TELEGRAM_API_HASH", "\"${credential("TELEGRAM_API_HASH")}\"")
         buildConfigField("boolean", "TELEGRAM_TEST_DC", "false")
@@ -77,6 +78,8 @@ android {
         }
     }
     sourceSets["main"].jniLibs.directories += "$buildState/jniLibs"
+    sourceSets["main"].java.srcDir(rootProject.file("shared/src/main/kotlin"))
+    sourceSets["main"].res.srcDir(rootProject.file("shared/src/main/res"))
     sourceSets["main"].assets.directories += layout.buildDirectory.get().dir("generated/licenseAssets").asFile.path
     buildFeatures {
         compose = true
@@ -97,16 +100,11 @@ tasks.named("preBuild").configure { dependsOn(licenseAssets) }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2025.08.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
+    implementation(compose.material3)
+    implementation(compose.materialIconsExtended)
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.media3:media3-exoplayer:1.8.0")
     implementation("androidx.media3:media3-session:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
-    implementation("dev.chrisbanes.haze:haze:2.0.1")
-    implementation("dev.chrisbanes.haze:haze-glass:2.0.1")
 }

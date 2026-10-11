@@ -16,4 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "spotygram"
 
-include(":app")
+include(":desktop")
+if (!providers.gradleProperty("desktopOnly").orElse("false").get().toBoolean()) include(":app")
