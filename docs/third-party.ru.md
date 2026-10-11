@@ -15,7 +15,7 @@
 | libmpv / FFmpeg desktop | [mpv-prebuilt](https://github.com/jason-yau/mpv-prebuilt/releases/tag/20260906162952), LGPL-сборки libmpv 0.41.0 | LGPL 2.1+ и лицензии компонентов |
 | SQLite JDBC | 3.50.3.0 | Apache 2.0 / BSD-2-Clause; SQLite — public domain |
 | JNA / JNA Platform | 5.17.0 | Apache 2.0 или LGPL 2.1+ |
-| java-keyring | 1.0.0 | BSD-3-Clause |
+| java-keyring | 1.0.4 | BSD-3-Clause |
 | jaudiotagger | 3.0.1 | LGPL 2.1+ |
 | Nucleus media-control / core-runtime | 2.5.0, [Nucleus](https://github.com/NucleusFramework/Nucleus/tree/v2.5.0) | MIT; встроенный код сохраняет свои уведомления |
 | Apache Commons Compress | 1.28.0; Commons Lang 3.18.0, IO 2.20.0 и Codec 1.19.0 | Apache 2.0 |

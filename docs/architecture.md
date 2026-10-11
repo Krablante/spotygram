@@ -168,7 +168,9 @@ events validate the file before making it offline again.
 
 The random TDLib database key is wrapped with Android Keystore AES-GCM or stored in
 Windows Credential Manager, macOS Keychain or Linux Secret Service. An existing
-database never receives a replacement key when the original is missing. Android
+database never receives a replacement key when the original is missing. Initialization
+reads that key before creating the Telegram database and file directories, then passes
+absolute native paths to TDLib. Directory creation runs on IO. Android
 backups are disabled. The catalog and audio use private per-user storage without
 separate per-file encryption. Telegram sign-in grants a full account session; source
 selection limits indexing, not account permissions. Logout clears Telegram catalog

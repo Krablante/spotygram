@@ -121,7 +121,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
     implementation("net.java.dev.jna:jna:5.17.0")
     implementation("net.java.dev.jna:jna-platform:5.17.0")
-    implementation("com.github.javakeyring:java-keyring:1.0.0")
+    implementation("com.github.javakeyring:java-keyring:1.0.4")
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("dev.nucleusframework:nucleus.media-control:2.5.0")

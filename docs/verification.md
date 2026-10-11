@@ -7,6 +7,46 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.15.3 — Telegram initialization on Windows
+
+Packaged Windows, Linux and both macOS targets initialized a fresh TDLib database
+and reached phone entry, then reopened it with the same credential-store key.
+Windows and macOS completed 200 key reads with forced garbage collection per run,
+including fresh and restarted processes. The older Windows heap failure did not
+occur with java-keyring 1.0.4. Windows also initialized a profile containing spaces
+and a separate Unicode path. Removing only a temporary desktop key made startup
+reject that database; its files remained byte-for-byte unchanged. Actual Windows
+and macOS phone-entry screens were inspected.
+
+Windows installed the **published 0.15.2 MSI**, upgraded to 0.15.3 and launched the
+installed app through phone entry. The same key and database remained after MSI
+removal. A separate standard account completed installation and removal of 0.15.2,
+reinstallation, upgrade and removal of 0.15.3 without elevation; a profile file
+survived. This isolated Server 2022 runner temporarily allowed unmanaged MSI
+packages, which its default policy blocks for standard accounts.
+`AlwaysInstallElevated` remained off. The original 0.15.2 product identifier and
+its elevated removal command were checked against the public package.
+
+The owner's `X:\Config.Msi` file-security failure was not reproduced. The MSI
+lifecycle passed with both administrator and standard accounts; the user guide
+provides elevated removal and log collection for diagnosing that machine's
+rollback-folder permissions. Per-user installation and the upgrade identity remain
+the same.
+
+Android debug/release builds and both Lint checks passed. Both APKs retained the
+original application ID and signer and passed 16 KB ZIP alignment. An isolated
+Android 16 debug installation reached phone entry on a fresh profile and after a
+process restart; its wrapped key was unchanged. The real screens were inspected.
+Cold-boot Pixel Launcher/System UI ANRs and Bluetooth crashes occurred before these
+checks; the app log contained no application crash during the successful scenario.
+
+Four installer signatures, four archive manifests and every archive payload file
+were verified with the existing desktop key. Both macOS bundles passed strict deep
+ad hoc signature checks. This cycle checks initialization, key retention and MSI
+lifecycle; it does not establish authenticated account playback or reproduce the
+owner's Windows drive permissions. Physical-device, audio and battery limits below
+still apply.
+
 ## 0.15.2 — native desktop installation
 
 The same prepared application image now produces a Windows MSI, Ubuntu DEB or

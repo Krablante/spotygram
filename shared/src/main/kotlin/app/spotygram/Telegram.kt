@@ -1,5 +1,7 @@
 package app.spotygram
 
+import java.io.File
+import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.*
@@ -144,13 +146,22 @@ class Telegram(
                 scope.launch {
                     auth.value = auth.value.copy(busy = true)
                     runCatching {
+                        // Read the key before creating the database directory: platform key stores
+                        // must still distinguish a new profile from an existing database without its key.
+                        val parameters = withContext(Dispatchers.IO) {
+                            val key = platform.databaseKey()
+                            val database = File(platform.filesDir, "telegram/db").canonicalFile
+                            val files = File(platform.filesDir, "telegram/files").canonicalFile
+                            Files.createDirectories(database.toPath())
+                            Files.createDirectories(files.toPath())
+                            Triple(database.path, files.path, key)
+                        }
                         request(
                             json(
                                 "setTdlibParameters",
-                                "database_directory" to "${platform.filesDir}/telegram/db",
-                                "files_directory" to "${platform.filesDir}/telegram/files",
-                                "database_encryption_key" to
-                                    withContext(Dispatchers.IO) { platform.databaseKey() },
+                                "database_directory" to parameters.first,
+                                "files_directory" to parameters.second,
+                                "database_encryption_key" to parameters.third,
                                 "use_file_database" to true,
                                 "use_chat_info_database" to true,
                                 "use_message_database" to true,
