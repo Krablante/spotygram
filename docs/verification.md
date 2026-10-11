@@ -7,6 +7,32 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.15.4 — return to phone entry during sign-in
+
+The packaged Linux debug launcher and an isolated Android 16 debug APK used
+Telegram's test DCs with reserved phone numbers. Both reached code entry, returned
+to phone entry and requested a code for another number. Linux exercised the arrow,
+Esc and Change phone number, including an invalid-number error that left the field
+editable. Android exercised system Back, Change phone number and the arrow. Actual
+screens were inspected in light appearance on Linux and dark appearance on Android,
+including English at 400 dp and Russian at 320 dp. The Russian action fit the narrow
+screen and its arrow returned to phone entry.
+
+Android debug/release assembly and both Lint checks passed. Both release APKs kept
+the original application ID and signing certificate, increased versionCode to 31
+and passed 16 KB ZIP alignment. All four desktop targets built on native runners.
+Four installer signatures, four signed archive manifests and every archive payload
+entry were verified with the existing public key.
+
+The fresh emulator had System UI, phone-service and Google-service ANRs during cold
+boot, before app checks; installation required a retry. The successful application
+flow had no AndroidRuntime crash. Linux sandbox code submission returned
+PHONE_CODE_INVALID, so this cycle establishes navigation and new code requests,
+not completed account authorization. Password/email transitions were reviewed
+against the pinned TDLib contract, but not exercised with an account. Windows/macOS
+UI, installer lifecycle, production-account playback and physical-device behavior
+were not rechecked in this cycle.
+
 ## 0.15.3 — Telegram initialization on Windows
 
 Packaged Windows, Linux and both macOS targets initialized a fresh TDLib database
