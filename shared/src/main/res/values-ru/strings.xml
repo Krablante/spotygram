@@ -8,6 +8,9 @@
     <string name="update_restart_title">Перезапустить для установки?</string>
     <string name="update_restart_help">Spotygram остановит воспроизведение, установит проверенное обновление и откроется снова. Медиатека, плейлисты и вход в Telegram сохранятся.</string>
     <string name="update_restart">Перезапустить и установить</string>
+    <string name="update_package_title">Открыть установщик?</string>
+    <string name="update_package_help">Spotygram закроется и откроет проверенный системный установщик. Завершите установку и откройте Spotygram из списка приложений. Медиатека, плейлисты и вход в Telegram сохранятся.</string>
+    <string name="update_package_open">Закрыть и открыть установщик</string>
     <string name="update_install_location">Эту копию нельзя обновить в текущей папке. Храните полную папку Spotygram там, где разрешена запись, и повторите попытку.</string>
     <string name="speed">Скорость</string>
     <string name="playback_speed">Скорость воспроизведения</string>

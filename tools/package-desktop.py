@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import stat
 import subprocess
 import tarfile
@@ -54,7 +55,7 @@ def checksum(file):
     return value.hexdigest()
 
 
-def package(image, target, version, state, destination):
+def release_key(state, destination):
     if state == ROOT or ROOT in state.parents or destination == ROOT or ROOT in destination.parents:
         raise RuntimeError("Signing state and release output must be outside the source checkout")
     private = state / "desktop/signing/release-private.pem"
@@ -63,6 +64,11 @@ def package(image, target, version, state, destination):
     expected_public = (ROOT / "desktop/src/main/resources/update-key.pub").read_text()
     if public_der(public_key(private)) != public_der(expected_public):
         raise RuntimeError("Desktop release key differs from the application's trusted key")
+    return private
+
+
+def package(image, target, version, state, destination):
+    private = release_key(state, destination)
     image = image.resolve()
     if image.name not in ("Spotygram", "Spotygram.app") or not image.is_dir():
         raise RuntimeError("Expected a complete Spotygram application image")
@@ -111,6 +117,79 @@ def package(image, target, version, state, destination):
             archive.write(signature, signature.name)
     print(artifact)
     print(f"SHA256 {checksum(artifact)}")
+
+
+def installer(image, target, version, state, destination):
+    private = release_key(state, destination)
+    system = target.split('-')[0]
+    extension = {'windows': 'msi', 'macos': 'dmg', 'linux': 'deb'}[system]
+    resources = image / {'windows': 'app/resources', 'macos': 'Contents/app/resources',
+                         'linux': 'lib/app/resources'}[system]
+    marker = resources / 'installation'
+    if marker.exists():
+        raise RuntimeError('Application image already has an installation marker')
+    output = state / 'desktop/installers' / target / version
+    output.mkdir(parents=True, exist_ok=True)
+    artifact = destination / f'spotygram-{version}-{target}.{extension}'
+    package_version = version
+    if system == 'macos':
+        major, minor, patch = version.split('.')
+        package_version = f'{int(major) + 1}.{minor}.{patch}'
+    icon_extension = {'windows': 'ico', 'macos': 'icns', 'linux': 'png'}[system]
+    icons = state / 'build/desktop/icons'
+    icon = icons / f'spotygram.{icon_extension}'
+    if not icon.is_file():
+        launcher = image / {'windows': 'Spotygram.exe', 'macos': 'Contents/MacOS/Spotygram',
+                            'linux': 'bin/Spotygram'}[system]
+        subprocess.run([str(launcher), '--write-icons', str(icons)], check=True,
+                       env=dict(os.environ, JAVA_TOOL_OPTIONS='-Djava.awt.headless=true -Xmx128m'))
+    java_home = os.environ.get('JAVA_HOME')
+    executable = str(Path(java_home) / 'bin' / ('jpackage.exe' if system == 'windows' else 'jpackage')) \
+        if java_home else 'jpackage'
+    command = [executable, '--type', extension, '--app-image', str(image), '--name', 'Spotygram',
+        '--verbose',
+        '--icon', str(icon),
+        '--app-version', package_version, '--dest', str(output), '--vendor', 'Krablante',
+        '--description', 'Music and long recordings from Telegram chats and local files',
+        '--about-url', 'https://github.com/Krablante/spotygram']
+    if system == 'windows':
+        command += ['--win-per-user-install', '--install-dir', 'SpotygramApp',
+                    '--license-file', str(ROOT / 'LICENSE'),
+                    '--win-menu', '--win-menu-group', 'Spotygram',
+                    '--win-shortcut', '--win-dir-chooser',
+                    '--win-upgrade-uuid', '58e4eaa7-5519-5da3-8f61-6e1dc41508c8']
+    elif system == 'linux':
+        command += ['--linux-package-name', 'spotygram', '--linux-shortcut',
+                    '--license-file', str(ROOT / 'LICENSE'),
+                    '--linux-menu-group', 'AudioVideo', '--linux-app-category', 'sound',
+                    '--linux-deb-maintainer', 'gkrablante@gmail.com',
+                    '--resource-dir', str(ROOT / 'desktop/packaging/linux'),
+                    '--linux-package-deps', 'libc6 (>= 2.35), libgl1, libegl1, libx11-6, xdg-utils']
+    else:
+        command += ['--mac-package-identifier', 'app.spotygram']
+    marker.write_text(extension + '\n')
+    try:
+        if system == 'macos':
+            subprocess.run(['codesign', '--force', '--deep', '--sign', '-', str(image)], check=True)
+        subprocess.run(command, check=True)
+        packages = list(output.glob(f'*.{extension}'))
+        if len(packages) != 1:
+            raise RuntimeError(f'Expected one {extension} installer in {output}')
+        destination.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(packages[0]), artifact)
+    finally:
+        marker.unlink()
+        if system == 'macos':
+            subprocess.run(['codesign', '--force', '--deep', '--sign', '-', str(image)], check=True)
+    digest = checksum(artifact)
+    # Bind the same trusted Ed25519 key to the exact installer name and digest.
+    metadata = state / 'desktop/manifests' / target / version / 'installer.txt'
+    metadata.parent.mkdir(parents=True, exist_ok=True)
+    metadata.write_bytes(f'Spotygram installer\n{artifact.name}\n{digest}\n'.encode())
+    subprocess.run([openssl(), 'pkeyutl', '-sign', '-rawin', '-inkey', str(private),
+                    '-in', str(metadata), '-out', str(artifact) + '.sig'], check=True)
+    print(artifact)
+    print(f'SHA256 {digest}')
 
 
 if __name__ == "__main__":

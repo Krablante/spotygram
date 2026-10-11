@@ -119,7 +119,7 @@ class DesktopPlatform : Platform, AutoCloseable {
     }
     override fun installer(app: SpotygramApp): UpdateInstallation = DesktopUpdateInstaller(app)
     override fun assetName(version: String, abi: String) =
-        "spotygram-$version-$abi.${if (abi.startsWith("linux")) "tar.gz" else "zip"}"
+        "spotygram-$version-$abi.${DesktopTarget.installerExtension ?: if (abi.startsWith("linux")) "tar.gz" else "zip"}"
     override fun logPlaybackError(code: String) { System.err.println("Spotygram playback failed: $code") }
     override fun close() {
         writer.shutdown()

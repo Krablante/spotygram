@@ -7,6 +7,49 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.15.2 — native desktop installation
+
+The same prepared application image now produces a Windows MSI, Ubuntu DEB or
+macOS DMG as well as its signed portable archive. Android debug/release builds
+and both full Lint checks passed. Both release APKs retained the original
+application ID and signing certificate and passed 16 KB ZIP alignment checks.
+
+Windows x64 completed silent MSI installation, upgrade from a private MSI wrapping
+the actual 0.15.1 payload, installed launch and native MSI removal. Three recordings
+imported with the older installed launcher survived upgrade and removal with
+integrity `ok`. The Start menu shortcut appeared and was removed on uninstall;
+Windows Installer registered one 0.15.2 product at the separate per-user program
+location. The real welcome wizard and installed application were inspected as PNGs;
+the complete interactive wizard was not driven on the hosted runner.
+
+Both macOS architectures mounted their actual DMGs, showed the Applications
+shortcut and copied the app into a user Applications folder. Installed launchers
+opened the retained catalog and position. Strict deep ad hoc signature checks
+passed before and after installation; removing the app preserved its profile.
+Actual Finder/install and application PNGs were inspected.
+
+Ubuntu 24.04 completed a fresh DEB installation, reinstallation and removal with
+a valid application-menu entry and the RGB Spotygram icon. Installation also
+worked when the standard XDG menu directory was initially absent. The installed
+app restored two recordings, a favorite, playlist membership and the paused
+position. A stale portable transfer in that profile was discarded after switching
+to the installed copy. A separately signed local fixture exercised the real
+Close and open installer flow: Spotygram verified it, closed and opened GDebi.
+All catalog/progress rows matched afterwards, integrity was `ok`, and temporary
+preferences/transfers were restored. The fixture's version label was private
+verification input, not a published future release.
+
+Installed runtime checks verified the selected package asset name, detached
+signature and tamper rejection with the original desktop update key. Portable
+installation/rollback checks also ran against the fresh native builds. This
+release focuses on packaging; authenticated Telegram, physical-device audio,
+battery and the other limits below were not rechecked. Windows Authenticode and
+Apple notarization remain unconfigured; Linux package-handler behavior depends
+on the user's desktop, with `apt install` as the documented alternative.
+One additional credential-store probe on a reused Windows image exited with native
+heap status `0xC0000374`. The accepted MSI lifecycle check used installed applications;
+this run does not establish reliable authenticated Telegram on Windows.
+
 ## 0.15.1 — storage, playback and update audit
 
 Android debug and both release APKs, debug/release Lint and the Linux application

@@ -211,7 +211,16 @@ versionCode and current signer set. A non-exported FileProvider grants read acce
 to that verified APK. Unknown-source permission and installation use Android's own UI;
 cancellation or denial does not reopen prompts automatically.
 
-Desktop resumes transfer and verifies SHA-256, detached Ed25519 signature, target,
+Desktop installers wrap the existing jpackage image: per-user MSI with shortcuts
+and a stable upgrade identity, Ubuntu DEB with a menu entry, and DMG with an
+Applications shortcut. An image resource marker selects native package updates;
+there is no second application or profile. These updates verify GitHub SHA-256 and
+the existing Ed25519 key's detached signature over the exact package name and digest,
+then open the OS installer after confirmation. The OS owns installation/removal;
+removal leaves the separate user profile. Windows binaries default to
+`%LOCALAPPDATA%\SpotygramApp`, apart from `%LOCALAPPDATA%\Spotygram` data.
+
+Portable desktop resumes transfer and verifies SHA-256, detached Ed25519 signature, target,
 version and every extracted file. Extraction bounds paths, links, entry count and
 expanded bytes, including copied hard links. After restart confirmation, a cache-owned
 helper waits for the old process and prepares a verified replacement on the installation

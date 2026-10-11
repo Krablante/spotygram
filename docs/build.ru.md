@@ -94,6 +94,8 @@ bash tools/build.sh release
 Собирай на целевой системе с **JDK 21**, **Python 3.12+** и CLI OpenSSL 3
 (на macOS — `brew install openssl@3`).
 Windows и Linux используют x86-64; для macOS есть отдельные сборки x86-64 и ARM64.
+Установщики создаёт JDK `jpackage`: на Windows нужен **WiX Toolset 3**, на Ubuntu
+для DEB — **fakeroot**. Workflow подготавливает эти инструменты.
 Компиляция нативных исходников и Node.js не нужны. `SPOTYGRAM_STATE` должен
 оставаться вне репозитория. Используй тот же `telegram.env` или переменные
 окружения `TELEGRAM_API_ID` и `TELEGRAM_API_HASH`.
@@ -126,16 +128,25 @@ python3 tools/package-desktop.py --init-key
 и выводит публичный. Только публичный ключ помещается в
 `desktop/src/main/resources/update-key.pub`. **При сопровождении официального
 Spotygram сохраняй существующие закрытый и публичный ключи.** Сделай приватные
-резервные копии desktop-ключа и Android keystore. Затем собери подписанный архив:
+резервные копии desktop-ключа и Android keystore. Затем собери установщик и подписанный переносной архив:
 
 ```sh
 python3 tools/build-desktop.py
 ```
 
-Архивы находятся в `$SPOTYGRAM_STATE/releases/VERSION/`. В каждом — полное
+MSI, DEB или DMG, его отдельная `.sig` и переносной архив находятся в
+`$SPOTYGRAM_STATE/releases/VERSION/`. В каждом архиве — полное
 приложение, манифест файлов и подпись Ed25519. Упаковка требует существующий
 закрытый ключ, совпадающий с доверенным публичным ключом приложения. При установке распаковывай
-весь архив; музыка и настройки хранятся отдельно в данных пользователя.
+весь архив для переносного запуска; музыка и настройки хранятся отдельно в данных пользователя.
+Установщики упаковывают тот же готовый образ. Windows использует постоянный MSI
+upgrade UUID и по умолчанию `%LOCALAPPDATA%\SpotygramApp`; не меняй этот UUID.
+Пакет Ubuntu владеет `/opt/spotygram` и записью меню приложений. В DMG находятся
+подписанное приложение и ссылка Applications. Только образ установщика получает
+ресурс `installation`: он выбирает обновление пакетом вместо замены архива.
+Подпись установщика связывает `Spotygram installer\nИМЯ_ФАЙЛА\nSHA256\n` с прежним
+ключом Ed25519. Эта подпись издателя отличается от Windows Authenticode и
+Apple notarization, которые не настроены.
 
 GitHub Actions **Desktop release assets** собирает четыре desktop-платформы
 на их штатных runners. Добавь секреты репозитория `TELEGRAM_API_ID`,
@@ -156,7 +167,10 @@ GitHub Actions **Desktop release assets** собирает четыре desktop-
 - `spotygram-MAJOR.MINOR.PATCH-windows-x64.zip`;
 - `spotygram-MAJOR.MINOR.PATCH-linux-x64.tar.gz`;
 - `spotygram-MAJOR.MINOR.PATCH-macos-x64.zip` и `spotygram-MAJOR.MINOR.PATCH-macos-arm64.zip`;
-- `SHA256SUMS` для всех шести файлов приложения.
+- `spotygram-MAJOR.MINOR.PATCH-windows-x64.msi` и его `.msi.sig`;
+- `spotygram-MAJOR.MINOR.PATCH-linux-x64.deb` и его `.deb.sig`;
+- `spotygram-MAJOR.MINOR.PATCH-macos-x64.dmg` и `spotygram-MAJOR.MINOR.PATCH-macos-arm64.dmg`, каждый со своей `.dmg.sig`;
+- `SHA256SUMS` для всех пакетов, переносных архивов и отдельных подписей.
 
 Сравни размер и GitHub SHA-256 digest каждого загруженного файла с локальным
 и только затем опубликуй полный обычный релиз как Latest.
@@ -172,7 +186,13 @@ GitHub Actions **Desktop release assets** собирает четыре desktop-
 официальный релиз как обновление. Установщик получает доступ только к приватной
 копии APK; разрешение на доступ ко всему хранилищу не требуется.
 
-Desktop проверяет digest, подпись манифеста, платформу и каждый распакованный
+Установленный desktop проверяет digest пакета и отдельную подпись релиза, затем
+открывает `msiexec`, Finder или установщик Linux. Приложение закрывается; пользователь
+завершает системную установку и запускает его обычным способом. Файлы программы
+и запись удаления остаются под управлением установщика. Linux требует обработчик
+DEB или `sudo apt install ./ФАЙЛ.deb`; удаление пакета сохраняет профиль.
+
+Переносной desktop проверяет digest, подпись манифеста, платформу и каждый распакованный
 файл. Для установки нужна доступная для записи родительская папка программы.
 После подтверждения помощник запускается из кэша, ждёт закрытия старого процесса,
 заменяет приложение и ждёт подтверждения запуска каталога от новой версии.

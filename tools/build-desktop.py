@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a desktop image and its signed release archive on the target operating system."""
+"""Build a native installer and signed portable archive on the target operating system."""
 import argparse
 import importlib.util
 import os
@@ -8,6 +8,8 @@ import platform
 import re
 import subprocess
 import sys
+
+sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -63,6 +65,7 @@ def main():
     packaging = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(packaging)
     packaging.package(image, target, version, state, state / 'releases' / version)
+    packaging.installer(image, target, version, state, state / 'releases' / version)
 
 
 if __name__ == '__main__':

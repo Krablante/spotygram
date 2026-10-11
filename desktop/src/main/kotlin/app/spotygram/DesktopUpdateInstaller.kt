@@ -14,10 +14,15 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
     private val staging = File(directory, "staging")
     private var work: Job? = null
     private var installAfterDownload = false
+    val usesSystemInstaller get() = DesktopTarget.installerExtension != null
     override val state = MutableStateFlow(InstallState())
 
     private fun saved() = UpdateAsset.fromJson(prefs.getString("asset", null))
-        ?.takeIf { it.abi == app.platform.releaseAbi && it.newerThanInstalled() }
+        ?.takeIf {
+            val filename = prefs.getString("filename", null)
+            it.abi == app.platform.releaseAbi && it.newerThanInstalled() &&
+                (filename == app.platform.assetName(it.version, it.abi) || filename == null && !usesSystemInstaller)
+        }
     private fun archive(asset: UpdateAsset) = File(directory, app.platform.assetName(asset.version, asset.abi))
     private fun partial(asset: UpdateAsset) = File(directory, "${app.platform.assetName(asset.version, asset.abi)}.part")
 
@@ -59,7 +64,8 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
             try {
                 withContext(Dispatchers.IO) {
                     clearDownload()
-                    check(prefs.edit().putString("asset", asset.toJson()).commit())
+                    check(prefs.edit().putString("asset", asset.toJson())
+                        .putString("filename", app.platform.assetName(asset.version, asset.abi)).commit())
                 }
                 transfer(asset)
             } catch (error: Exception) {
@@ -136,7 +142,22 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
     private fun verify(asset: UpdateAsset) {
         val file = archive(asset)
         require(file.length() == asset.size && SignedBundle.sha256(file) == asset.sha256)
-        SignedBundle.extract(file, staging, asset.version, asset.abi)
+        if (!usesSystemInstaller) {
+            SignedBundle.extract(file, staging, asset.version, asset.abi)
+            return
+        }
+        val signature = File(file.path + ".sig")
+        if (!signature.isFile) {
+            val connection = connection(asset.url + ".sig", 0)
+            try {
+                require(connection.responseCode == 200)
+                val bytes = connection.inputStream.use { it.readNBytes(65) }
+                require(bytes.size == 64)
+                signature.writeBytes(bytes)
+            } finally { connection.disconnect() }
+        }
+        require(signature.length() == 64L)
+        SignedBundle.verifySignature("Spotygram installer\n${file.name}\n${asset.sha256}\n".toByteArray(), signature.readBytes())
     }
     override fun cancel() {
         if (state.value.phase == InstallPhase.CANCELLING) return
@@ -155,11 +176,15 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
     private fun clearDownload() {
         val old = UpdateAsset.fromJson(prefs.getString("asset", null))
         if (old != null) {
-            java.nio.file.Files.deleteIfExists(archive(old).toPath())
-            java.nio.file.Files.deleteIfExists(partial(old).toPath())
+            // The same profile can move between a portable copy and an OS installation.
+            for (extension in listOf("zip", "tar.gz", "msi", "dmg", "deb")) {
+                val name = "spotygram-${old.version}-${old.abi}.$extension"
+                for (suffix in listOf("", ".part", ".sig"))
+                    java.nio.file.Files.deleteIfExists(File(directory, name + suffix).toPath())
+            }
         }
         SignedBundle.remove(staging)
-        check(prefs.edit().remove("asset").commit())
+        check(prefs.edit().remove("asset").remove("filename").commit())
     }
     fun confirmInstall() {
         if (work?.isActive == true || state.value.phase != InstallPhase.READY) return
@@ -169,6 +194,24 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
             var applying = false
             try {
                 val asset = checkNotNull(saved())
+                if (usesSystemInstaller) {
+                    state.value = state.value.copy(phase = InstallPhase.VERIFYING)
+                    withContext(Dispatchers.IO) {
+                        verify(asset)
+                        val file = archive(asset)
+                        val command = when (DesktopTarget.os) {
+                            "windows" -> listOf("msiexec.exe", "/i", file.absolutePath)
+                            "macos" -> listOf("open", file.absolutePath)
+                            else -> listOf("xdg-open", file.absolutePath)
+                        }
+                        val process = ProcessBuilder(command).redirectErrorStream(true)
+                            .redirectOutput(File(directory, "installer.log")).start()
+                        if (process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS))
+                            check(process.exitValue() == 0) { "Could not open the system installer" }
+                    }
+                    app.updateApplyRequested.value = true
+                    return@launch
+                }
                 val installed = DesktopUpdater.installedRoot()
                 if (installed == null || !java.nio.file.Files.isWritable(installed.parentFile.toPath())) {
                     state.value = state.value.copy(error = R.string.update_install_location)

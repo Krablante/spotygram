@@ -22,6 +22,7 @@
 | ZXing core | 3.5.4 | Apache 2.0 |
 | JSON-java | 20250517 | Public domain |
 | Встроенный Java-рантайм desktop | JDK 21 сборочного runner | GPL 2 с Classpath Exception и уведомления компонентов |
+| Упаковка установщика Windows | [Исходники WiX Toolset 3](https://github.com/wixtoolset/wix3/tree/wix3141rtm), поставляется Windows build runner | [Microsoft Reciprocal License](https://github.com/wixtoolset/wix3/blob/wix3141rtm/LICENSE.TXT); copyright .NET Foundation and contributors |
 
 Нативные библиотеки Android собираются из upstream-исходников; `JsonClient.java`
 содержит сокращённые совместимые JNI-декларации. Лицензии нативных компонентов

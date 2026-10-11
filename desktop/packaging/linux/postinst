@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+package_type=deb
+LAUNCHER_AS_SERVICE_SCRIPTS
+
+case "$1" in
+    configure)
+        # Minimal graphical environments may lack this standard XDG directory.
+        mkdir -p /usr/share/desktop-directories
+DESKTOP_COMMANDS_INSTALL
+LAUNCHER_AS_SERVICE_COMMANDS_INSTALL
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        exit 1
+        ;;
+esac

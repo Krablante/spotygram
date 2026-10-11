@@ -8,6 +8,9 @@
     <string name="update_restart_title">Restart to install?</string>
     <string name="update_restart_help">Spotygram will stop playback, install the verified update and reopen. Your library, playlists and Telegram sign-in will remain.</string>
     <string name="update_restart">Restart and install</string>
+    <string name="update_package_title">Open the installer?</string>
+    <string name="update_package_help">Spotygram will close and open the verified system installer. Complete installation, then open Spotygram from your applications. Your library, playlists and Telegram sign-in will remain.</string>
+    <string name="update_package_open">Close and open installer</string>
     <string name="update_install_location">This copy cannot be updated in its current location. Keep the complete Spotygram folder in a location you can write to, then try again.</string>
     <string name="speed">Speed</string>
     <string name="playback_speed">Playback speed</string>

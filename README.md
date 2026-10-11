@@ -58,30 +58,42 @@ file on GitHub. Nothing downloads until you choose it.
 
 ## Put it on your computer
 
-Choose the archive for your computer from the same [release](https://github.com/Krablante/spotygram/releases/latest):
+Choose the installer for your computer from the same [release](https://github.com/Krablante/spotygram/releases/latest):
 
 | System | Download | Requirements |
 | --- | --- | --- |
-| Windows | `spotygram-…-windows-x64.zip` | Windows 10+ on x86-64 |
-| Linux | `spotygram-…-linux-x64.tar.gz` | x86-64, glibc 2.35+, a graphical desktop and Secret Service for Telegram sign-in |
-| macOS, Apple Silicon | `spotygram-…-macos-arm64.zip` | macOS 14+ |
-| macOS, Intel | `spotygram-…-macos-x64.zip` | macOS 14+ |
+| Windows | `spotygram-…-windows-x64.msi` | Windows 10+ on x86-64 |
+| Linux | `spotygram-…-linux-x64.deb` | Ubuntu 24.04+, x86-64, a graphical desktop and Secret Service for Telegram sign-in |
+| macOS, Apple Silicon | `spotygram-…-macos-arm64.dmg` | macOS 14+ |
+| macOS, Intel | `spotygram-…-macos-x64.dmg` | macOS 14+ |
 
-Extract the **whole archive**. On Windows, open `Spotygram/Spotygram.exe`; on Linux,
-open `Spotygram/bin/Spotygram`. On macOS, move `Spotygram.app` to a writable folder
-such as your own Applications folder and open it. Java, TDLib and the audio engine
-are included. macOS builds are ad hoc signed, without Apple notarization; if macOS
-blocks the first launch, use **System Settings → Privacy & Security → Open Anyway**.
+- **Windows:** open the MSI and follow the installation wizard. It installs for your user,
+  adds Start menu and desktop shortcuts, and appears in **Settings → Apps** for removal.
+- **macOS:** open the DMG and drag Spotygram onto Applications. Eject the disk image,
+  then open the installed app from Applications.
+- **Linux:** open the DEB with your software installer, or run `sudo apt install ./spotygram-…-linux-x64.deb`
+  with the downloaded file's actual name. Launch Spotygram from the applications menu.
+
+Java, TDLib and the audio engine are included. Windows packages do not have an
+Authenticode publisher certificate. macOS builds are ad hoc signed, without Apple
+notarization; if macOS blocks the first launch, use **System Settings → Privacy &
+Security → Open Anyway**.
+
+ZIP archives and the Linux TAR.GZ remain available for portable use; the Linux
+archive supports other distributions with glibc 2.35+. Extract the **whole archive**
+and open its launcher. An existing portable library is also available to the
+installer version under the same OS user; quit the old copy before switching.
 
 Sign in using your phone number or the QR code, or import local files.
 **Ctrl/⌘+O** opens the import picker; **Esc** closes the current sheet or player.
 Closing the window keeps active playback or downloads running in the tray, or
 minimizes the window when a tray is unavailable. **Ctrl/⌘+Q** quits.
 
-Desktop updates use the same **Download and install** action. The app verifies
-the archive and its release signature, then asks to restart. Keep the application
-in a folder you can update. Your library and Telegram session are stored separately
-from the extracted application.
+Desktop updates use the same **Download and install** action. Installed copies
+verify the package and its release signature, then offer to close Spotygram and
+open the system installer. Complete installation and launch from your applications.
+Portable copies update their writable application folder and reopen automatically.
+Your library and Telegram session are stored separately from the program.
 
 <p align="center">
   <img src="docs/screenshots/desktop-player-light.png" width="900" alt="The shared player and glass controls on macOS">

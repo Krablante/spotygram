@@ -39,6 +39,11 @@ object DesktopTarget {
     val arch = if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) "arm64" else "x64"
     val id = "$os-$arch"
     val resources = File(System.getProperty("compose.application.resources.dir", System.getProperty("user.dir")))
+    val installerExtension: String? by lazy {
+        val marker = File(resources, "installation")
+        val expected = when (os) { "windows" -> "msi"; "macos" -> "dmg"; else -> "deb" }
+        marker.takeIf { it.isFile && it.length() <= 16 }?.readText()?.trim()?.takeIf { it == expected }
+    }
     val nativeDirectory = File(System.getProperty("spotygram.native.dir", resources.path))
 
     fun library(name: String): String {

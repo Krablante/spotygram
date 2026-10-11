@@ -2,7 +2,7 @@
 
 [Documentation](README.md) · **English** · [Русский](build.ru.md)
 
-For listening, use the APK or desktop archive from [Releases](https://github.com/Krablante/spotygram/releases/latest).
+For listening, use the APK or desktop installer from [Releases](https://github.com/Krablante/spotygram/releases/latest).
 This guide is for building your own copy or maintaining the published app.
 The first Android build compiles TDLib and OpenSSL; later builds reuse them.
 Desktop builds download pinned TDLib/libmpv binaries with verified checksums.
@@ -72,6 +72,8 @@ The phone APK is at `$SPOTYGRAM_STATE/build/app/outputs/apk/release/app-arm64-v8
 Build on the target operating system with **JDK 21**, **Python 3.12+** and the
 OpenSSL 3 CLI (on macOS, `brew install openssl@3`). Windows and Linux use x86-64;
 macOS has separate x86-64 and ARM64 builds.
+Native installers use JDK's `jpackage`: **WiX Toolset 3** is required on Windows,
+and **fakeroot** on Ubuntu for DEB packaging. The workflow prepares these tools.
 There is no native source compilation or Node.js runtime. Keep `SPOTYGRAM_STATE`
 outside the checkout and use the same `telegram.env`, or supply `TELEGRAM_API_ID`
 and `TELEGRAM_API_HASH` as environment variables.
@@ -104,17 +106,25 @@ This writes the private key to `$SPOTYGRAM_STATE/desktop/signing/release-private
 and prints its public key. Put only that public key in
 `desktop/src/main/resources/update-key.pub`. **Maintainers of official Spotygram
 must keep the existing key and public key.** Back up both the desktop private key
-and the Android keystore privately. Then build and sign the release archive:
+and the Android keystore privately. Then build the native installer and signed portable archive:
 
 ```sh
 python3 tools/build-desktop.py
 ```
 
-Archives are written to `$SPOTYGRAM_STATE/releases/VERSION/`. Each contains the
+MSI, DEB or DMG, its detached `.sig`, and the portable archive are written to
+`$SPOTYGRAM_STATE/releases/VERSION/`. Each archive contains the
 complete application, a file manifest and an Ed25519 signature. The packager rejects
 a missing private key or one that does not match the application's trusted public key. Extract the
-whole archive when installing it; the app retains music and settings in separate
-per-user storage.
+whole archive for portable use; the app retains music and settings in separate
+per-user storage. Installers wrap the same prepared image. Windows uses a stable
+MSI upgrade UUID and defaults to `%LOCALAPPDATA%\SpotygramApp`; keep that UUID
+unchanged. Ubuntu's package owns `/opt/spotygram` and a desktop menu entry. DMGs
+contain the signed app and an Applications shortcut. Only installer images receive
+the `installation` resource marker; it selects package updates instead of archive replacement.
+Installer signatures bind `Spotygram installer\nFILENAME\nSHA256\n` to the existing
+Ed25519 key. This publisher signature is separate from Windows Authenticode and
+Apple notarization, which are not configured.
 
 The **Desktop release assets** GitHub Actions workflow builds all four desktop
 targets on their native runners. Set repository secrets `TELEGRAM_API_ID`,
@@ -132,7 +142,10 @@ Create a draft tagged `vMAJOR.MINOR.PATCH`, then upload:
 - `spotygram-MAJOR.MINOR.PATCH-windows-x64.zip`;
 - `spotygram-MAJOR.MINOR.PATCH-linux-x64.tar.gz`;
 - `spotygram-MAJOR.MINOR.PATCH-macos-x64.zip` and `spotygram-MAJOR.MINOR.PATCH-macos-arm64.zip`;
-- `SHA256SUMS` covering all six application assets.
+- `spotygram-MAJOR.MINOR.PATCH-windows-x64.msi` and its `.msi.sig`;
+- `spotygram-MAJOR.MINOR.PATCH-linux-x64.deb` and its `.deb.sig`;
+- `spotygram-MAJOR.MINOR.PATCH-macos-x64.dmg` and `spotygram-MAJOR.MINOR.PATCH-macos-arm64.dmg`, each with `.dmg.sig`;
+- `SHA256SUMS` covering all packages, portable archives and detached signatures.
 
 Verify every uploaded asset's size and GitHub SHA-256 digest against the local
 file before publishing the complete ordinary release as Latest. Keep both signing
@@ -147,7 +160,13 @@ publishing. Builds with another signing key, including debug, intentionally
 cannot install the official release as an update. The app grants the installer
 read access only to its private cached APK; no storage-wide permission is needed.
 
-Desktop verifies the digest, then the manifest's release signature, target and
+Installed desktop copies verify the package's digest and detached release signature
+before opening `msiexec`, Finder or the Linux software installer. The app closes;
+the user completes OS installation and launches it normally. Program files and
+uninstall registration remain under the native installer's ownership. Linux requires
+a DEB handler or manual `sudo apt install ./FILE.deb`; package removal keeps the profile.
+
+Portable desktop verifies the digest, then the manifest's release signature, target and
 every extracted file. Installation requires a writable parent application folder.
 After confirmation, a helper runs from cache, waits for the old process to close,
 replaces the application and waits for the new one to acknowledge catalog startup.

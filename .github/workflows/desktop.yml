@@ -43,6 +43,16 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as environment:
               environment.write('SPOTYGRAM_STATE=' + str(Path(os.environ['RUNNER_TEMP']) / 'spotygram-state') + '\n')
       - uses: gradle/actions/setup-gradle@v6
+      - name: Prepare Linux packaging
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+      - name: Prepare Windows packaging
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $wix = Get-ChildItem "${env:ProgramFiles(x86)}\WiX Toolset*\bin\candle.exe" | Select-Object -First 1
+          if (!$wix) { throw 'WiX Toolset 3 is required by JDK 21 jpackage' }
+          $wix.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build and sign
         run: python tools/build-desktop.py
       - uses: actions/upload-artifact@v7

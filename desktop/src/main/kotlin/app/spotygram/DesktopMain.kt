@@ -65,6 +65,7 @@ fun main(arguments: Array<String>) {
         kotlinx.coroutines.runBlocking { model.awaitLibrary() }
         application {
             val app = remember { model }
+            val installer = remember { app.updates.installer as DesktopUpdateInstaller }
             val engine = remember { MpvPlayer(app) }
             val queue = remember { PlaybackQueue(app, engine) }
             val controls = remember { PlaybackControls(app, engine) }
@@ -182,11 +183,11 @@ fun main(arguments: Array<String>) {
                                 )
                                 if (restart) GlassDialog(
                                     onDismissRequest = { app.updateRestartRequested.value = false },
-                                    title = { Text(tr(R.string.update_restart_title)) },
-                                    text = { Text(tr(R.string.update_restart_help)) },
+                                    title = { Text(tr(if (installer.usesSystemInstaller) R.string.update_package_title else R.string.update_restart_title)) },
+                                    text = { Text(tr(if (installer.usesSystemInstaller) R.string.update_package_help else R.string.update_restart_help)) },
                                     confirmButton = { TextButton(onClick = {
-                                        (app.updates.installer as DesktopUpdateInstaller).confirmInstall()
-                                    }) { Text(tr(R.string.update_restart)) } },
+                                        installer.confirmInstall()
+                                    }) { Text(tr(if (installer.usesSystemInstaller) R.string.update_package_open else R.string.update_restart)) } },
                                     dismissButton = { TextButton(onClick = { app.updateRestartRequested.value = false }) { Text(tr(R.string.cancel)) } },
                                 )
                             }

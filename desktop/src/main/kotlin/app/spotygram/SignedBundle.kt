@@ -121,10 +121,7 @@ object SignedBundle {
         val signed = File(directory, SIGNATURE)
         require(metadata.length() in 1..1_048_576 && signed.length() == 64L)
         val bytes = metadata.readBytes()
-        val publicText = checkNotNull(javaClass.classLoader.getResourceAsStream("update-key.pub"))
-            .bufferedReader().use { it.readText() }.lineSequence().filterNot { it.startsWith("-----") }.joinToString("")
-        val key = KeyFactory.getInstance("Ed25519").generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(publicText)))
-        require(Signature.getInstance("Ed25519").run { initVerify(key); update(bytes); verify(signed.readBytes()) })
+        verifySignature(bytes, signed.readBytes())
         val manifest = JSONObject(bytes.toString(Charsets.UTF_8))
         require(manifest.getInt("format") == 1 && manifest.getString("application") == "app.spotygram" &&
             manifest.getString("version") == version && manifest.getString("target") == target)
@@ -185,5 +182,12 @@ object SignedBundle {
             }
         }
         return hash.digest().joinToString("") { "%02x".format(it) }
+    }
+    fun verifySignature(bytes: ByteArray, signature: ByteArray) {
+        require(signature.size == 64)
+        val publicText = checkNotNull(javaClass.classLoader.getResourceAsStream("update-key.pub"))
+            .bufferedReader().use { it.readText() }.lineSequence().filterNot { it.startsWith("-----") }.joinToString("")
+        val key = KeyFactory.getInstance("Ed25519").generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(publicText)))
+        require(Signature.getInstance("Ed25519").run { initVerify(key); update(bytes); verify(signature) })
     }
 }

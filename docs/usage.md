@@ -11,9 +11,10 @@ On Android, install the ARM64 APK from the [latest release](https://github.com/K
 Android may ask you to allow installation from the browser or file manager
 opening the APK. Android 8.0 or newer is required.
 
-On Windows, Linux or macOS, choose the matching archive and extract the whole
-application. The [installation instructions](../README.md#put-it-on-your-computer)
-give the file names and system requirements. Java and the native libraries are included.
+On Windows, install the MSI and launch from Start. On macOS, open the DMG and drag
+Spotygram to Applications. On Ubuntu, install the DEB and launch from the applications
+menu. The [installation instructions](../README.md#put-it-on-your-computer) give
+requirements and the portable alternative. Java and native libraries are included.
 
 Sign in to Telegram with your phone number or scan the QR code from Telegram's
 **Settings → Devices → Link Desktop Device**. The code for phone sign-in may arrive in an existing
@@ -244,12 +245,15 @@ the APK on the next launch. **View release** remains available for reading the
 changes on GitHub. Automatic checks only offer updates: they never start a
 download or installer by themselves.
 
-Desktop downloads the matching archive and verifies its digest, release signature
-and contents. A completed download offers a restart confirmation. The app closes,
-replaces its program files and reopens with the same data, paused. Its folder must
-be writable; move the whole application to your own folder if Settings reports
-otherwise. Hiding the window keeps a transfer running. After quitting, an incomplete
-transfer resumes on launch, and Cancel removes it.
+Installed desktop copies download the matching MSI, DMG or DEB and verify its digest
+and release signature. **Close and open installer** hands it to the OS. Complete
+installation, then launch Spotygram normally. Linux needs a software installer
+associated with DEB files; alternatively install the downloaded package with `sudo apt install ./FILE.deb`.
+
+Portable copies download a signed archive, verify its contents and offer a restart.
+The app replaces its program files and reopens with the same data, paused. Its parent
+folder must be writable. Hiding the window keeps a transfer running; incomplete
+transfers resume on launch, and Cancel removes them.
 
 **Open message in Telegram** uses the normal message link where available.
 Personal chats on desktop open Telegram Web K; sign in there with the same account
@@ -257,8 +261,11 @@ to see the selected message.
 
 Installing a new official APK
 over the old one preserves data. **Uninstalling the Android app removes its library
-and settings.** Deleting the extracted desktop application leaves its separate
-user data in place. Playlists are not synced to the cloud or between devices.
+and settings.** On Windows, remove Spotygram through **Settings → Apps**; on macOS,
+move the installed app to Trash; on Ubuntu, use your software manager or `sudo apt remove spotygram`.
+Desktop removal preserves the separate user profile, imported music and sign-in.
+Deleting a portable application folder has the same effect. Playlists are not synced
+to the cloud or between devices.
 
 Telegram sign-in creates a full account session, not access restricted to the
 chosen chats. You can revoke it from the official Telegram app's device settings.
@@ -294,7 +301,7 @@ Keep your original imported files too. There is no in-app export or device sync.
 | A song is absent | Refresh its selected source. Use **Search selected chats** if the library has not found it yet. Check that it is audio or an audio document, not a voice note. |
 | An interrupted download stays paused | Check connectivity and the Wi-Fi-only setting, then resume downloads in Settings. |
 | Remove from device reports that audio is in use | Select another collection so that file leaves the player's current, previous and next working set. Retry removal. |
-| Desktop cannot install an update | Quit and move the whole application into a folder whose parent you can write to. Relaunch it there and retry. |
+| Desktop cannot install an update | Installed copy: complete the OS installer; on Linux, check the DEB file association or use `sudo apt install ./FILE.deb`. Portable copy: quit, move the full application to a folder with a writable parent, relaunch and retry. |
 | The library cannot open | Close and reopen the app. Keep its profile and the error details; do not clear app data as a troubleshooting step. An older app cannot open a newer database schema. |
 
 For a reproducible problem, include the app version, operating system, action
