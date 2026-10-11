@@ -41,7 +41,6 @@ fun main(arguments: Array<String>) {
     System.setProperty("nucleus.app.name", "Spotygram")
     System.setProperty("nucleus.app.version", BuildConfig.VERSION_NAME)
     System.setProperty("nucleus.app.aumid", "app.spotygram")
-    if (DesktopTarget.os == "windows") System.setProperty("skiko.rendering.angle.enabled", "true")
     val platform = try { DesktopPlatform() } catch (error: Exception) {
         JOptionPane.showMessageDialog(null, error.message, "Spotygram", JOptionPane.ERROR_MESSAGE)
         return

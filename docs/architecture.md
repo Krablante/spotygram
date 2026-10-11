@@ -144,6 +144,11 @@ thread. Play is idempotent, including buffering; Toggle remains a state change.
 Hiding/minimizing stops UI observations and picker work. Quit flushes playback and
 preferences and closes native resources before releasing the profile lock.
 
+Desktop Play/Pause commands own playback intent. The native pause used while
+loading another file cannot replace that intent. File events belong to the native
+playlist entry and load generation; replacing a stream cancels its pending reads.
+Duration and buffering updates use the captured native event values.
+
 ## File ownership and account security
 
 By default, completed Telegram files remain offline; TDLib's storage optimizer is
@@ -183,6 +188,15 @@ submissions keep phone entry and show the error. Pending QR login uses the exist
 unfinished-client restart because TDLib cannot directly replace that state with a
 phone number. Android Back, desktop Esc and the screen arrow share this behavior.
 
+`Telegram` serializes authentication requests and retains the server's code
+destination, delivery type, next type and monotonic resend deadline. The screen
+binds submitted text to its visible authorization step and destination, so a
+delayed frame cannot submit a phone number as a code after TDLib advances. It
+counts down only while visible; it never resends automatically. A resend requires
+both the next type and an expired deadline. Missed-call delivery is allowed because
+the caller digits can be entered manually; flash-call, SMS retriever and Firebase
+facilities are not advertised.
+
 ## Visual system and idle work
 
 English/Russian strings and the RGB brand vector are shared XML resources. Android
@@ -192,6 +206,12 @@ dense glass diffuses text underneath. Primary edge refraction, dispersion and li
 remain, while the secondary detail pass is disabled. There is no row effect or animated
 wallpaper. Desktop and Android 13+ use full optics; older Android uses denser tint,
 lighting and rim fallback. Compose/Haze follows the system reduced-motion policy.
+Static environment and rim gradients are cached until their size or theme changes.
+Windows uses Skiko's default Direct3D path, which performs drawing and presentation
+outside the UI event thread. A startup check selects ANGLE when no hardware
+DXGI adapter supports Direct3D 12; ANGLE was faster than software Direct3D in native
+measurements. The choice is made before creating a window. Explicit Skiko renderer
+overrides remain available; both paths use the same glass material.
 
 At 840 dp, navigation becomes a side rail; wide players separate artwork and controls.
 Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with 48 dp

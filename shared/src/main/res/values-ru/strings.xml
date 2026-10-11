@@ -98,7 +98,13 @@
     <string name="code">"Код"</string>
     <string name="code_expired">"Код истёк. Запросите новый."</string>
     <string name="code_invalid">"Неверный код. Проверьте сообщение от Telegram."</string>
-    <string name="code_sent_telegram">"Код отправлен в приложение Telegram."</string>
+    <string name="code_help_telegram">"Проверьте служебный чат Telegram на устройстве, где уже выполнен вход с этим номером. Код может прийти с задержкой."</string>
+    <string name="code_help_sms">"Проверьте SMS для этого номера."</string>
+    <string name="code_help_call">"Введите код из телефонного звонка на этот номер."</string>
+    <string name="code_help_missed_call">"Не отвечайте на звонок. Введите последние %1$d цифр номера, с которого вам позвонили."</string>
+    <string name="code_help_fragment">"Откройте Fragment, чтобы получить код для своего номера."</string>
+    <string name="open_fragment">"Открыть Fragment"</string>
+    <string name="code_resend_unavailable">"Telegram не предлагает повторную отправку для этой попытки. Если код не пришёл, войдите по QR-коду или попробуйте позже."</string>
     <string name="confirm_telegram_login">"Подтвердите вход в Telegram"</string>
     <string name="connect">"Подключить"</string>
     <string name="connect_help">"Аудиофайлы из выбранных чатов появятся в медиатеке. Локальная музыка доступна и без входа."</string>
@@ -132,7 +138,7 @@
     <string name="email_code">"Код из письма"</string>
     <string name="email_code_sent">"Код отправлен на %1$s"</string>
     <string name="enter_code_help">"Введите код, отправленный способом, выбранным Telegram."</string>
-    <string name="enter_phone_help">"Введите номер своего аккаунта с кодом страны."</string>
+    <string name="enter_phone_help">"Введите номер Telegram в международном формате: +, код страны и номер."</string>
     <string name="favorites">"Любимые"</string>
     <string name="favorites_empty_help">"Нажми сердечко рядом с песней — она появится здесь."</string>
     <string name="favorites_empty_title">"То, что нравится"</string>
@@ -229,6 +235,9 @@
     <string name="reorder_help">"Зажми ручку справа и перетащи. Можно также нажимать стрелки."</string>
     <string name="repeat_mode">"Повтор"</string>
     <string name="resend_code">"Отправить код ещё раз"</string>
+    <string name="resend_code_in">"Повторить через %1$d с"</string>
+    <string name="resend_code_sms">"Получить код по SMS"</string>
+    <string name="resend_code_call">"Получить код звонком"</string>
     <string name="change_phone_number">"Изменить номер телефона"</string>
     <string name="resume_downloads">"Продолжить загрузки"</string>
     <string name="resume_history">"Продолжить загрузку истории"</string>

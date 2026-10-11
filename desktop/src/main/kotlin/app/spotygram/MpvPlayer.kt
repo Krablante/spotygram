@@ -19,6 +19,8 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     private var wanted = false
     private var prepared = false
     private var buffering = false
+    private var pausedForCache = false
+    private var seeking = false
     private var state = Player.STATE_IDLE
     private var speed = 1f
     @Volatile private var released = false
@@ -82,13 +84,14 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     private val openCallback = StreamOpen { _, uri, output ->
         var reader: TrackReader? = null
         try {
+            val ticket = generation
             if (released || uri != expectedUri) return@StreamOpen -13
             val id = URLDecoder.decode(uri.substringAfter("spotygram://track/").substringBefore('?'), "UTF-8")
             val track = app.track(id) ?: return@StreamOpen -13
             reader = TrackReader(app)
             val token = tokens.incrementAndGet()
             val size = track.size.takeIf { it > 0 } ?: if (track.local) File(track.path).length() else 0
-            streams[token] = Stream(id, size, reader, generation)
+            streams[token] = Stream(id, size, reader, ticket)
             MpvStreamInfo(output).apply {
                 cookie = Pointer.createConstant(token)
                 read = readCallback
@@ -122,7 +125,8 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
 
     init {
         check(Mpv.api.mpv_stream_cb_add_ro(handle, "spotygram", null, openCallback) >= 0)
-        listOf("pause" to Mpv.FLAG, "paused-for-cache" to Mpv.FLAG, "seeking" to Mpv.FLAG,
+        // play()/pause() own user intent. The temporary pause during load must not overwrite it.
+        listOf("paused-for-cache" to Mpv.FLAG, "seeking" to Mpv.FLAG,
             "duration" to Mpv.DOUBLE, "speed" to Mpv.DOUBLE).forEachIndexed { i, (name, format) ->
             check(Mpv.api.mpv_observe_property(handle, i.toLong() + 1, name, format) >= 0)
         }
@@ -175,10 +179,14 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
                     Mpv.EVENT_FILE_LOADED -> {
                         val entry = eventEntry
                         val duration = (Mpv.double(handle, "duration") * 1000).toLong()
+                        val cached = Mpv.flag(handle, "paused-for-cache")
+                        val nativeSeeking = Mpv.flag(handle, "seeking")
                         dispatch {
                             if (entry != nativeEntry || !prepared) return@dispatch
                             readyGeneration = generation
-                            buffering = Mpv.flag(handle, "paused-for-cache") || Mpv.flag(handle, "seeking")
+                            pausedForCache = cached
+                            seeking = nativeSeeking
+                            buffering = pendingPosition != null || pausedForCache || seeking
                             length = duration.takeIf { it > 0 } ?: (app.track(currentMediaItem?.mediaId.orEmpty())?.duration ?: 0) * 1000L
                             state = if (buffering) Player.STATE_BUFFERING else Player.STATE_READY
                             pendingPosition?.let { Mpv.command(handle, "seek", (it / 1000.0).toString(), "absolute+exact") }
@@ -190,12 +198,16 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
                         val entry = eventEntry
                         // Capture at the native event, before a busy UI thread can advance beyond the seek tolerance.
                         val actual = (Mpv.double(handle, "time-pos") * 1000).toLong()
+                        val cached = Mpv.flag(handle, "paused-for-cache")
+                        val nativeSeeking = Mpv.flag(handle, "seeking")
                         dispatch {
                             if (entry != nativeEntry || readyGeneration != generation) return@dispatch
                             if (pendingPosition == null || kotlin.math.abs(actual - pendingPosition!!) <= 500) {
                                 pendingPosition = null
                                 position = actual
-                                buffering = Mpv.flag(handle, "paused-for-cache") || Mpv.flag(handle, "seeking")
+                                pausedForCache = cached
+                                seeking = nativeSeeking
+                                buffering = pausedForCache || seeking
                                 state = if (buffering) Player.STATE_BUFFERING else Player.STATE_READY
                                 emit(Player.EVENT_POSITION_DISCONTINUITY)
                             }
@@ -223,22 +235,22 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
                             else -> null
                         } } ?: continue
                         val ticket = generation
+                        val entry = eventEntry
                         dispatch {
                             if (ticket != generation) return@dispatch
                             when (name) {
-                                "duration" -> if (readyGeneration == generation) {
-                                    val current = Mpv.double(handle, "duration")
-                                    if (current > 0) length = (current * 1000).toLong()
+                                "duration" -> if (entry == nativeEntry && readyGeneration == generation) {
+                                    if (value > 0) length = (value * 1000).toLong()
                                 }
-                                "speed" -> if (Mpv.double(handle, "speed", speed.toDouble()).toFloat() != speed) {
-                                    speed = Mpv.double(handle, "speed", speed.toDouble()).toFloat()
+                                "speed" -> if (value.toFloat() != speed) {
+                                    speed = value.toFloat()
                                     listeners.toList().forEach { it.onPlaybackParametersChanged(playbackParameters) }
                                 }
-                                "pause" -> if (readyGeneration == generation && state == Player.STATE_READY)
-                                    wanted = !Mpv.flag(handle, "pause")
                                 "paused-for-cache", "seeking" -> {
-                                    if (readyGeneration != generation) return@dispatch
-                                    buffering = pendingPosition != null || Mpv.flag(handle, "paused-for-cache") || Mpv.flag(handle, "seeking")
+                                    if (entry != nativeEntry || readyGeneration != generation) return@dispatch
+                                    if (name == "paused-for-cache") pausedForCache = value != 0.0
+                                    else seeking = value != 0.0
+                                    buffering = pendingPosition != null || pausedForCache || seeking
                                     if (prepared && state != Player.STATE_IDLE && state != Player.STATE_ENDED)
                                         state = if (buffering) Player.STATE_BUFFERING else Player.STATE_READY
                                 }
@@ -275,7 +287,10 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
         readyGeneration = -1
         pendingPosition = null
         expectedUri = "spotygram://track/${URLEncoder.encode(item.mediaId, "UTF-8")}?generation=$generation"
+        streams.values.forEach { it.cancelled = true; it.reader.cancel() }
         nativeEntry = -1
+        pausedForCache = false
+        seeking = false
         buffering = true
         state = Player.STATE_BUFFERING
         Mpv.api.mpv_set_property_string(handle, "pause", "yes")

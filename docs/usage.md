@@ -16,10 +16,20 @@ Spotygram to Applications. On Ubuntu, install the DEB and launch from the applic
 menu. The [installation instructions](../README.md#put-it-on-your-computer) give
 requirements and the portable alternative. Java and native libraries are included.
 
-Sign in to Telegram with your phone number or scan the QR code from Telegram's
-**Settings → Devices → Link Desktop Device**. The code for phone sign-in may arrive in an existing
-Telegram session rather than by SMS. If you use a two-step verification
-password, enter it next. Published packages do not require developer API keys.
+Sign in with your Telegram number in international format (`+`, country code,
+number), or scan the QR code from Telegram's **Settings → Devices → Link Desktop
+Device**. Spaces, brackets and dashes are accepted; `00` also works as the
+international prefix. Published packages do not require developer API keys.
+
+The code screen shows the number Telegram received and the delivery method it
+selected. For a Telegram code, check the service chat on a device already signed
+in to that number. Telegram controls delivery and may delay or suppress a code.
+Resending becomes available after its countdown, if Telegram offers another
+delivery method. The button identifies SMS or a phone call when offered. For a
+missed call, do not answer; enter the indicated number of final caller digits.
+If no code arrives, QR login is also available directly on this screen. Repeated
+new requests can trigger Telegram's limits. If you use a two-step verification
+password, enter it after the code.
 
 Entered the wrong number? On the code, password or email screen, use the back arrow,
 Android Back, desktop Esc or **Change phone number**. Enter the other number and

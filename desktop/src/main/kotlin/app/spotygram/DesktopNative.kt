@@ -3,10 +3,68 @@ package app.spotygram
 import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
+import com.sun.jna.Memory
+import com.sun.jna.platform.win32.Guid
+import com.sun.jna.platform.win32.COM.Unknown
+import com.sun.jna.ptr.PointerByReference
 import java.io.File
 
+private interface Direct3D12 : Library {
+    fun D3D12CreateDevice(adapter: Pointer?, minimumFeatureLevel: Int, iid: Guid.GUID, device: Pointer?): Int
+}
+
+private interface Dxgi : Library {
+    fun CreateDXGIFactory1(iid: Guid.GUID, factory: PointerByReference): Int
+}
+
+private class DxgiFactory(pointer: Pointer) : Unknown(pointer) {
+    fun adapter(index: Int, output: PointerByReference) = _invokeNativeInt(12, arrayOf(pointer, index, output))
+}
+
+private class DxgiAdapter(pointer: Pointer) : Unknown(pointer) {
+    fun hardware() = Memory(312).use { description ->
+        // DXGI_ADAPTER_DESC1 on Windows x64: Flags follows the 128 WCHARs, IDs, sizes and LUID.
+        if (_invokeNativeInt(10, arrayOf(pointer, description)) < 0) return@use false
+        // Hyper-V can expose Microsoft's WARP adapter without the software flag.
+        val warp = description.getInt(256) == 0x1414 && description.getInt(260) == 0x8c
+        !warp && (description.getInt(304) and 2) == 0
+    }
+}
+
+private fun hardwareDirect3D(): Boolean {
+    val factoryPointer = PointerByReference()
+    if (Native.load("dxgi", Dxgi::class.java).CreateDXGIFactory1(
+        Guid.GUID("770AAE78-F26F-4DBA-A829-253C83D1B387"), factoryPointer,
+    ) < 0) return false
+    val factory = DxgiFactory(checkNotNull(factoryPointer.value))
+    try {
+        val direct3d = Native.load("d3d12", Direct3D12::class.java)
+        val deviceId = Guid.GUID("189819F1-1DB6-4B57-BE54-1821339B85F7")
+        var index = 0
+        while (true) {
+            val pointer = PointerByReference()
+            if (factory.adapter(index++, pointer) < 0) return false
+            val adapter = DxgiAdapter(checkNotNull(pointer.value))
+            try {
+                // Null output checks support without allocating a Direct3D device.
+                if (adapter.hardware() && direct3d.D3D12CreateDevice(adapter.pointer, 0xb000, deviceId, null) >= 0)
+                    return true
+            } finally { adapter.Release() }
+        }
+    } finally { factory.Release() }
+}
+
 fun prepareDesktopGraphics(cache: File) {
-    if (DesktopTarget.os != "windows" || System.getProperty("skiko.library.path") != null) return
+    if (DesktopTarget.os != "windows") return
+    val renderer = System.getenv("SKIKO_RENDER_API") ?: System.getProperty("skiko.renderApi")
+    if (renderer == null && System.getProperty("skiko.rendering.angle.enabled") == null) {
+        // Skiko's software Direct3D adapter is slower than ANGLE. Choose before creating the window.
+        // Probe without loading Skiko: its renderer preferences are cached during native initialization.
+        val hardware = runCatching { hardwareDirect3D() }.getOrDefault(false)
+        if (!hardware) System.setProperty("skiko.rendering.angle.enabled", "true")
+    }
+    if (System.getProperty("skiko.library.path") != null) return
+    if (renderer != "ANGLE" && System.getProperty("skiko.rendering.angle.enabled") != "true") return
     val resources = DesktopTdClient::class.java.classLoader
     fun checksum(name: String) = checkNotNull(resources.getResourceAsStream("$name.sha256"))
         .bufferedReader().use { it.readLine().trim().lowercase() }

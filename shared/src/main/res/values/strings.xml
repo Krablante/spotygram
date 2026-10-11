@@ -96,7 +96,13 @@
     <string name="code">"Code"</string>
     <string name="code_expired">"This code has expired. Request a new one."</string>
     <string name="code_invalid">"Incorrect code. Check your message from Telegram."</string>
-    <string name="code_sent_telegram">"The code was sent to your Telegram app."</string>
+    <string name="code_help_telegram">"Check the Telegram service chat on a device already signed in to this number. The code may take time to arrive."</string>
+    <string name="code_help_sms">"Check SMS messages for this number."</string>
+    <string name="code_help_call">"Enter the code from the phone call to this number."</string>
+    <string name="code_help_missed_call">"Do not answer the call. Enter the last %1$d digits of the number that called you."</string>
+    <string name="code_help_fragment">"Open Fragment to get the code for your number."</string>
+    <string name="open_fragment">"Open Fragment"</string>
+    <string name="code_resend_unavailable">"Telegram is not offering another code for this attempt. If it does not arrive, use QR login or try again later."</string>
     <string name="confirm_telegram_login">"Confirm sign-in in Telegram"</string>
     <string name="connect">"Connect"</string>
     <string name="connect_help">"Audio from selected chats will appear in your library. Local music is available without signing in."</string>
@@ -130,7 +136,7 @@
     <string name="email_code">"Email code"</string>
     <string name="email_code_sent">"Code sent to %1$s"</string>
     <string name="enter_code_help">"Enter the code sent using the method selected by Telegram."</string>
-    <string name="enter_phone_help">"Enter your account phone number, including the country code."</string>
+    <string name="enter_phone_help">"Enter your Telegram number in international format: + followed by the country code and number."</string>
     <string name="favorites">"Favorites"</string>
     <string name="favorites_empty_help">"Tap the heart next to a song to find it here."</string>
     <string name="favorites_empty_title">"Keep what you love"</string>
@@ -227,6 +233,9 @@
     <string name="reorder_help">"Hold and drag the handle on the right, or use the arrow buttons."</string>
     <string name="repeat_mode">"Repeat"</string>
     <string name="resend_code">"Resend code"</string>
+    <string name="resend_code_in">"Resend in %1$d s"</string>
+    <string name="resend_code_sms">"Send code by SMS"</string>
+    <string name="resend_code_call">"Get code by phone call"</string>
     <string name="change_phone_number">"Change phone number"</string>
     <string name="resume_downloads">"Resume downloads"</string>
     <string name="resume_history">"Resume loading history"</string>

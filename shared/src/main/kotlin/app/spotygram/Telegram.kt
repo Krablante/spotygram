@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,7 @@ class Telegram(
     val updates = Channel<JSONObject>(Channel.UNLIMITED)
     private val requests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
     private val sequence = AtomicLong()
+    private val authenticating = AtomicBoolean()
     @Volatile private var client = 0
     private var receiving: Job? = null
     private val prefs = platform.preferences("settings")
@@ -140,7 +142,18 @@ class Telegram(
                 "authorizationStateWaitOtherDeviceConfirmation" -> state.optString("link")
                 else -> ""
             }
-        if (type != "authorizationStateClosed") auth.value = AuthState(type, detail)
+        if (type != "authorizationStateClosed") {
+            val code = state.optJSONObject("code_info")
+                .takeIf { type == "authorizationStateWaitCode" }
+            auth.value = AuthState(
+                type, detail, busy = authenticating.get(),
+                phoneNumber = code?.optString("phone_number").orEmpty(),
+                nextCodeType = code?.optJSONObject("next_type")?.kind().orEmpty(),
+                resendAt = System.nanoTime() + (code?.optInt("timeout") ?: 0).coerceAtLeast(0) * 1_000_000_000L,
+                codeLink = code?.optJSONObject("type")?.optString("url").orEmpty(),
+                codeLength = code?.optJSONObject("type")?.optInt("length") ?: 0,
+            )
+        }
         when (type) {
             "authorizationStateWaitTdlibParameters" ->
                 scope.launch {
@@ -214,39 +227,81 @@ class Telegram(
         }
     }
 
-    fun submit(value: String) {
-        if (auth.value.busy) return
+    fun submit(value: String, expected: AuthState) {
         val state = auth.value
+        // A delayed frame must not submit a phone number as a code after TDLib advances.
+        if (state.busy || state.type != expected.type || state.editingPhone != expected.editingPhone ||
+            state.phoneNumber != expected.phoneNumber) return
         val type = if (state.editingPhone) "authorizationStateWaitPhoneNumber" else state.type
-        auth.value = state.copy(busy = true, error = "")
+        val phone = if (type == "authorizationStateWaitPhoneNumber") {
+            val compact = value.trim().filterNot { it.isWhitespace() || it in "()-." }
+            val international = if (compact.startsWith("00")) "+" + compact.drop(2) else compact
+            if (!international.startsWith('+') || international.length !in 6..16 ||
+                international.drop(1).any { it !in '0'..'9' } || international.getOrNull(1) == '0') {
+                auth.value = state.copy(error = tr(R.string.phone_invalid))
+                return
+            }
+            international
+        } else ""
+        val request = when (type) {
+            "authorizationStateWaitPhoneNumber" ->
+                json(
+                    "setAuthenticationPhoneNumber",
+                    "phone_number" to phone,
+                    // Missed calls can be read manually; flash-call/Firebase flows need mobile facilities.
+                    "settings" to json("phoneNumberAuthenticationSettings", "allow_missed_call" to true),
+                )
+            "authorizationStateWaitCode" ->
+                json("checkAuthenticationCode", "code" to value.trim())
+            "authorizationStateWaitPassword" ->
+                json("checkAuthenticationPassword", "password" to value)
+            "authorizationStateWaitEmailAddress" ->
+                json("setAuthenticationEmailAddress", "email_address" to value.trim())
+            "authorizationStateWaitEmailCode" ->
+                json(
+                    "checkAuthenticationEmailCode",
+                    "code" to json("emailAddressAuthenticationCode", "code" to value.trim()),
+                )
+            else -> null
+        }
+        if (request != null) authenticate(request)
+    }
+
+    fun resendCode() {
+        val state = auth.value
+        if (state.type != "authorizationStateWaitCode" || state.editingPhone ||
+            state.nextCodeType.isEmpty() || state.resendSeconds() > 0) return
+        authenticate(json("resendAuthenticationCode", "reason" to json("resendCodeReasonUserRequest")))
+    }
+
+    fun useQrAuthentication() {
+        if (auth.value.type == "authorizationStateWaitPhoneNumber" || auth.value.canChangePhone)
+            authenticate(json("requestQrCodeAuthentication", "other_user_ids" to org.json.JSONArray()))
+    }
+
+    private fun authenticate(query: JSONObject) {
+        if (auth.value.busy || !authenticating.compareAndSet(false, true)) return
+        auth.update { it.copy(busy = true, error = "") }
         scope.launch {
-            val request =
-                when (type) {
-                    "authorizationStateWaitPhoneNumber" ->
-                        json(
-                            "setAuthenticationPhoneNumber",
-                            "phone_number" to value,
-                            "settings" to null,
-                        )
-                    "authorizationStateWaitCode" ->
-                        json("checkAuthenticationCode", "code" to value.trim())
-                    "authorizationStateWaitPassword" ->
-                        json("checkAuthenticationPassword", "password" to value)
-                    "authorizationStateWaitEmailAddress" ->
-                        json("setAuthenticationEmailAddress", "email_address" to value.trim())
-                    "authorizationStateWaitEmailCode" ->
-                        json(
-                            "checkAuthenticationEmailCode",
-                            "code" to
-                                json("emailAddressAuthenticationCode", "code" to value.trim()),
-                        )
-                    else -> null
+            try {
+                request(query)
+                auth.update { it.copy(editingPhone = false) }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                val retry = Regex("(?:FLOOD_WAIT_|retry after )(\\d+)", RegexOption.IGNORE_CASE)
+                    .find(error.message.orEmpty())?.groupValues?.get(1)?.toLongOrNull()
+                auth.update {
+                    it.copy(
+                        error = friendly(error),
+                        resendAt = if (it.type == "authorizationStateWaitCode" && retry != null)
+                            System.nanoTime() + retry.coerceIn(0, Int.MAX_VALUE.toLong()) * 1_000_000_000L
+                        else it.resendAt,
+                    )
                 }
-            if (request != null)
-                runCatching { request(request) }
-                    .onSuccess { auth.value = auth.value.copy(editingPhone = false) }
-                    .onFailure { auth.value = auth.value.copy(error = friendly(it)) }
-            auth.value = auth.value.copy(busy = false)
+            } finally {
+                authenticating.set(false)
+                auth.update { it.copy(busy = false) }
+            }
         }
     }
 
@@ -260,17 +315,21 @@ class Telegram(
         }
         // TDLib cannot replace a pending QR login with setAuthenticationPhoneNumber.
         // End only this unfinished authorization; the Spotygram catalog stays intact.
-        auth.value = auth.value.copy(busy = true, error = "")
+        if (!authenticating.compareAndSet(false, true)) return
+        auth.update { it.copy(busy = true, error = "") }
         val previousReceiver = receiving
         try {
             request(json("logOut"))
             withTimeout(10_000) { auth.first { it.type == "authorizationStateClosed" } }
             previousReceiver?.join()
-            start()
         } catch (error: Throwable) {
             auth.value = auth.value.copy(busy = false, error = friendly(error))
             throw error
+        } finally {
+            authenticating.set(false)
+            auth.update { it.copy(busy = false) }
         }
+        start()
     }
 
     fun updateFile(file: JSONObject) {

@@ -116,7 +116,7 @@ fun Modifier.glassContent(zIndex: Float = 1f): Modifier =
 @Composable
 fun PrismBackdrop(modifier: Modifier = Modifier) {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    Canvas(modifier.background(MaterialTheme.colorScheme.background)) {
+    Box(modifier.background(MaterialTheme.colorScheme.background).drawWithCache {
         val w = size.width
         val h = size.height
         val glows =
@@ -127,19 +127,22 @@ fun PrismBackdrop(modifier: Modifier = Modifier) {
                 Triple(Green, Offset(w * 0.48f, h * 1.02f), w * 0.32f),
                 Triple(Red, Offset(w * 1.02f, h * 0.92f), w * 0.39f),
             )
-        glows.forEach { (color, center, radius) ->
+        val lights = glows.map { (color, center, radius) ->
             val lightRadius = minOf(radius, 220.dp.toPx())
-            drawCircle(
+            Triple(
                 Brush.radialGradient(
                     listOf(color.copy(alpha = if (dark) 0.17f else 0.13f), Color.Transparent),
                     center = center,
                     radius = lightRadius,
                 ),
-                radius = lightRadius,
-                center = center,
+                lightRadius,
+                center,
             )
         }
-    }
+        onDrawBehind {
+            lights.forEach { (brush, radius, center) -> drawCircle(brush, radius, center) }
+        }
+    })
 }
 
 /** One optical material, with diffusion appropriate to a control or a text-heavy sheet. */
@@ -234,29 +237,31 @@ fun Modifier.liquidGlass(
                     start = Offset.Zero,
                     end = Offset(size.width, size.height),
                 )
+            val veil = Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (dark) 0.10f else 0.26f),
+                    Color.Transparent,
+                    Color.Black.copy(alpha = if (dark) 0.12f else 0.035f),
+                )
+            )
+            val rim = Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (dark) 0.20f else 0.95f),
+                    Cyan.copy(alpha = 0.12f),
+                    Color.Black.copy(alpha = if (dark) 0.08f else 0.12f),
+                    Color.White.copy(alpha = if (dark) 0.20f else 0.72f),
+                ),
+                startY = 0f,
+                endY = size.height * 0.52f,
+            )
             onDrawBehind {
                 drawRoundRect(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (dark) 0.10f else 0.26f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = if (dark) 0.12f else 0.035f),
-                        )
-                    ),
+                    veil,
                     cornerRadius = corner,
                 )
                 drawRoundRect(edge, cornerRadius = corner, style = Stroke(1.dp.toPx()))
                 drawRoundRect(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (dark) 0.20f else 0.95f),
-                            Cyan.copy(alpha = 0.12f),
-                            Color.Black.copy(alpha = if (dark) 0.08f else 0.12f),
-                            Color.White.copy(alpha = if (dark) 0.20f else 0.72f),
-                        ),
-                        startY = 0f,
-                        endY = size.height * 0.52f,
-                    ),
+                    rim,
                     topLeft = Offset(2.dp.toPx(), 2.dp.toPx()),
                     size =
                         androidx.compose.ui.geometry.Size(

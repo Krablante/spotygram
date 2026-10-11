@@ -7,6 +7,43 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.15.6 — phone codes and desktop playback
+
+A fresh production Windows client requested a code for a controlled account.
+TDLib reported Telegram-message delivery and the correct destination; a new code
+message appeared in that account's existing Spotygram session three seconds after
+the Windows request. The new Windows session did not complete code/password sign-in.
+
+Native Windows and Linux sandbox checks covered international-number normalization,
+rejection of a stale phone-screen submission, server countdowns, early resend
+rejection, incorrect codes, changing the destination, and code → QR → phone.
+The Android debug app exercised code entry, a wrong-code error, number editing and
+QR → phone on Android 16. Actual Windows light/dark and Android Russian screenshots
+were inspected, including 320 dp with font scale 1.3. The resend countdown fit one
+line. An emulator System UI ANR preceded app checks; the application crash log was empty.
+
+The native Windows software adapter selected ANGLE automatically. Hyper-V exposed
+Microsoft Basic Render Driver twice, including one entry without its software flag;
+checking WARP's vendor/device identity handled that case. Continuous redraws of the
+phone screen measured about 51 FPS automatically and 54 FPS with explicit ANGLE;
+the published 0.15.5 ANGLE baseline measured 54 FPS. Earlier software Direct3D runs
+measured about 16–17 FPS. These are software-runner measurements; hardware Direct3D
+and physical-machine scrolling were not measured.
+
+The published 0.15.5 player lost playback intent after a controlled native pause.
+The updated player retained it. Native Windows then completed 38 automatic random
+transitions, six shuffle/repeat-all transitions and four repeat-one transitions.
+The signed Linux package completed 12 random transitions through Telegram recordings
+after seeking near their ends. Desktop checks used libmpv's null audio output;
+physical audio drivers and the owner's exact end-of-song stall were not reproduced.
+
+Android debug/release assembly and both Lint checks passed. Both release APKs kept
+the existing signer and application ID, used versionCode 33 and passed 16 KB alignment.
+All four desktop targets built on native runners. Four installer signatures, four
+archive manifests and every archived payload hash verified with the existing key.
+Packaged desktop versions were 0.15.6 with the release flag; inspection classes were
+absent from their launcher classpaths. Physical-device and account limits below remain.
+
 ## 0.15.5 — Windows installation and removal
 
 Windows now uses a per-user Inno Setup EXE with its own uninstaller. The prepared

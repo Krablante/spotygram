@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -18,16 +19,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: () -> Unit) {
-    var value by rememberSaveable(auth.type, auth.editingPhone) { mutableStateOf("") }
+    var value by rememberSaveable(auth.type, auth.editingPhone) {
+        mutableStateOf(if (auth.editingPhone) auth.phoneNumber else "")
+    }
     var passwordVisible by remember { mutableStateOf(false) }
     val phone = auth.type == "authorizationStateWaitPhoneNumber" || auth.editingPhone
+    val waitingCode = !phone && auth.type == "authorizationStateWaitCode"
+    var resendSeconds by remember(auth.resendAt) { mutableIntStateOf(auth.resendSeconds()) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(auth.resendAt, waitingCode, lifecycle) {
+        if (waitingCode) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            resendSeconds = auth.resendSeconds()
+            while (resendSeconds > 0) {
+                delay(1000)
+                resendSeconds = auth.resendSeconds()
+            }
+        }
+    }
     val keyboardVisible = imeVisible()
     val back = {
         if (!auth.busy) {
@@ -54,9 +74,16 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
         }
         if (!keyboardVisible) {
             Spacer(Modifier.height(20.dp))
-            Image(painterResource(R.drawable.spotygram_mark), null, Modifier.size(64.dp))
-            Spacer(Modifier.height(16.dp))
-            Text("Spotygram", style = MaterialTheme.typography.headlineLarge)
+            if (!phone && auth.canChangePhone) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Image(painterResource(R.drawable.spotygram_mark), null, Modifier.size(40.dp))
+                    Text("Spotygram", style = MaterialTheme.typography.headlineSmall)
+                }
+            } else {
+                Image(painterResource(R.drawable.spotygram_mark), null, Modifier.size(64.dp))
+                Spacer(Modifier.height(16.dp))
+                Text("Spotygram", style = MaterialTheme.typography.headlineLarge)
+            }
             Spacer(Modifier.height(12.dp))
         }
         val welcome = auth.type in listOf("welcome", "authorizationStateClosed")
@@ -107,9 +134,15 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
             Text(
                 if (phone) tr(R.string.enter_phone_help) else when (auth.type) {
                     "authorizationStateWaitPhoneNumber" -> tr(R.string.enter_phone_help)
-                    "authorizationStateWaitCode" ->
-                        if (auth.detail.contains("TelegramMessage")) tr(R.string.code_sent_telegram)
-                        else tr(R.string.enter_code_help)
+                    "authorizationStateWaitCode" -> when (auth.detail) {
+                        "authenticationCodeTypeTelegramMessage" -> tr(R.string.code_help_telegram)
+                        "authenticationCodeTypeSms", "authenticationCodeTypeSmsWord",
+                        "authenticationCodeTypeSmsPhrase" -> tr(R.string.code_help_sms)
+                        "authenticationCodeTypeCall" -> tr(R.string.code_help_call)
+                        "authenticationCodeTypeMissedCall" -> tr(R.string.code_help_missed_call, auth.codeLength)
+                        "authenticationCodeTypeFragment" -> tr(R.string.code_help_fragment)
+                        else -> tr(R.string.enter_code_help)
+                    }
                     "authorizationStateWaitPassword" ->
                         tr(R.string.password_help) +
                             if (auth.detail.isNotBlank()) tr(R.string.password_hint, auth.detail)
@@ -122,6 +155,18 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (waitingCode && auth.phoneNumber.isNotBlank()) {
+                Text(
+                    auth.phoneNumber,
+                    Modifier.padding(top = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            if (waitingCode && auth.codeLink.startsWith("https://fragment.com/")) {
+                TextButton(onClick = { app.platform.openUrl(auth.codeLink) }) {
+                    Text(tr(R.string.open_fragment))
+                }
+            }
             Spacer(Modifier.height(24.dp))
             if (supported) {
                 OutlinedTextField(
@@ -151,8 +196,13 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                                 if (phone) KeyboardType.Phone
                                 else if (password) KeyboardType.Password
                                 else if (auth.type.contains("EmailAddress")) KeyboardType.Email
-                                else KeyboardType.Number
+                                else if (auth.detail in listOf("authenticationCodeTypeSmsWord", "authenticationCodeTypeSmsPhrase")) KeyboardType.Text
+                                else KeyboardType.Number,
+                            imeAction = ImeAction.Done,
                         ),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (value.isNotBlank() && !auth.busy) app.telegram.submit(value, auth)
+                    }),
                     visualTransformation =
                         if (password && !passwordVisible) PasswordVisualTransformation()
                         else VisualTransformation.None,
@@ -171,7 +221,7 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                 )
                 Spacer(Modifier.height(16.dp))
                 GlassButton(
-                    onClick = { app.telegram.submit(value) },
+                    onClick = { app.telegram.submit(value, auth) },
                     enabled = value.isNotBlank() && !auth.busy,
                     modifier = Modifier.fillMaxWidth(),
                     tint = spectrumAccent(0),
@@ -180,21 +230,32 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
                         CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                     else Text(tr(R.string.continue_action))
                 }
-                if (!phone && auth.type == "authorizationStateWaitCode")
+                if (waitingCode && auth.nextCodeType.isNotEmpty())
                     TextButton(
-                        onClick = {
-                            app.action {
-                                app.telegram.request(
-                                    json("resendAuthenticationCode", "reason" to null)
-                                )
-                            }
-                        },
-                        enabled = !auth.busy,
+                        onClick = { app.telegram.resendCode() },
+                        enabled = !auth.busy && resendSeconds == 0,
+                        colors = ButtonDefaults.textButtonColors(
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                     ) {
-                        Text(tr(R.string.resend_code))
+                        Text(if (resendSeconds > 0) tr(R.string.resend_code_in, resendSeconds)
+                            else when (auth.nextCodeType) {
+                                "authenticationCodeTypeSms" -> tr(R.string.resend_code_sms)
+                                "authenticationCodeTypeCall" -> tr(R.string.resend_code_call)
+                                "authenticationCodeTypeMissedCall" -> tr(R.string.resend_code_call)
+                                else -> tr(R.string.resend_code)
+                            })
                     }
-                if (phone) TextButton(
-                    onClick = { app.action { app.telegram.request(json("requestQrCodeAuthentication", "other_user_ids" to org.json.JSONArray())) } },
+                if (waitingCode && auth.nextCodeType.isEmpty()) {
+                    Text(
+                        tr(R.string.code_resend_unavailable),
+                        Modifier.padding(top = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (phone || waitingCode) TextButton(
+                    onClick = { app.telegram.useQrAuthentication() },
                     enabled = !auth.busy,
                 ) { Text(tr(R.string.qr_login)) }
             } else if (auth.type == "authorizationStateWaitOtherDeviceConfirmation" && auth.detail.isNotBlank()) {

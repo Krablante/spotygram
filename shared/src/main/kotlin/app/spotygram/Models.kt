@@ -95,7 +95,15 @@ data class AuthState(
     val busy: Boolean = false,
     val error: String = "",
     val editingPhone: Boolean = false,
+    val phoneNumber: String = "",
+    val nextCodeType: String = "",
+    val resendAt: Long = 0,
+    val codeLink: String = "",
+    val codeLength: Int = 0,
 ) {
+    fun resendSeconds(): Int =
+        ((resendAt - System.nanoTime() + 999_999_999L) / 1_000_000_000L).coerceAtLeast(0).toInt()
+
     val canChangePhone: Boolean
         get() = type in listOf(
             "authorizationStateWaitCode",

@@ -191,6 +191,12 @@ removes the transfer and staging files.
 
 Debug builds use the application ID `app.spotygram.dev`; release builds use `app.spotygram`, so they cannot accidentally share account state. Debug builds can opt into Telegram's official sandbox with `-PtelegramTestDc=true`; release builds always use production. Do not switch an existing debug installation between environments without clearing that debug installation's data.
 
+Reserved sandbox numbers still reach code entry, but Telegram has
+[disabled their simplified login codes](https://github.com/tdlib/td/issues/3083).
+They can verify requests and screen transitions, not completed sign-in. Full
+authorization needs an account you control; do not record its codes or session in
+public inspection artifacts.
+
 Use Android's file picker, ordinary UI interaction, `adb logcat`, `adb shell dumpsys media_session`, `adb shell dumpsys meminfo`, and `adb shell dumpsys gfxinfo` for verification. There is no test suite or generated test scaffold.
 
 On desktop, run the actual packaged launcher, check its native libraries, import,
