@@ -62,13 +62,15 @@ Choose the installer for your computer from the same [release](https://github.co
 
 | System | Download | Requirements |
 | --- | --- | --- |
-| Windows | `spotygram-…-windows-x64.msi` | Windows 10+ on x86-64 |
+| Windows | `spotygram-…-windows-x64.exe` | Windows 10+ on x86-64 |
 | Linux | `spotygram-…-linux-x64.deb` | Ubuntu 24.04+, x86-64, a graphical desktop and Secret Service for Telegram sign-in |
 | macOS, Apple Silicon | `spotygram-…-macos-arm64.dmg` | macOS 14+ |
 | macOS, Intel | `spotygram-…-macos-x64.dmg` | macOS 14+ |
 
-- **Windows:** open the MSI and follow the installation wizard. It installs for your user,
-  adds Start menu and desktop shortcuts, and appears in **Settings → Apps** for removal.
+- **Windows:** open the EXE and follow the installation wizard. It installs for your user,
+  adds a Start menu shortcut and an optional desktop shortcut, and appears in **Settings → Apps** for removal.
+  For an existing MSI installation (0.15.2–0.15.4), download and run this EXE once;
+  it replaces the old installer registration and keeps your library and sign-in.
 - **macOS:** open the DMG and drag Spotygram onto Applications. Eject the disk image,
   then open the installed app from Applications.
 - **Linux:** open the DEB with your software installer, or run `sudo apt install ./spotygram-…-linux-x64.deb`

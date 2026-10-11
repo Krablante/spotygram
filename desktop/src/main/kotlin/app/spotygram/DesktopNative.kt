@@ -41,8 +41,12 @@ object DesktopTarget {
     val resources = File(System.getProperty("compose.application.resources.dir", System.getProperty("user.dir")))
     val installerExtension: String? by lazy {
         val marker = File(resources, "installation")
-        val expected = when (os) { "windows" -> "msi"; "macos" -> "dmg"; else -> "deb" }
-        marker.takeIf { it.isFile && it.length() <= 16 }?.readText()?.trim()?.takeIf { it == expected }
+        val type = marker.takeIf { it.isFile && it.length() <= 16 }?.readText()?.trim()
+        when (os) {
+            "windows" -> "exe".takeIf { type == "exe" || type == "msi" }
+            "macos" -> "dmg".takeIf { type == "dmg" }
+            else -> "deb".takeIf { type == "deb" }
+        }
     }
     val nativeDirectory = File(System.getProperty("spotygram.native.dir", resources.path))
 

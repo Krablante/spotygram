@@ -122,7 +122,7 @@ def package(image, target, version, state, destination):
 def installer(image, target, version, state, destination):
     private = release_key(state, destination)
     system = target.split('-')[0]
-    extension = {'windows': 'msi', 'macos': 'dmg', 'linux': 'deb'}[system]
+    extension = {'windows': 'exe', 'macos': 'dmg', 'linux': 'deb'}[system]
     resources = image / {'windows': 'app/resources', 'macos': 'Contents/app/resources',
                          'linux': 'lib/app/resources'}[system]
     marker = resources / 'installation'
@@ -153,11 +153,16 @@ def installer(image, target, version, state, destination):
         '--description', 'Music and long recordings from Telegram chats and local files',
         '--about-url', 'https://github.com/Krablante/spotygram']
     if system == 'windows':
-        command += ['--win-per-user-install', '--install-dir', 'SpotygramApp',
-                    '--license-file', str(ROOT / 'LICENSE'),
-                    '--win-menu', '--win-menu-group', 'Spotygram',
-                    '--win-shortcut', '--win-dir-chooser',
-                    '--win-upgrade-uuid', '58e4eaa7-5519-5da3-8f61-6e1dc41508c8']
+        compiler = os.environ.get('INNO_SETUP_COMPILER') or shutil.which('ISCC.exe')
+        if not compiler:
+            default = Path(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)')) / 'Inno Setup 6/ISCC.exe'
+            if default.is_file():
+                compiler = str(default)
+        if not compiler:
+            raise RuntimeError('Inno Setup 6.4.3 is required; set INNO_SETUP_COMPILER to ISCC.exe')
+        command = [compiler, f'/DAppImage={image}', f'/DAppVersion={version}',
+            f'/DAppIcon={icon}', f'/DLicenseFile={ROOT / "LICENSE"}', f'/DOutputDir={output}',
+            str(ROOT / 'desktop/packaging/windows/Spotygram.iss')]
     elif system == 'linux':
         command += ['--linux-package-name', 'spotygram', '--linux-shortcut',
                     '--license-file', str(ROOT / 'LICENSE'),

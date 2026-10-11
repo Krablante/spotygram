@@ -177,7 +177,7 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
         val old = UpdateAsset.fromJson(prefs.getString("asset", null))
         if (old != null) {
             // The same profile can move between a portable copy and an OS installation.
-            for (extension in listOf("zip", "tar.gz", "msi", "dmg", "deb")) {
+            for (extension in listOf("zip", "tar.gz", "msi", "exe", "dmg", "deb")) {
                 val name = "spotygram-${old.version}-${old.abi}.$extension"
                 for (suffix in listOf("", ".part", ".sig"))
                     java.nio.file.Files.deleteIfExists(File(directory, name + suffix).toPath())
@@ -200,7 +200,7 @@ class DesktopUpdateInstaller(private val app: SpotygramApp) : UpdateInstallation
                         verify(asset)
                         val file = archive(asset)
                         val command = when (DesktopTarget.os) {
-                            "windows" -> listOf("msiexec.exe", "/i", file.absolutePath)
+                            "windows" -> listOf(file.absolutePath)
                             "macos" -> listOf("open", file.absolutePath)
                             else -> listOf("xdg-open", file.absolutePath)
                         }

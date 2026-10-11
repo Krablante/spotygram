@@ -11,7 +11,7 @@ On Android, install the ARM64 APK from the [latest release](https://github.com/K
 Android may ask you to allow installation from the browser or file manager
 opening the APK. Android 8.0 or newer is required.
 
-On Windows, install the MSI and launch from Start. On macOS, open the DMG and drag
+On Windows, install the EXE and launch from Start. On macOS, open the DMG and drag
 Spotygram to Applications. On Ubuntu, install the DEB and launch from the applications
 menu. The [installation instructions](../README.md#put-it-on-your-computer) give
 requirements and the portable alternative. Java and native libraries are included.
@@ -250,10 +250,15 @@ the APK on the next launch. **View release** remains available for reading the
 changes on GitHub. Automatic checks only offer updates: they never start a
 download or installer by themselves.
 
-Installed desktop copies download the matching MSI, DMG or DEB and verify its digest
+Installed desktop copies download the matching EXE, DMG or DEB and verify its digest
 and release signature. **Close and open installer** hands it to the OS. Complete
 installation, then launch Spotygram normally. Linux needs a software installer
 associated with DEB files; alternatively install the downloaded package with `sudo apt install ./FILE.deb`.
+
+Windows MSI versions 0.15.2–0.15.4 need one manual download of the latest EXE from
+[Releases](https://github.com/Krablante/spotygram/releases/latest). Run it under the
+same Windows account; it removes the old MSI and preserves your profile. Later
+updates use the in-app installer normally.
 
 Portable copies download a signed archive, verify its contents and offer a restart.
 The app replaces its program files and reopens with the same data, paused. Its parent
@@ -302,7 +307,7 @@ Keep your original imported files too. There is no in-app export or device sync.
 | Symptom | What to do |
 | --- | --- |
 | Windows 0.15.2 cannot initialize the Telegram database | Install the latest release over it. Keep `%LOCALAPPDATA%\Spotygram` and its saved credential-store key. The fix creates the missing Telegram directories. |
-| Windows removal repeats a `Config.Msi` file-security error | Close the stalled installer and use the elevated removal command below. This error concerns Windows Installer's rollback folder. |
+| Windows removal repeats a `Config.Msi` file-security error | Close the stalled installer and run the latest EXE as described below. It replaces the old MSI with its own uninstaller. |
 | Telegram sign-in on Linux reports a key-store error | Start and unlock a Secret Service provider, such as GNOME Keyring or KeePassXC with Secret Service enabled. Restart Spotygram and retry. |
 | macOS blocks first launch | Use **Privacy & Security → Open Anyway**, as described in the [installation guide](../README.md#put-it-on-your-computer). |
 | A song is absent | Refresh its selected source. Use **Search selected chats** if the library has not found it yet. Check that it is audio or an audio document, not a voice note. |
@@ -311,31 +316,23 @@ Keep your original imported files too. There is no in-app export or device sync.
 | Desktop cannot install an update | Installed copy: complete the OS installer; on Linux, check the DEB file association or use `sudo apt install ./FILE.deb`. Portable copy: quit, move the full application to a folder with a writable parent, relaunch and retry. |
 | The library cannot open | Close and reopen the app. Keep its profile and the error details; do not clear app data as a troubleshooting step. An older app cannot open a newer database schema. |
 
-### Windows Installer cannot remove 0.15.2
+### Windows Installer cannot remove an older version
 
-Quit Spotygram. If the error dialog keeps returning, end the stalled **Windows
-Installer** task in Task Manager. Open PowerShell and run this command to request
-administrator approval for removing the official 0.15.2 MSI:
+Quit Spotygram and cancel its stalled removal. If its error dialog keeps returning,
+end that **Windows Installer** task in Task Manager. Download the latest
+`spotygram-…-windows-x64.exe` from [Releases](https://github.com/Krablante/spotygram/releases/latest)
+and run it under the same Windows account. The wizard removes the old MSI before
+installing the new version. It handles the known rollback-folder errors without
+changing drive permissions. After installation, **Settings → Apps → Spotygram →
+Uninstall** uses the new uninstaller and keeps your profile and saved key.
 
-```powershell
-Start-Process msiexec.exe -Verb RunAs -Wait -ArgumentList '/x {128D5E52-EB59-3133-904D-7A5B4A5AC182} /passive /norestart'
-```
+If Windows already lost the old installation's registration, enter its previous
+program folder on the wizard's directory page. The default is
+`%LOCALAPPDATA%\SpotygramApp`. Setup replaces the remaining program files there.
 
-Approve the prompt with the same Windows account that installed Spotygram. Its
-separate profile and credential-store key remain. You can then install the latest
-MSI. The product identifier above belongs specifically to the official 0.15.2
-package; it is not a command for every Spotygram version or a custom build.
-
-If Windows still reports the permission error, keep the installer log for diagnosis.
-Do not delete `Config.Msi`, change permissions across a drive or remove the profile.
-Collect a log by repeating the command with:
-
-```powershell
-Start-Process msiexec.exe -Verb RunAs -Wait -ArgumentList "/x {128D5E52-EB59-3133-904D-7A5B4A5AC182} /passive /norestart /L*v `"$env:TEMP\spotygram-uninstall.log`""
-```
-
-The log is at `$env:TEMP\spotygram-uninstall.log`. Review it before sharing; it can
-include your Windows username and file paths.
+If migration cannot complete, the wizard stops and shows the log path under
+`%LOCALAPPDATA%\Spotygram\cache\installer`. Keep that log for diagnosis; review it
+before sharing because it contains usernames and file paths. Keep the profile.
 
 For a reproducible problem, include the app version, operating system, action
 and displayed error in a [GitHub issue](https://github.com/Krablante/spotygram/issues).

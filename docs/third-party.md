@@ -24,7 +24,7 @@
 | ZXing core | 3.5.4 | Apache 2.0 |
 | JSON-java | 20250517 | Public domain |
 | Bundled desktop Java runtime | JDK 21 distribution used by the build runner | GPL 2 with Classpath Exception and component notices |
-| Windows installer packaging | [WiX Toolset 3 sources](https://github.com/wixtoolset/wix3/tree/wix3141rtm), supplied by the Windows build runner | [Microsoft Reciprocal License](https://github.com/wixtoolset/wix3/blob/wix3141rtm/LICENSE.TXT); copyright .NET Foundation and contributors |
+| Windows installer packaging | [Inno Setup 6.4.3 sources](https://github.com/jrsoftware/issrc/tree/is-6_4_3) | [Inno Setup License](https://github.com/jrsoftware/issrc/blob/is-6_4_3/license.txt); copyright Jordan Russell 1997–2025 and Martijn Laan 2000–2025; free for commercial and noncommercial use |
 
 Android native libraries are compiled from upstream sources. `JsonClient.java`
 is a reduced JNI declaration compatible with the upstream interface. Native

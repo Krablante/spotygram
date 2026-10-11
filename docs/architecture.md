@@ -220,7 +220,7 @@ versionCode and current signer set. A non-exported FileProvider grants read acce
 to that verified APK. Unknown-source permission and installation use Android's own UI;
 cancellation or denial does not reopen prompts automatically.
 
-Desktop installers wrap the existing jpackage image: per-user MSI with shortcuts
+Desktop installers wrap the existing jpackage image: per-user Inno Setup EXE with shortcuts
 and a stable upgrade identity, Ubuntu DEB with a menu entry, and DMG with an
 Applications shortcut. An image resource marker selects native package updates;
 there is no second application or profile. These updates verify GitHub SHA-256 and
@@ -228,6 +228,17 @@ the existing Ed25519 key's detached signature over the exact package name and di
 then open the OS installer after confirmation. The OS owns installation/removal;
 removal leaves the separate user profile. Windows binaries default to
 `%LOCALAPPDATA%\SpotygramApp`, apart from `%LOCALAPPDATA%\Spotygram` data.
+
+The Windows EXE enumerates the old MSI upgrade family for the current user and
+removes matching Spotygram products before installation, retaining their program
+directory. A logged `Config.Msi` error 1926 or 1314 permits one retry of that
+removal with `DISABLEROLLBACK=1`; no system policy or drive permissions are changed.
+Failure stops setup and gives the log path. Subsequent installation and removal
+use Inno Setup and do not depend on Windows Installer rollback. Old MSI clients
+require one manual EXE download because their updater expects an MSI asset.
+Setup also removes obsolete JARs named by an existing Spotygram launcher config
+after the new files are installed. This covers files left by a failed MSI removal;
+files absent from that old classpath remain untouched.
 
 Portable desktop resumes transfer and verifies SHA-256, detached Ed25519 signature, target,
 version and every extracted file. Extraction bounds paths, links, entry count and

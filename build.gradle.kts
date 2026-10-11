@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.compose") version "1.12.0" apply false
 }
 
-version = "0.15.4"
+version = "0.15.5"
 
 subprojects {
     plugins.withId("org.jetbrains.kotlin.plugin.compose") {

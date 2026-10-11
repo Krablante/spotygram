@@ -72,8 +72,10 @@ The phone APK is at `$SPOTYGRAM_STATE/build/app/outputs/apk/release/app-arm64-v8
 Build on the target operating system with **JDK 21**, **Python 3.12+** and the
 OpenSSL 3 CLI (on macOS, `brew install openssl@3`). Windows and Linux use x86-64;
 macOS has separate x86-64 and ARM64 builds.
-Native installers use JDK's `jpackage`: **WiX Toolset 3** is required on Windows,
-and **fakeroot** on Ubuntu for DEB packaging. The workflow prepares these tools.
+JDK's `jpackage` prepares the application image and Linux/macOS installers.
+Windows wraps that image with **Inno Setup 6.4.3**; Ubuntu needs **fakeroot** for DEB
+packaging. The workflow prepares these tools. For a local Windows build, install
+Inno Setup 6.4.3 or set `INNO_SETUP_COMPILER` to its `ISCC.exe`.
 There is no native source compilation or Node.js runtime. Keep `SPOTYGRAM_STATE`
 outside the checkout and use the same `telegram.env`, or supply `TELEGRAM_API_ID`
 and `TELEGRAM_API_HASH` as environment variables.
@@ -112,14 +114,19 @@ and the Android keystore privately. Then build the native installer and signed p
 python3 tools/build-desktop.py
 ```
 
-MSI, DEB or DMG, its detached `.sig`, and the portable archive are written to
+EXE, DEB or DMG, its detached `.sig`, and the portable archive are written to
 `$SPOTYGRAM_STATE/releases/VERSION/`. Each archive contains the
 complete application, a file manifest and an Ed25519 signature. The packager rejects
 a missing private key or one that does not match the application's trusted public key. Extract the
 whole archive for portable use; the app retains music and settings in separate
-per-user storage. Installers wrap the same prepared image. Windows uses a stable
-MSI upgrade UUID and defaults to `%LOCALAPPDATA%\SpotygramApp`; keep that UUID
-unchanged. Ubuntu's package owns `/opt/spotygram` and a desktop menu entry. DMGs
+per-user storage. Installers wrap the same prepared image. Windows defaults to
+`%LOCALAPPDATA%\SpotygramApp`; keep AppId `58e4eaa7-5519-5da3-8f61-6e1dc41508c8`
+unchanged. The same UUID identifies the old MSI upgrade family for migration.
+The EXE removes matching current-user MSI products before writing its files,
+retains their installation directory and leaves the separate profile and saved
+credential key. A rollback-folder security failure allows one logged legacy
+removal retry with `DISABLEROLLBACK=1`. Future removal uses Inno Setup directly.
+Ubuntu's package owns `/opt/spotygram` and a desktop menu entry. DMGs
 contain the signed app and an Applications shortcut. Only installer images receive
 the `installation` resource marker; it selects package updates instead of archive replacement.
 Installer signatures bind `Spotygram installer\nFILENAME\nSHA256\n` to the existing
@@ -142,7 +149,7 @@ Create a draft tagged `vMAJOR.MINOR.PATCH`, then upload:
 - `spotygram-MAJOR.MINOR.PATCH-windows-x64.zip`;
 - `spotygram-MAJOR.MINOR.PATCH-linux-x64.tar.gz`;
 - `spotygram-MAJOR.MINOR.PATCH-macos-x64.zip` and `spotygram-MAJOR.MINOR.PATCH-macos-arm64.zip`;
-- `spotygram-MAJOR.MINOR.PATCH-windows-x64.msi` and its `.msi.sig`;
+- `spotygram-MAJOR.MINOR.PATCH-windows-x64.exe` and its `.exe.sig`;
 - `spotygram-MAJOR.MINOR.PATCH-linux-x64.deb` and its `.deb.sig`;
 - `spotygram-MAJOR.MINOR.PATCH-macos-x64.dmg` and `spotygram-MAJOR.MINOR.PATCH-macos-arm64.dmg`, each with `.dmg.sig`;
 - `SHA256SUMS` covering all packages, portable archives and detached signatures.
@@ -161,10 +168,16 @@ cannot install the official release as an update. The app grants the installer
 read access only to its private cached APK; no storage-wide permission is needed.
 
 Installed desktop copies verify the package's digest and detached release signature
-before opening `msiexec`, Finder or the Linux software installer. The app closes;
+before opening the EXE, Finder or the Linux software installer. The app closes;
 the user completes OS installation and launches it normally. Program files and
 uninstall registration remain under the native installer's ownership. Linux requires
 a DEB handler or manual `sudo apt install ./FILE.deb`; package removal keeps the profile.
+
+Windows MSI clients through 0.15.4 expect an MSI asset, so the transition requires
+one manual EXE download. The new installed client accepts the legacy `msi` marker
+as well as `exe`, but requests the signed EXE for future updates. Portable clients
+continue to use ZIP. Do not publish a new MSI alongside the EXE: that would keep
+users on the failing installer path.
 
 Portable desktop verifies the digest, then the manifest's release signature, target and
 every extracted file. Installation requires a writable parent application folder.

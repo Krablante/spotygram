@@ -7,6 +7,45 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.15.5 — Windows installation and removal
+
+Windows now uses a per-user Inno Setup EXE with its own uninstaller. The prepared
+application image, profile location and trusted desktop signing key stay the same.
+
+An ordinary account on Windows Server 2025 installed the published 0.15.4 MSI on
+an owned virtual X drive. Restricting its `Config.Msi` folder caused error 1314 and
+MSI exit code 1603. The new EXE found that registered MSI, encountered the failure,
+retried removal with `DISABLEROLLBACK=1` and completed with exit code 0. It retained
+the program directory. EXE reinstallation and removal passed; installed JARs were
+gone and a profile sentinel remained. The isolated server temporarily allowed
+unmanaged MSI packages; that policy was restored after inspection. The product
+installer changes neither system policies nor drive permissions.
+
+The published 0.15.2 MSI also migrated to EXE and uninstalled under the ordinary
+account. A separate failed MSI removal left program files after losing its
+registration. Installing the EXE in that old directory removed obsolete libraries
+from the old launcher classpath. A file outside that classpath survived both
+installation and removal, while the new application libraries were removed.
+
+Interactive installation, installed launch and interactive removal passed on the
+native Windows desktop. The same credential-store key and TDLib database reopened
+after removal. English/Russian wizard screens, the installed app and uninstall
+confirmation/completion were inspected as actual screenshots. Windows's installed
+update marker selected EXE; its portable image selected the archive channel.
+
+Android debug/release builds and both Lint checks passed. Both APKs kept the
+original application ID and signer, used versionCode 32 and passed 16 KB alignment.
+All four desktop targets built on native runners. Four installer signatures,
+four signed archive manifests and every archive entry passed verification with
+the existing public key. Linux and both macOS images launched and initialized
+Telegram with retained keys; macOS ad hoc signatures verified.
+
+The owner's exact file-security error 1926 (`Error: 5`) was not reproduced on the
+physical X drive. The observed failure was the related rollback-folder error 1314;
+the guarded retry also recognizes 1926. Production-account playback and physical
+device behavior were not checked. Old Windows MSI clients need one manual EXE
+download because their updater expects an MSI asset.
+
 ## 0.15.4 — return to phone entry during sign-in
 
 The packaged Linux debug launcher and an isolated Android 16 debug APK used
@@ -54,8 +93,8 @@ packages, which its default policy blocks for standard accounts.
 its elevated removal command were checked against the public package.
 
 The owner's `X:\Config.Msi` file-security failure was not reproduced. The MSI
-lifecycle passed with both administrator and standard accounts; the user guide
-provides elevated removal and log collection for diagnosing that machine's
+lifecycle passed with both administrator and standard accounts; that release's user guide
+provided elevated removal and log collection for diagnosing that machine's
 rollback-folder permissions. Per-user installation and the upgrade identity remain
 the same.
 

@@ -14,7 +14,7 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: linux-x64
-          - os: windows-2022
+          - os: windows-2025
             target: windows-x64
           - os: macos-15-intel
             target: macos-x64
@@ -23,6 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
+      JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2'
       TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
       TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
       DESKTOP_RELEASE_KEY: ${{ secrets.DESKTOP_RELEASE_KEY }}
@@ -50,9 +51,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $wix = Get-ChildItem "${env:ProgramFiles(x86)}\WiX Toolset*\bin\candle.exe" | Select-Object -First 1
-          if (!$wix) { throw 'WiX Toolset 3 is required by JDK 21 jpackage' }
-          $wix.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.4.3.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_4_3/innosetup-6.4.3.exe' -OutFile $setup
+          if ((Get-FileHash $setup).Hash -ne 'F3C42116542C4CC57263C5BA6C4FEABFC49FE771F2F98A79D2F7628B8762723B') { throw 'Inno Setup checksum mismatch' }
+          $tools = Join-Path $env:SPOTYGRAM_STATE 'desktop/tools/inno-6.4.3'
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOICONS', "/DIR=`"$tools`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Inno Setup preparation failed: $($process.ExitCode)" }
+          "INNO_SETUP_COMPILER=$tools\ISCC.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Build and sign
         run: python tools/build-desktop.py
       - uses: actions/upload-artifact@v7

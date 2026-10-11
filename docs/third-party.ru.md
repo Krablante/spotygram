@@ -22,7 +22,7 @@
 | ZXing core | 3.5.4 | Apache 2.0 |
 | JSON-java | 20250517 | Public domain |
 | Встроенный Java-рантайм desktop | JDK 21 сборочного runner | GPL 2 с Classpath Exception и уведомления компонентов |
-| Упаковка установщика Windows | [Исходники WiX Toolset 3](https://github.com/wixtoolset/wix3/tree/wix3141rtm), поставляется Windows build runner | [Microsoft Reciprocal License](https://github.com/wixtoolset/wix3/blob/wix3141rtm/LICENSE.TXT); copyright .NET Foundation and contributors |
+| Упаковка установщика Windows | [Исходники Inno Setup 6.4.3](https://github.com/jrsoftware/issrc/tree/is-6_4_3) | [Inno Setup License](https://github.com/jrsoftware/issrc/blob/is-6_4_3/license.txt); copyright Jordan Russell 1997–2025 и Martijn Laan 2000–2025; бесплатное коммерческое и некоммерческое использование |
 
 Нативные библиотеки Android собираются из upstream-исходников; `JsonClient.java`
 содержит сокращённые совместимые JNI-декларации. Лицензии нативных компонентов
