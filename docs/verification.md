@@ -54,6 +54,14 @@ retained local queue paused. Its archive manifest, every payload hash and instal
 signature verified with the existing desktop key; the packaged version was 0.17.0
 with DEBUG false.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38293684212)
+also built on their native runners. Four installer signatures, four archive
+manifests and every archived payload hash verified with the existing key. All
+packages reported 0.17.0, DEBUG false and sync format 2. The release Linux archive
+passed the native local-playback and restart checks. The final installed Android
+APK matched the release file byte-for-byte and retained the same catalog counts
+with integrity `ok`.
+
 Native TDLib sandbox sessions reached code entry, but Telegram rejected the reserved
 account codes with `PHONE_CODE_INVALID`. Authenticated format 2 exchange and server
 deletion were not exercised in this cycle. The controlled transport scenarios
