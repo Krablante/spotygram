@@ -53,6 +53,16 @@ after rebinding the same account, and decoded a descriptor whose long title had
 been bounded to the protocol's 8,192-character limit. Imported placeholders now
 report unavailable audio rather than a deleted Telegram message.
 
+All four desktop targets built on their native runners. The four installer
+signatures, archive manifests and every archived payload hash verified with the
+existing desktop key. Both final APKs kept the original signer and application ID,
+used versionCode 35 and passed 16 KB alignment. The test collection was removed
+from shared storage, leaving a clean muted, archived library channel. The temporary
+audio-source channel was deleted and the controlled Android/desktop sessions signed
+out. Signing out did not publish deletion of the shared library. Account sync was
+exercised on Linux and Android emulators; current Windows/macOS account flows and
+physical devices were not exercised in this cycle.
+
 ## 0.15.7 — Windows streaming and seeking
 
 The published 0.15.6 reproduced stalled seeks and an absolute-random end transition
