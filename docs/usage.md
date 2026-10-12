@@ -153,8 +153,8 @@ the library entry or signing out removes the corresponding positions.
 Positions are saved about every five seconds while playing and immediately on
 pause, seek and track changes. An abrupt process kill can lose progress since the
 last completed save. Recordings with unknown duration qualify once the player
-learns their length. Positions sync on pause, seek, track changes and orderly exit;
-receiving a position does not seek another device's active player.
+learns their length. Positions belong to this device. Pausing, seeking and changing
+tracks save locally without publishing playback data to Telegram.
 
 ## Favorites and playlists
 
@@ -183,8 +183,8 @@ mutes it and moves it to Telegram's archive. It stays out of the music-source pi
 You do not need to choose files or start a sync manually.
 
 Playlists, their song order, favorites, selected chats, playback preferences,
-appearance, language and long-recording positions sync automatically. The last
-queue restores paused on a device where you have not started another queue.
+appearance and language sync automatically. Each device keeps its own queue,
+last track and listening positions. Playback itself does not send sync documents.
 Referenced songs appear before their source finishes indexing. Imported songs
 retain their place in playlists, but their audio stays on the device that imported
 it; a metadata entry alone cannot make such a song playable elsewhere.
@@ -194,6 +194,12 @@ the app and send after reconnection. Different song additions are kept together.
 Conflicting edits of the same field resolve consistently using their saved
 versions; a deleted playlist cannot return through an older device's edits.
 Separate existing playlists keep their identities even when their names match.
+
+The storage channel keeps a current full snapshot and a short tail of recent edits.
+Connected clients consolidate that tail within about a minute or when it grows,
+then delete the replaced documents. Interrupted cleanup resumes after reconnection.
+Update every device to **0.17.0 or later**. Older versions pause sync when they encounter
+the new format; upgrading restores library sync while retaining local playback data.
 
 **Settings → Library sync** shows the current state and offers Retry after an
 error. Sync runs while Spotygram is running and Telegram is connected; a closed

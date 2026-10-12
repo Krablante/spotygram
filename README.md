@@ -30,7 +30,8 @@ device and use the player without connecting Telegram. All versions share the
 same screens, glass material, library and playback rules.
 
 Sign in to the same Telegram account on another device to restore your playlists,
-favorites, selected chats, settings and listening positions automatically. Spotygram
+favorites, selected chats and settings automatically. Each device keeps its own
+queue, last track and listening positions, including long-recording bookmarks. Spotygram
 keeps its library documents in a private, muted channel in your Telegram archive.
 
 <p align="center">

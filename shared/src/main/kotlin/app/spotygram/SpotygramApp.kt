@@ -45,6 +45,8 @@ class SpotygramApp(val platform: Platform) {
 
     private val scanning = Mutex()
     private val updating = Mutex()
+    private val preferencesChanging = Mutex()
+    private var preferencesSaving: Job? = null
     private var scanJob: Job? = null
     private lateinit var libraryReady: Deferred<Unit>
     private val artworkSlots = Semaphore(2)
@@ -148,6 +150,7 @@ class SpotygramApp(val platform: Platform) {
         scanJob?.cancelAndJoin()
         downloadService?.cancelForCacheCleanup()
         playback?.close()?.join()
+        preferencesSaving?.join()
         cloudSync.close()
         telegram.close()
         scope.coroutineContext.job.cancelAndJoin()
@@ -181,11 +184,16 @@ class SpotygramApp(val platform: Platform) {
         changeSetting("resume_minutes", value)
     }
 
-    fun changeSetting(key: String, value: Any) = action {
-        awaitLibrary()
-        if (!suppressCloudWrites) library.sync.setting(key, value)
-        applyCloudPreferences(mapOf(key to value))
+    fun changeSetting(key: String, value: Any) = changeSettings(mapOf(key to value))
+
+    fun changeSettings(values: Map<String, Any>) = action {
+        preferencesChanging.withLock {
+            awaitLibrary()
+            if (!suppressCloudWrites) library.sync.settingsChanged(values)
+            applyCloudPreferences(values)
+        }
     }
+        .also { preferencesSaving = it }
 
     fun applyCloudPreferences(values: Map<String, Any>) {
         val edit = prefs.edit()
@@ -219,28 +227,16 @@ class SpotygramApp(val platform: Platform) {
         values["order"]?.let { position.putString("order", it as String) }
         values["repeat"]?.let { position.putInt("repeat", (it as Number).toInt()) }
         position.apply()
-        val queue = values["queue"] as? JSONObject
-        if (queue != null && (playback == null || playback?.canReceiveCloudQueue() == true)) {
-            val version = UUID.nameUUIDFromBytes(queue.toString().toByteArray()).toString()
-            val order = values["order"] as? String ?: PlaybackOrder.ORDERED.name
-            val repeat = (values["repeat"] as? Number)?.toInt() ?: Player.REPEAT_MODE_OFF
-            for (name in listOf("playback_queue", "playback_position")) getSharedPreferences(name)
-                .edit()
-                .putString("version", version)
-                .putString("ids", queue.getJSONArray("ids").toString())
-                .putString("path", queue.getJSONArray("path").toString())
-                .putString("random_path", queue.getJSONArray("path").toString())
-                .putInt("cursor", queue.getInt("cursor"))
-                .putLong("position", queue.getLong("position"))
-                .putString("order", order)
-                .putInt("repeat", repeat)
-                .commit()
-            playback?.receiveCloudQueue()
+        if ("order" in values || "repeat" in values) {
+            val current = playbackMode.value
+            val order = (values["order"] as? String)?.let(PlaybackOrder::valueOf) ?: current.order
+            val repeat = (values["repeat"] as? Number)?.toInt() ?: current.repeat
+            if (playback != null) playback?.setMode(order, repeat, publish = false)
+            else playbackMode.value = PlaybackMode(order, repeat)
         }
     }
 
     fun cloudLibraryChanged(keys: Set<String>) {
-        playback?.receiveCloudProgress()
         if (keys.any { it.startsWith("source/") }) action { refresh() }
     }
 

@@ -58,7 +58,7 @@ resolution, keeps desktop alive when the window closes.
 
 ## Catalog and data
 
-SQLite schema 6 stores tracks, sources, playlists, playlist membership, pending
+SQLite schema 7 stores tracks, sources, playlists, playlist membership, pending
 downloads, temporary-file ownership and long-recording progress. Both adapters
 apply the same incremental migrations. Playback progress has a cascading track
 reference. Account-scoped sync values and metadata share this database. Playlist edits, batch favorite changes, message removal and Telegram
@@ -123,7 +123,9 @@ local clock; ties use the writer UUID, so replay and duplicate sends converge.
 Playlist membership is versioned per song; ordering retains concurrent additions.
 Deletion tombstones survive snapshots and prevent old offline playlist edits from
 restoring a removed identity. The first migration seeds existing playlists,
-favorites, sources, referenced tracks, preferences, positions and queue state.
+favorites, sources, referenced tracks and preferences. Schema 7 retires cloud queue
+and progress records while preserving local queue preferences and bookmarks. JSON
+object fields are encoded in sorted order for equal values on Android and desktop.
 Signing out detaches that account's records without publishing catalog cleanup.
 
 `CloudSync` owns channel discovery and one coalesced IO worker. It loads both chat
@@ -136,20 +138,27 @@ There is no idle polling; server delays and bounded retry backoff preserve pendi
 edits. Missing remembered storage reports an error instead of silently replacing it.
 
 Gzip JSON documents carry format, account, record versions and a SHA-256 digest in
-the caption. Small batches carry changes; an initial or large pending batch and
-every 32 delta batches produce a full snapshot. Its `through` boundary permits
-deleting only protocol messages already incorporated from that channel. Versions
-and tombstones remain in the snapshot. Confirmation waits for TDLib's final send
+the caption. Small batches carry changes. Format 2 reads format 1 library records but
+ignores its queue and progress. A confirmed format 2 snapshot causes old clients to
+pause sync until upgraded. Full snapshots omit track descriptors used only by playback.
+An initial or large pending batch produces a full snapshot. A one-shot deferred pass
+consolidates a dirty channel after 60 seconds; 16 retained tail documents trigger
+earlier consolidation, counting shared history across writers. This does not poll
+an idle channel. The snapshot's `through` boundary permits deleting only protocol
+messages already incorporated from that channel. Cleanup debt is durable and cleared
+only after successful deletion; reconnection resumes it. Versions and tombstones
+remain in the snapshot. Confirmation waits for TDLib's final send
 result before clearing the exact sent versions; newer edits remain pending.
 Reads validate the complete incoming collection before one merge transaction.
 Unknown formats and invalid documents retain the catalog and pending edits.
 Documents are bounded to 8 MiB compressed and 32 MiB expanded; downloaded sync
 documents and upload staging files are discarded after use.
 
-Settings apply through the same shared app controls. Queue reception is paused and
-does not replace a queue used in the current session. Received bookmarks do not
-seek the active track. Local five-second checkpoints stay local; pause, seek,
-track change and orderly exit publish positions. Audio copies, downloads, indexing
+Settings apply through the same shared app controls. Speed, order and repeat publish
+only on preference changes; received modes also update the active queue without
+republishing them. The queue, last track and all listening positions stay local.
+Five-second checkpoints, pause, seek, track change and orderly exit write only local
+playback storage. Audio copies, downloads, indexing
 checkpoints, native sessions and installation state belong to each device.
 The channel uses Telegram cloud protection; there is no separate encryption key.
 

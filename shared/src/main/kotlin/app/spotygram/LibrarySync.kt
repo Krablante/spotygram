@@ -36,7 +36,7 @@ class LibrarySync(
     }
 
     companion object {
-        const val FORMAT = 1
+        const val FORMAT = 2
         val settings =
             setOf(
                 "theme",
@@ -53,22 +53,42 @@ class LibrarySync(
         private val uuid = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
         private val trackId = Regex("(?:-?[0-9]{1,16}:[0-9]{1,16}|local:[a-f0-9-]{36})")
 
-        private fun wrapped(value: Any?) =
-            JSONObject().put("v", value ?: JSONObject.NULL).toString()
+        // Android preserves insertion order, while desktop JSON uses a hash map.
+        // Portable equality must not depend on either implementation's field ordering.
+        private fun encoded(value: Any?): String =
+            when (value) {
+                null,
+                JSONObject.NULL -> "null"
+                is JSONObject ->
+                    value.keys().asSequence().toList().sorted().joinToString(",", "{", "}") {
+                        "${JSONObject.quote(it)}:${encoded(value.get(it))}"
+                    }
+                is JSONArray ->
+                    (0 until value.length()).joinToString(",", "[", "]") { encoded(value.get(it)) }
+                is String -> JSONObject.quote(value)
+                is Boolean -> value.toString()
+                is Number -> JSONObject.numberToString(value)
+                else -> error("Unsupported sync value")
+            }
 
-        fun decode(array: JSONArray): List<Record> {
+        private fun wrapped(value: Any?) = "{\"v\":${encoded(value)}}"
+
+        fun decode(array: JSONArray, legacy: Boolean = false): List<Record> {
             require(array.length() <= 300_000) { "Sync collection is too large" }
             val seen = HashSet<String>()
-            return List(array.length()) { i ->
-                val row = array.getJSONArray(i)
-                require(row.length() == 4)
-                val key = row.getString(0)
-                val clock = row.getLong(1)
-                val writer = row.getString(2)
-                val value = row.get(3)
-                require(clock in 1..Long.MAX_VALUE / 4 && uuid.matches(writer) && seen.add(key))
-                validate(key, value)
-                Record(key, clock, writer, wrapped(value))
+            return buildList {
+                for (i in 0 until array.length()) {
+                    val row = array.getJSONArray(i)
+                    require(row.length() == 4)
+                    val key = row.getString(0)
+                    val clock = row.getLong(1)
+                    val writer = row.getString(2)
+                    val value = row.get(3)
+                    require(clock in 1..Long.MAX_VALUE / 4 && uuid.matches(writer) && seen.add(key))
+                    if (legacy && (key == "queue" || key.startsWith("progress/"))) continue
+                    validate(key, value)
+                    add(Record(key, clock, writer, wrapped(value)))
+                }
             }
         }
 
@@ -124,21 +144,6 @@ class LibrarySync(
                         else -> error("Unsupported sync field")
                     }
                 }
-                "progress" -> {
-                    require(parts.size == 2 && trackId.matches(parts[1]))
-                    if (value != JSONObject.NULL) {
-                        require(
-                            value is JSONObject &&
-                                value.getLong("position") >= 0 &&
-                                value.getLong("duration") > 0
-                        )
-                        require(
-                            value.getLong("position") <= value.getLong("duration") &&
-                                value.getLong("size") >= 0
-                        )
-                        require(value.getString("key").length <= 8192)
-                    }
-                }
                 "setting" -> {
                     require(parts.size == 2 && parts[1] in settings)
                     when (parts[1]) {
@@ -154,15 +159,6 @@ class LibrarySync(
                         "resume_minutes" -> require(value is Number && value.toInt() > 0)
                         else -> require(value is Boolean)
                     }
-                }
-                "queue" -> {
-                    require(parts.size == 1 && value is JSONObject)
-                    validateIds(value.getJSONArray("ids"))
-                    val path = value.getJSONArray("path")
-                    require(path.length() <= 200_000 && value.getLong("position") >= 0)
-                    val count = value.getJSONArray("ids").length()
-                    for (i in 0 until path.length()) require(path.getInt(i) in 0 until count)
-                    require(value.getInt("cursor") in 0..maxOf(0, path.length() - 1))
                 }
                 else -> error("Unsupported sync field")
             }
@@ -193,7 +189,7 @@ class LibrarySync(
                 JSONObject().put("enabled", true).put("title", c.getString(1))
         }
         db.rawQuery(
-                "SELECT id,liked FROM tracks WHERE liked=1 OR chat=0 OR id IN(SELECT track FROM playlist_tracks) OR id IN(SELECT track FROM playback_progress)",
+                "SELECT id,liked FROM tracks WHERE liked=1 OR chat=0 OR id IN(SELECT track FROM playlist_tracks)",
                 null,
             )
             .use { c ->
@@ -214,15 +210,6 @@ class LibrarySync(
                 for (track in ids) seed["playlist/$uid/member/$track"] = true
             }
         }
-        db.rawQuery("SELECT track,position,duration,file_key,size FROM playback_progress", null)
-            .use { c ->
-                while (c.moveToNext()) seed["progress/${c.getString(0)}"] =
-                    JSONObject()
-                        .put("position", c.getLong(1))
-                        .put("duration", c.getLong(2))
-                        .put("key", c.getString(3))
-                        .put("size", c.getLong(4))
-            }
         val prefs = platform.preferences("settings")
         for (key in settings - setOf("speed", "order", "repeat")) if (prefs.contains(key))
             seed["setting/$key"] =
@@ -236,22 +223,13 @@ class LibrarySync(
         if (position.contains("speed")) seed["setting/speed"] = position.getFloat("speed", 1f)
         val queue = platform.preferences("playback_queue")
         if (queue.contains("ids")) {
-            val ids = JSONArray(queue.getString("ids", "[]"))
-            val path = JSONArray(queue.getString("path", "[]"))
             val current =
                 if (position.getString("version", "") == queue.getString("version", "?")) position
                 else queue
-            seed["queue"] =
-                JSONObject()
-                    .put("ids", ids)
-                    .put("path", path)
-                    .put("cursor", current.getInt("cursor", 0))
-                    .put("position", current.getLong("position", 0).coerceAtLeast(0))
             val order =
                 current.getString("order", PlaybackOrder.ORDERED.name) ?: PlaybackOrder.ORDERED.name
             seed["setting/order"] = order
             seed["setting/repeat"] = current.getInt("repeat", 0)
-            references(db, List(ids.length()) { ids.getString(it) }, seed)
         }
         edit(db, seed)
     }
@@ -272,6 +250,71 @@ class LibrarySync(
 
     suspend fun meta(key: String, value: String) =
         withContext(Dispatchers.IO) { putMeta(database(), key, value) }
+
+    suspend fun meta(values: Map<String, String>) =
+        withContext(Dispatchers.IO) {
+            database().transaction { for ((key, value) in values) putMeta(this, key, value) }
+        }
+
+    /** Retire cloud playback without touching this device's queue or bookmarks. */
+    fun migrate(db: SqlDatabase) {
+        db.execSQL("DELETE FROM sync_values WHERE key='queue' OR key LIKE 'progress/%'")
+        val accounts =
+            db.rawQuery("SELECT DISTINCT account FROM sync_values", null).use { c ->
+                buildList { while (c.moveToNext()) add(c.getLong(0)) }
+            }
+        for (user in accounts) {
+            val all = records(db, false, user = user)
+            for (r in all) {
+                val canonical = wrapped(JSONObject(r.value).get("v"))
+                if (canonical != r.value)
+                    db.execSQL(
+                        "UPDATE sync_values SET value=? WHERE account=? AND key=?",
+                        arrayOf<Any>(canonical, user, r.key),
+                    )
+            }
+            portable(db, records(db, false, user = user), user)
+        }
+    }
+
+    private fun portable(db: SqlDatabase, all: List<Record>, user: Long): List<Record> {
+        val deleted =
+            all.filter { it.key.startsWith("playlist/") && it.removesIdentity() }
+                .map { it.key.split('/')[1] }
+                .toSet()
+        val referenced =
+            all.mapNotNull { r ->
+                    when {
+                        r.key.startsWith("favorite/") && JSONObject(r.value).get("v") == true ->
+                            r.key.removePrefix("favorite/")
+                        r.key.startsWith("playlist/") &&
+                            r.key.split('/').let {
+                                it.size == 4 && it[2] == "member" && it[1] !in deleted
+                            } &&
+                            JSONObject(r.value).get("v") == true -> r.key.split('/')[3]
+                        else -> null
+                    }
+                }
+                .toSet()
+        return all.filter { r ->
+            val keep =
+                !r.key.startsWith("track/") ||
+                    r.removesIdentity() ||
+                    r.key.removePrefix("track/") in referenced ||
+                    JSONObject(r.value).getJSONObject("v").getLong("chat") == 0L
+            if (!keep)
+                db.execSQL(
+                    "DELETE FROM sync_values WHERE account=? AND key=?",
+                    arrayOf<Any>(user, r.key),
+                )
+            keep
+        }
+    }
+
+    suspend fun snapshotRecords(): List<Record> =
+        withContext(Dispatchers.IO) {
+            database().transaction { portable(this, records(this, false), account) }
+        }
 
     /** Must share the caller's transaction with the local user action. */
     fun edit(db: SqlDatabase, values: Map<String, Any?>) {
@@ -472,48 +515,13 @@ class LibrarySync(
             changed
         }
 
-    suspend fun setting(key: String, value: Any) =
-        withContext(Dispatchers.IO) {
-            require(key in settings)
-            database().transaction { edit(this, mapOf("setting/$key" to value)) }
-        }
+    suspend fun setting(key: String, value: Any) = settingsChanged(mapOf(key to value))
 
-    suspend fun playback(
-        ids: List<String>,
-        path: List<Int>,
-        cursor: Int,
-        position: Long,
-        mode: PlaybackMode,
-        progress: Map<String, PlaybackProgress?>,
-    ) =
+    suspend fun settingsChanged(values: Map<String, Any>) =
         withContext(Dispatchers.IO) {
-            database().transaction {
-                val values =
-                    linkedMapOf<String, Any?>(
-                        "queue" to
-                            JSONObject()
-                                .put("ids", JSONArray(ids))
-                                .put("path", JSONArray(path))
-                                .put("cursor", cursor)
-                                .put("position", position.coerceAtLeast(0)),
-                        "setting/order" to mode.order.name,
-                        "setting/repeat" to mode.repeat,
-                    )
-                references(this, ids, values)
-                progressValues(progress, values)
-                edit(this, values)
-            }
+            require(values.keys.all { it in settings })
+            database().transaction { edit(this, values.mapKeys { "setting/${it.key}" }) }
         }
-
-    fun progressValues(progress: Map<String, PlaybackProgress?>, values: MutableMap<String, Any?>) {
-        for ((id, p) in progress) values["progress/$id"] = p?.let {
-            JSONObject()
-                .put("position", it.position)
-                .put("duration", it.duration)
-                .put("key", it.fileKey)
-                .put("size", it.size)
-        }
-    }
 
     private fun materialize(db: SqlDatabase, changed: Set<String>) {
         if (changed.isEmpty()) return
@@ -627,34 +635,12 @@ class LibrarySync(
                     }
                 }
         }
-        val bookmarks =
-            changed.filter { it.startsWith("progress/") }.toSet() +
-                changed
-                    .filter { it.startsWith("track/") }
-                    .map { "progress/${it.removePrefix("track/")}" }
-                    .filter { it in rows }
-        for (key in bookmarks) {
-            val id = key.removePrefix("progress/")
-            val p = value(key) as? JSONObject
-            if (p == null) db.execSQL("DELETE FROM playback_progress WHERE track=?", arrayOf(id))
-            else
-                db.execSQL(
-                    "INSERT OR REPLACE INTO playback_progress(track,position,duration,file_key,size) SELECT id,?,?,?,? FROM tracks WHERE id=?",
-                    arrayOf<Any>(
-                        p.getLong("position"),
-                        p.getLong("duration"),
-                        p.getString("key"),
-                        p.getLong("size"),
-                        id,
-                    ),
-                )
-        }
     }
 
     suspend fun preferences(): Map<String, Any> =
         withContext(Dispatchers.IO) {
             records(database(), false)
-                .filter { it.key.startsWith("setting/") || it.key == "queue" }
+                .filter { it.key.startsWith("setting/") }
                 .associate { it.key.removePrefix("setting/") to JSONObject(it.value).get("v") }
         }
 }

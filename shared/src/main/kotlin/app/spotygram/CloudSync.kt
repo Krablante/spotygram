@@ -24,6 +24,7 @@ class CloudSync(private val app: SpotygramApp) {
         CoroutineScope(app.scope.coroutineContext + SupervisorJob(app.scope.coroutineContext[Job]))
     private var worker: Job? = null
     private var retry: Job? = null
+    private var maintenance: Job? = null
     private var connected = false
     private var initialized = false
     private var failures = 0
@@ -38,8 +39,11 @@ class CloudSync(private val app: SpotygramApp) {
     private val telegram
         get() = app.telegram
 
-    private val prefix = "spotygram-sync/1"
+    private val prefix = "spotygram-sync/${LibrarySync.FORMAT}"
     private val marker = "spotygram-storage/1"
+    private val settleMillis = 60_000L
+    private val maxTail = 16
+    private val heads = mutableMapOf<Long, List<JSONObject>>()
     private val maxCompressed = 8 * 1024 * 1024
     private val maxExpanded = 32 * 1024 * 1024
 
@@ -59,6 +63,8 @@ class CloudSync(private val app: SpotygramApp) {
             worker = null
             retry?.cancel()
             retry = null
+            maintenance?.cancel()
+            maintenance = null
             initialized = false
             state.value = state.value.copy(phase = "offline")
         } else {
@@ -129,10 +135,13 @@ class CloudSync(private val app: SpotygramApp) {
         worker = null
         retry?.cancelAndJoin()
         retry = null
+        maintenance?.cancelAndJoin()
+        maintenance = null
         for (room in rooms) runCatching { telegram.request(json("closeChat", "chat_id" to room)) }
         initialized = false
         rooms = emptyList()
         inspected.clear()
+        heads.clear()
         lastPreferences = emptyMap()
         retryAt = 0
         floodAt = 0
@@ -179,27 +188,59 @@ class CloudSync(private val app: SpotygramApp) {
             }
         }
         val changed = linkedSetOf<String>()
+        heads.clear()
         for (room in rooms) changed += read(room)
         applyPreferences()
         if (changed.isNotEmpty())
             withContext(Dispatchers.Main.immediate) { app.cloudLibraryChanged(changed) }
         val room = rooms.first()
-        var packets = store.meta("packets/$room").toIntOrNull() ?: 0
-        val initial = store.meta("snapshot/$room").isEmpty()
-        val firstPending = store.records(pending = true, limit = 1500)
-        if (initial || firstPending.size == 1500) {
-            snapshot(room)
-            packets = 0
+        for (storage in rooms) {
+            finishCleanup(storage)
+            val through = store.meta("through2/$storage").toLongOrNull() ?: 0L
+            val checkpoint = store.meta("snapshot2/$storage").toLongOrNull() ?: 0L
+            val tail =
+                heads[storage].orEmpty().filter {
+                    it.getLong("id") > through && it.getLong("id") != checkpoint && protocol(it)
+                }
+            if (tail.isNotEmpty()) {
+                val oldest =
+                    tail.minOf { it.optLong("date", 0) * 1000 }.takeIf { it > 0 }
+                        ?: System.currentTimeMillis()
+                dirty(storage, oldest)
+            }
+            val since = store.meta("dirty2/$storage").toLongOrNull() ?: 0L
+            val pending =
+                if (storage == room) store.records(pending = true, limit = 1500) else emptyList()
+            if (
+                checkpoint == 0L ||
+                    pending.size == 1500 ||
+                    tail.size >= maxTail ||
+                    since > 0 && System.currentTimeMillis() >= since + settleMillis ||
+                    storage == room && rooms.size > 1 && changed.isNotEmpty()
+            ) {
+                snapshot(storage)
+            } else if (pending.isNotEmpty()) {
+                // One bounded batch per pass; another burst uses the worker's coalescing delay.
+                send(storage, pending, snapshot = false)
+                store.acknowledge(pending)
+                dirty(storage, System.currentTimeMillis())
+                if (store.records(pending = true, limit = 1).isNotEmpty()) signal()
+            }
         }
-        while (true) {
-            val pending = store.records(pending = true, limit = 1500)
-            if (pending.isEmpty()) break
-            send(room, pending, snapshot = false)
-            store.acknowledge(pending)
-            packets++
-            store.meta("packets/$room", packets.toString())
+        maintenance?.cancel()
+        maintenance = null
+        val next =
+            rooms
+                .mapNotNull {
+                    store.meta("dirty2/$it").toLongOrNull()?.takeIf { it > 0 }?.plus(settleMillis)
+                }
+                .minOrNull()
+        if (next != null) {
+            maintenance = scope.launch {
+                delay((next - System.currentTimeMillis()).coerceIn(0, settleMillis))
+                signal()
+            }
         }
-        if (packets >= 32 || rooms.size > 1 && changed.isNotEmpty()) snapshot(room)
         quiet(room)
         val now = System.currentTimeMillis()
         store.meta("last_sync/${store.account}", now.toString())
@@ -207,13 +248,45 @@ class CloudSync(private val app: SpotygramApp) {
     }
 
     private suspend fun snapshot(room: Long) {
-        val all = store.records()
+        val all = store.snapshotRecords()
         val through = store.meta("cursor/$room").toLongOrNull() ?: 0L
         val sent = send(room, all, snapshot = true, through = through)
         store.acknowledge(all)
-        store.meta("snapshot/$room", sent.getLong("id").toString())
-        store.meta("packets/$room", "0")
+        checkpoint(room, sent.getLong("id"), through)
+        finishCleanup(room)
+    }
+
+    private suspend fun dirty(room: Long, since: Long) {
+        val existing = store.meta("dirty2/$room").toLongOrNull() ?: 0L
+        if (existing == 0L || since < existing) store.meta("dirty2/$room", since.toString())
+    }
+
+    private suspend fun checkpoint(room: Long, id: Long, through: Long) {
+        val previous = store.meta("through2/$room").toLongOrNull() ?: 0L
+        val pending = store.meta("compact2/$room").toLongOrNull() ?: 0L
+        store.meta(
+            mapOf(
+                "snapshot2/$room" to id.toString(),
+                "through2/$room" to maxOf(previous, through).toString(),
+                "compact2/$room" to maxOf(pending, through).toString(),
+                "dirty2/$room" to "0",
+            )
+        )
+    }
+
+    private suspend fun finishCleanup(room: Long) {
+        val through = store.meta("compact2/$room").toLongOrNull() ?: 0L
+        if (through == 0L) return
         compact(room, through)
+        store.meta("compact2/$room", "0")
+    }
+
+    private fun protocol(message: JSONObject): Boolean {
+        val caption =
+            message.getJSONObject("content").optJSONObject("caption")?.optString("text").orEmpty()
+        return (1..LibrarySync.FORMAT).any {
+            caption.startsWith("spotygram-sync/$it ${store.account} ")
+        }
     }
 
     private suspend fun discover(user: Long): List<Long> {
@@ -347,6 +420,7 @@ class CloudSync(private val app: SpotygramApp) {
         var newest = previous
         var stalled = 0
         var latestSnapshot = 0L
+        var snapshotThrough = 0L
         val incoming = linkedMapOf<String, LibrarySync.Record>()
         history@ while (true) {
             val messages =
@@ -363,6 +437,7 @@ class CloudSync(private val app: SpotygramApp) {
                     )
                     .getJSONArray("messages")
             if (messages.length() == 0) break
+            if (from == 0L) heads[room] = List(messages.length()) { messages.getJSONObject(it) }
             var next = from
             for (i in 0 until messages.length()) {
                 val message = messages.getJSONObject(i)
@@ -376,11 +451,16 @@ class CloudSync(private val app: SpotygramApp) {
                 if (content.kind() == "messageSupergroupChatCreate") break@history
                 val caption = content.optJSONObject("caption")?.optString("text").orEmpty()
                 if (!caption.startsWith("spotygram-sync/")) continue
-                require(caption.startsWith("$prefix ")) { tr(R.string.sync_newer_version) }
+                val format =
+                    caption.substringBefore(' ').removePrefix("spotygram-sync/").toIntOrNull()
+                require(format != null && format in 1..LibrarySync.FORMAT) {
+                    tr(R.string.sync_newer_version)
+                }
                 val (packet, records) =
                     try {
                         val packet = download(content, caption)
-                        packet to LibrarySync.decode(packet.getJSONArray("records"))
+                        packet to
+                            LibrarySync.decode(packet.getJSONArray("records"), legacy = format == 1)
                     } catch (e: Exception) {
                         if (e is CancellationException || e is TelegramException) throw e
                         throw IllegalArgumentException(tr(R.string.sync_invalid_data), e)
@@ -390,7 +470,10 @@ class CloudSync(private val app: SpotygramApp) {
                 }
                 if (packet.getString("kind") == "snapshot") {
                     covered = maxOf(covered, packet.getLong("through"))
-                    latestSnapshot = maxOf(latestSnapshot, id)
+                    if (format == LibrarySync.FORMAT) {
+                        latestSnapshot = maxOf(latestSnapshot, id)
+                        snapshotThrough = maxOf(snapshotThrough, packet.getLong("through"))
+                    }
                 }
             }
             if (next == from) {
@@ -402,15 +485,18 @@ class CloudSync(private val app: SpotygramApp) {
             }
         }
         val changed = store.merge(incoming.values.toList())
-        if (latestSnapshot != 0L) store.meta("snapshot/$room", latestSnapshot.toString())
+        if (latestSnapshot != 0L) checkpoint(room, latestSnapshot, snapshotThrough)
         store.meta("cursor/$room", newest.toString())
         return changed
     }
 
     private suspend fun download(content: JSONObject, caption: String): JSONObject {
         val parts = caption.split(' ')
+        val format = parts.firstOrNull()?.substringAfter("spotygram-sync/")?.toIntOrNull()
         require(
             parts.size == 6 &&
+                format != null &&
+                format in 1..LibrarySync.FORMAT &&
                 parts[1].toLong() == store.account &&
                 parts[2] in listOf("delta", "snapshot")
         )
@@ -455,7 +541,7 @@ class CloudSync(private val app: SpotygramApp) {
                 }
             val packet = JSONObject(plain.toString(Charsets.UTF_8))
             require(
-                packet.getInt("format") == LibrarySync.FORMAT &&
+                packet.getInt("format") == format &&
                     packet.getLong("account") == store.account &&
                     packet.getString("kind") == parts[2] &&
                     packet.getLong("through") == parts[5].toLong()
@@ -533,6 +619,7 @@ class CloudSync(private val app: SpotygramApp) {
         if (through == 0L) return
         val ids = mutableListOf<Long>()
         var from = through
+        var stalled = 0
         while (true) {
             val page =
                 telegram
@@ -547,21 +634,25 @@ class CloudSync(private val app: SpotygramApp) {
                         )
                     )
                     .getJSONArray("messages")
+            if (page.length() == 0) break
             var next = from
+            var beginning = false
             for (i in 0 until page.length()) {
                 val message = page.getJSONObject(i)
                 val id = message.getLong("id")
                 next = minOf(next, id)
-                val caption =
-                    message
-                        .getJSONObject("content")
-                        .optJSONObject("caption")
-                        ?.optString("text")
-                        .orEmpty()
-                if (id <= through && caption.startsWith("$prefix ${store.account} ")) ids += id
+                if (message.getJSONObject("content").kind() == "messageSupergroupChatCreate")
+                    beginning = true
+                if (id <= through && protocol(message)) ids += id
             }
-            if (next == from || page.length() == 0) break
-            from = next
+            if (beginning) break
+            if (next == from) {
+                require(++stalled <= 3) { tr(R.string.sync_history_incomplete) }
+                delay(200)
+            } else {
+                from = next
+                stalled = 0
+            }
         }
         for (chunk in ids.distinct().chunked(100)) telegram.request(
             json(

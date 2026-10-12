@@ -15,7 +15,7 @@ class Library(private val platform: Platform) : AutoCloseable {
     val sync: LibrarySync = LibrarySync(platform, { writableDatabase }, { reload() })
     private val publishing = Mutex()
     private val storage = lazy {
-        platform.openDatabase("library.db", 6, ::onCreate, ::onUpgrade, ::onOpen)
+        platform.openDatabase("library.db", 7, ::onCreate, ::onUpgrade, ::onOpen)
     }
     private val database
         get() = storage.value
@@ -70,6 +70,7 @@ class Library(private val platform: Platform) : AutoCloseable {
             db.execSQL("ALTER TABLE sources ADD COLUMN documents_complete INTEGER DEFAULT 0")
         }
         if (oldVersion < 6) sync.install(db)
+        if (oldVersion < 7) sync.migrate(db)
     }
 
     private fun createPlaybackProgress(db: SqlDatabase) {

@@ -7,6 +7,60 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.17.0 — local playback and bounded sync history
+
+Temporary runtime checks used the compiled application with isolated catalogs and
+controlled TDLib responses. A schema 6 catalog upgraded to 7, retaining its queue
+and 125,000 ms bookmark while ignoring a foreign legacy playback position. Its
+playlists and favorites survived; playback-only descriptors left the portable
+snapshot. A fresh client recovered the library without inheriting a queue or
+bookmarks. The actual 0.16.0 reader paused on format 2, sent nothing and retained
+a pending local setting.
+
+Controlled history checks covered the shared tail threshold, old history without
+local edits, deletion failure, cleanup retry without another upload, and restart
+with unfinished cleanup. Concurrent edits arriving after a snapshot's boundary
+survived compaction; a stale offline rename could not restore a deleted playlist.
+The actual one-minute maintenance timer consolidated a short tail and did not
+start an idle publication loop. Android's and desktop's JSON implementations
+both recognized unchanged object values without publishing them again.
+Short history pages were retried; a persistently incomplete history kept cleanup
+pending until a later successful pass. A 10,000-song metadata snapshot was about
+231 kB compressed. Two offline additions converged to 10,002 songs and identical
+portable records, with one retained snapshot. This used the controlled transport
+and does not establish Telegram media availability.
+
+The packaged Linux player used native libmpv with null audio output and a synthetic
+31-minute WAV. Periodic checkpoints, seeking and pausing saved local progress
+without pending playback edits. Received order/repeat preferences updated the
+active queue; later local saves did not overwrite them. Explicit mode changes
+published only settings. Closing and reopening retained the local track and
+paused position. Actual Linux screenshots covered the library, player and settings
+in light English and dark Russian, including a narrow window.
+
+A signed APK upgraded the retained Android 16 catalog from schema 6 to 7, keeping
+three tracks, two favorites, two playlists and three memberships with SQLite
+integrity `ok`. That emulator again reported launcher/system ANRs. A fresh
+Android 15 emulator completed local import, playback, seeking and process restart.
+Its 652,707 ms bookmark remained local with zero cloud queue/progress records and
+integrity `ok`. The application had no AndroidRuntime crash during these checks.
+Actual Android library, player and settings screens were inspected in both themes,
+including Russian at 320 dp with font scale 1.3.
+
+The final Android debug/release assemblies and both Lint checks passed. Both
+release APKs retained the original signer and application ID, used versionCode 36
+and passed 16 KB alignment. The production Linux image built and reopened its
+retained local queue paused. Its archive manifest, every payload hash and installer
+signature verified with the existing desktop key; the packaged version was 0.17.0
+with DEBUG false.
+
+Native TDLib sandbox sessions reached code entry, but Telegram rejected the reserved
+account codes with `PHONE_CODE_INVALID`. Authenticated format 2 exchange and server
+deletion were not exercised in this cycle. The controlled transport scenarios
+above verify application behavior; the production transport evidence for 0.16.0
+below does not establish a new server check. Current Windows/macOS account flows,
+physical audio output and physical-device behavior were not rechecked.
+
 ## 0.16.0 — automatic library sync
 
 Two independent Spotygram TDLib sessions on Linux used a controlled production

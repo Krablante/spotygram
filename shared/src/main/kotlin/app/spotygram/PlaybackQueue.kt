@@ -59,9 +59,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
     private var pendingStart: Job? = null
     private val progress = mutableMapOf<String, PlaybackProgress>()
     private val progressUpdates = mutableMapOf<String, PlaybackProgress?>()
-    private val cloudProgressUpdates = mutableMapOf<String, PlaybackProgress?>()
-    private var localQueueTouched = false
-    private var cloudVersion = ""
     private var speedSaving: Job? = null
     private var observedDuration = 0L
     private lateinit var writer: Job
@@ -79,9 +76,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         val position: Long,
         val mode: PlaybackMode,
         val progress: Map<String, PlaybackProgress?> = emptyMap(),
-        val publish: Boolean = false,
-        val cloudProgress: Map<String, PlaybackProgress?> = emptyMap(),
-        val account: Long = 0,
     )
 
     private val saves = Channel<Saved>(Channel.CONFLATED)
@@ -123,28 +117,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                             }
                         }
                     }
-                    if (
-                        s.publish &&
-                            !app.suppressCloudWrites &&
-                            (s.account == 0L || s.account == app.library.sync.account)
-                    ) {
-                        app.library.sync.playback(
-                            s.ids,
-                            s.path,
-                            s.cursor,
-                            s.position,
-                            s.mode,
-                            s.cloudProgress,
-                        )
-                        withContext(Dispatchers.Main.immediate) {
-                            cloudVersion = s.version
-                            for ((id, value) in s.cloudProgress) if (
-                                cloudProgressUpdates.containsKey(id) &&
-                                    cloudProgressUpdates[id] == value
-                            )
-                                cloudProgressUpdates.remove(id)
-                        }
-                    }
                     if (written != s.version) {
                         queuePrefs
                             .edit()
@@ -182,14 +154,13 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying && !restoring && !editing) localQueueTouched = true
                     positionSaving?.cancel()
                     positionSaving =
                         if (isPlaying)
                             scope.launch {
                                 while (isActive) {
                                     delay(5000)
-                                    save(publish = false)
+                                    save()
                                 }
                             }
                         else null
@@ -279,7 +250,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                     else window(position = restored.position)
                 }
                 restoring = false
-                changed(publish = false)
+                changed()
                 app.listeningCache.ready()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -306,8 +277,12 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         generation++
         restoring = false
         ids = tracks.map { it.id }
-        app.playbackMode.value =
-            mode.copy(order = order, repeat = normalizedRepeat(order, mode.repeat))
+        val updatedMode = mode.copy(order = order, repeat = normalizedRepeat(order, mode.repeat))
+        if (updatedMode != mode)
+            app.changeSettings(
+                mapOf("order" to updatedMode.order.name, "repeat" to updatedMode.repeat)
+            )
+        app.playbackMode.value = updatedMode
         resetOrder(index)
         window()
         exo.prepare()
@@ -413,14 +388,22 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
             Player.REPEAT_MODE_OFF
         else repeat
 
-    fun setMode(order: PlaybackOrder = mode.order, repeat: Int = mode.repeat) {
+    fun setMode(
+        order: PlaybackOrder = mode.order,
+        repeat: Int = mode.repeat,
+        publish: Boolean = true,
+    ) {
         if (blockedByCleanup()) return
+        val updated = PlaybackMode(order, normalizedRepeat(order, repeat))
+        if (updated == mode) return
         val selected = current
         val reshuffle = mode.order != order
-        app.playbackMode.value = PlaybackMode(order, normalizedRepeat(order, repeat))
+        app.playbackMode.value = updated
         if (reshuffle) resetOrder(selected)
         window(preserve = true)
         changed()
+        if (publish)
+            app.changeSettings(mapOf("order" to updated.order.name, "repeat" to updated.repeat))
     }
 
     fun snapshot(): QueueSnapshot {
@@ -568,11 +551,10 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         changed(false)
     }
 
-    private fun changed(structural: Boolean = true, publish: Boolean = true) {
-        if (publish && !app.suppressCloudWrites) localQueueTouched = true
+    private fun changed(structural: Boolean = true) {
         if (structural) version = UUID.randomUUID().toString()
         app.queueRevision.value++
-        save(publish)
+        save()
     }
 
     private fun eligible(duration: Long) =
@@ -614,7 +596,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         if (progress[id] == value) return
         if (value == null) progress.remove(id) else progress[id] = value
         progressUpdates[id] = value
-        cloudProgressUpdates[id] = value
     }
 
     fun savePosition() {
@@ -635,7 +616,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         save()
     }
 
-    private fun save(publish: Boolean = true) {
+    private fun save() {
         if (!restoring && !editing && app.startupError.value.isEmpty()) {
             if (cleanupPosition == null)
                 rememberPosition(
@@ -655,11 +636,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                     },
                     mode,
                     progressUpdates.toMap(),
-                    (publish || cloudVersion != version) &&
-                        localQueueTouched &&
-                        !app.suppressCloudWrites,
-                    cloudProgressUpdates.toMap(),
-                    app.library.sync.account,
                 )
             )
             app.playbackCheckpoints.tryEmit(Unit)
@@ -749,40 +725,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                 ),
             ),
         )
-    }
-
-    fun canReceiveCloudQueue() = !localQueueTouched && !exo.isPlaying && !exo.playWhenReady
-
-    fun receiveCloudQueue() {
-        if (!canReceiveCloudQueue()) return
-        scope.launch {
-            restoringJob?.join()
-            if (!canReceiveCloudQueue()) return@launch
-            val saved = withContext(Dispatchers.IO) { restore() } ?: return@launch
-            if (!canReceiveCloudQueue()) return@launch
-            restoring = true
-            try {
-                ids = saved.ids
-                path = saved.path
-                cursor = saved.cursor
-                app.playbackMode.value = saved.mode
-                window(position = saved.position)
-            } finally {
-                restoring = false
-            }
-            changed(publish = false)
-        }
-    }
-
-    fun receiveCloudProgress() {
-        scope.launch {
-            val saved = app.library.playbackProgress()
-            val active = exo.currentMediaItem?.mediaId
-            val protected = progressUpdates.keys + cloudProgressUpdates.keys + listOfNotNull(active)
-            for (id in progress.keys.toList()) if (id !in protected && id !in saved)
-                progress.remove(id)
-            for ((id, p) in saved) if (id !in protected) progress[id] = p
-        }
     }
 
     fun close(): Job {
