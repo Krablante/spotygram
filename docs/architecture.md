@@ -128,7 +128,9 @@ slider movement; closing the queue flushes it. Speed changes do not rebuild the 
 `TrackReader` reads available on-disk TDLib ranges through both engines. Missing
 ranges wait for native file events, with a 60-second read timeout. Replacement or
 closing cancels the wait. A reader error stops playback without becoming successful
-end-of-file or clearing the bookmark. Media3 targets a 15–30 second buffer; libmpv
+end-of-file or clearing the bookmark. A NIO file channel permits TDLib to rename a
+completed download while the reader remains open on Windows; positional reads keep
+using that handle. Media3 targets a 15–30 second buffer; libmpv
 reads ahead up to 30 seconds within an 8 MiB demuxer limit. These are settings,
 not measured latency promises.
 
@@ -148,6 +150,10 @@ Desktop Play/Pause commands own playback intent. The native pause used while
 loading another file cannot replace that intent. File events belong to the native
 playlist entry and load generation; replacing a stream cancels its pending reads.
 Duration and buffering updates use the captured native event values.
+libmpv's playback-restart event acknowledges a seek. Its audio clock can differ
+from the requested position because of output latency and speed; it is not used
+as a completion tolerance. A new seek rejects restart work already queued for an
+older request on the UI thread.
 
 ## File ownership and account security
 

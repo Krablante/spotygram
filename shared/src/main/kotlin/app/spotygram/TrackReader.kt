@@ -2,7 +2,9 @@ package app.spotygram
 
 import java.io.File
 import java.io.IOException
-import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -10,7 +12,8 @@ import kotlinx.coroutines.flow.first
 
 /** Reads TDLib's on-disk bytes directly; no localhost server or duplicate media cache. */
 class TrackReader(private val app: SpotygramApp) : AutoCloseable {
-    private var input: RandomAccessFile? = null
+    // NIO allows TDLib to rename a completed download while it is open on Windows.
+    private var input: FileChannel? = null
     private var lease: ListeningCache.Lease? = null
     private var fileId = 0
     private var position = 0L
@@ -43,11 +46,11 @@ class TrackReader(private val app: SpotygramApp) : AutoCloseable {
             }
             val localPath = checkNotNull(lease).path
             if (fileId == 0) {
-                input = RandomAccessFile(localPath, "r")
+                input = FileChannel.open(File(localPath).toPath(), StandardOpenOption.READ)
                 remaining =
                     if (length >= 0)
-                        minOf(length, (input!!.length() - position).coerceAtLeast(0))
-                    else (input!!.length() - position).coerceAtLeast(0)
+                        minOf(length, (input!!.size() - position).coerceAtLeast(0))
+                    else (input!!.size() - position).coerceAtLeast(0)
             }
             return remaining
         } catch (e: Exception) {
@@ -64,7 +67,7 @@ class TrackReader(private val app: SpotygramApp) : AutoCloseable {
         while (!closed && !Thread.currentThread().isInterrupted) {
             val revision = app.telegram.fileRevision.value
             if (fileId == 0) {
-                available = (input?.length() ?: 0) - position
+                available = (input?.size() ?: 0) - position
                 break
             }
             val f = app.telegram.files[fileId]
@@ -73,7 +76,8 @@ class TrackReader(private val app: SpotygramApp) : AutoCloseable {
                 else if (position >= f.offset && position < f.offset + f.prefix)
                     available = f.offset + f.prefix - position
                 if (available > 0 || f.complete) {
-                    if (input == null && f.path.isNotBlank()) input = RandomAccessFile(f.path, "r")
+                    if (input == null && f.path.isNotBlank())
+                        input = FileChannel.open(File(f.path).toPath(), StandardOpenOption.READ)
                     break
                 }
             }
@@ -93,8 +97,7 @@ class TrackReader(private val app: SpotygramApp) : AutoCloseable {
             minOf(length.toLong(), available, if (remaining >= 0) remaining else Long.MAX_VALUE)
                 .toInt()
         val file = input ?: throw IOException(tr(R.string.audio_unavailable))
-        file.seek(position)
-        val read = file.read(buffer, offset, count)
+        val read = file.read(ByteBuffer.wrap(buffer, offset, count), position)
         if (read < 0) return -1
         position += read
         if (remaining >= 0) remaining -= read

@@ -30,6 +30,7 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     private var nativeEntry = -1L
     private var readyGeneration = -1L
     private var pendingPosition: Long? = null
+    @Volatile private var seekRevision = 0L
     private val tokens = AtomicLong()
     private class Stream(val id: String, val size: Long, val reader: TrackReader, val generation: Long) {
         val buffer = ByteArray(64 * 1024)
@@ -196,21 +197,21 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
                     }
                     Mpv.EVENT_PLAYBACK_RESTART -> {
                         val entry = eventEntry
-                        // Capture at the native event, before a busy UI thread can advance beyond the seek tolerance.
+                        val seek = seekRevision
                         val actual = (Mpv.double(handle, "time-pos") * 1000).toLong()
                         val cached = Mpv.flag(handle, "paused-for-cache")
                         val nativeSeeking = Mpv.flag(handle, "seeking")
                         dispatch {
-                            if (entry != nativeEntry || readyGeneration != generation) return@dispatch
-                            if (pendingPosition == null || kotlin.math.abs(actual - pendingPosition!!) <= 500) {
-                                pendingPosition = null
-                                position = actual
-                                pausedForCache = cached
-                                seeking = nativeSeeking
-                                buffering = pausedForCache || seeking
-                                state = if (buffering) Player.STATE_BUFFERING else Player.STATE_READY
-                                emit(Player.EVENT_POSITION_DISCONTINUITY)
-                            }
+                            if (entry != nativeEntry || readyGeneration != generation || seek != seekRevision) return@dispatch
+                            // Restart acknowledges the seek. The audio clock can differ by output latency,
+                            // multiplied by playback speed; matching a timestamp can leave loading forever.
+                            pendingPosition = null
+                            position = actual
+                            pausedForCache = cached
+                            seeking = nativeSeeking
+                            buffering = pausedForCache || seeking
+                            state = if (buffering) Player.STATE_BUFFERING else Player.STATE_READY
+                            emit(Player.EVENT_POSITION_DISCONTINUITY)
                         }
                     }
                     Mpv.EVENT_END_FILE -> {
@@ -352,6 +353,7 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     }
     override fun seekTo(position: Long) {
         val old = Player.PositionInfo(index, currentMediaItem, currentPosition)
+        seekRevision++
         this.position = position.coerceAtLeast(0).let { if (length > 0) it.coerceAtMost(length) else it }
         pendingPosition = this.position
         if (prepared) {

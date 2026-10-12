@@ -7,6 +7,46 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.15.7 — Windows streaming and seeking
+
+The published 0.15.6 reproduced stalled seeks and an absolute-random end transition
+on native Windows with actual Telegram recordings. Its reader waited for the last
+partial download block while TDLib reported an incomplete, inactive transfer.
+The file already had its expected physical size, but native range queries confirmed
+that the final bytes were not available to the reader. Clearing a UI loading flag
+did not resolve this case.
+
+Windows rejected renaming a file held by `RandomAccessFile`. A NIO channel allowed
+the same rename and kept positional reads working, including a nonzero destination
+buffer offset. With that channel, the same Telegram files completed downloading.
+The release Windows image exercised four local recordings (CBR/VBR MP3, FLAC and
+Opus) and four actual Telegram recordings at 0.3×, 1×, 2× and 4×. Each collection passed 80 individual seeks,
+16 paused seeks, 16 bursts of four rapid seeks, 40 absolute-random end transitions,
+six shuffle/repeat-all transitions and four repeat-one transitions. End transitions
+followed seeks near the ends; no stalls or player errors occurred. Tests used an
+isolated copy of a controlled Spotygram session with fresh media downloads, without
+forced download retries or manual file-state refreshes.
+
+The older player also retained loading after a completed paused seek at 4×:
+the audio clock differed from the target by more than its 500 ms tolerance. The
+updated player acknowledges libmpv's restart event and rejects queued work from
+an earlier seek. Actual Windows and Linux player screenshots were inspected in
+light/dark themes after pointer seeking, paused seeking and resumed playback. The
+timeline advanced and the transport returned to Play/Pause without a loading loop.
+Native audio checks used null output; physical audio drivers and the owner's exact
+recording were not checked.
+
+Android debug/release assembly and both Lint checks passed. Both release APKs kept
+the existing signer and application ID, used versionCode 34 and passed 16 KB
+alignment. All four desktop targets built on native runners. The installer
+signatures, signed archive manifests and all archived payload hashes verified
+with the existing key. All four desktop packages reported 0.15.7 with DEBUG false.
+The signed Linux archive also passed the local seek matrix and 50 end transitions;
+the retained local desktop image was rebuilt as release 0.15.7.
+The signed Android app reached its welcome and local-library screens, but the
+host emulator crashed during UI checks on Android 15/16. Android playback through
+the changed reader was not confirmed in this cycle.
+
 ## 0.15.6 — phone codes and desktop playback
 
 A fresh production Windows client requested a code for a controlled account.
