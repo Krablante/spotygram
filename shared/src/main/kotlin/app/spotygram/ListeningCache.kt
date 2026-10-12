@@ -69,7 +69,7 @@ class ListeningCache(private val app: SpotygramApp) {
         signal()
     }
 
-    fun setEnabled(enabled: Boolean) {
+    fun setEnabled(enabled: Boolean, publish: Boolean = true) {
         if (state.value.changing || state.value.enabled == enabled) return
         val before = state.value.enabled
         state.update { it.copy(enabled = enabled, changing = true) }
@@ -79,6 +79,8 @@ class ListeningCache(private val app: SpotygramApp) {
                     if (!enabled) app.library.retainTemporaryFiles()
                     withContext(Dispatchers.IO) {
                         check(app.prefs.edit().putBoolean("discard_listened", enabled).commit())
+                        if (publish && !app.suppressCloudWrites)
+                            app.library.sync.setting("discard_listened", enabled)
                     }
                     app.library.reload()
                 }
@@ -127,7 +129,10 @@ class ListeningCache(private val app: SpotygramApp) {
     /** Called on the loader's IO coroutine; there is no suspension after registering the lease. */
     suspend fun acquire(track: Track): Lease {
         check(!app.musicCache.state.value.clearing) { tr(R.string.cache_clearing) }
-        if (track.chatId == 0L) return lease(0, track.path, "")
+        if (track.chatId == 0L) {
+            check(track.local) { tr(R.string.audio_unavailable) }
+            return lease(0, track.path, "")
+        }
         if (track.fileKey.isNotEmpty()) {
             val local =
                 gated(track.fileKey) {

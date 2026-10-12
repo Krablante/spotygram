@@ -1,17 +1,21 @@
 package app.spotygram
 
 import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 class Library(private val platform: Platform) : AutoCloseable {
     val state = MutableStateFlow(LibraryState())
+    val sync: LibrarySync = LibrarySync(platform, { writableDatabase }, { reload() })
     private val publishing = Mutex()
     private val storage = lazy {
-        platform.openDatabase("library.db", 5, ::onCreate, ::onUpgrade, ::onOpen)
+        platform.openDatabase("library.db", 6, ::onCreate, ::onUpgrade, ::onOpen)
     }
     private val database
         get() = storage.value
@@ -42,6 +46,7 @@ class Library(private val platform: Platform) : AutoCloseable {
         db.execSQL("CREATE TABLE downloads(track TEXT PRIMARY KEY,position INTEGER)")
         createTemporaryStorage(db)
         createPlaybackProgress(db)
+        sync.install(db)
     }
 
     private fun onUpgrade(db: SqlDatabase, oldVersion: Int, newVersion: Int) {
@@ -64,6 +69,7 @@ class Library(private val platform: Platform) : AutoCloseable {
             db.execSQL("ALTER TABLE sources ADD COLUMN document_cursor INTEGER DEFAULT 0")
             db.execSQL("ALTER TABLE sources ADD COLUMN documents_complete INTEGER DEFAULT 0")
         }
+        if (oldVersion < 6) sync.install(db)
     }
 
     private fun createPlaybackProgress(db: SqlDatabase) {
@@ -123,6 +129,7 @@ class Library(private val platform: Platform) : AutoCloseable {
     }
 
     private fun onOpen(db: SqlDatabase) {
+        sync.opened(db)
         // TDLib file IDs belong to one client lifetime, not to the persisted catalog.
         // Clear old bindings before any new audio/thumbnail completion can match them.
         db.execSQL("UPDATE tracks SET file=0 WHERE chat!=0 AND file!=0")
@@ -182,7 +189,7 @@ class Library(private val platform: Platform) : AutoCloseable {
                             c.getString(15),
                             c.getString(16),
                             c.getInt(17) == 1,
-                            c.getInt(18) == 1,
+                            c.getInt(19) == 1,
                         )
                 }
             val lists = mutableListOf<Playlist>()
@@ -196,11 +203,16 @@ class Library(private val platform: Platform) : AutoCloseable {
                         .getOrPut(c.getLong(0)) { mutableListOf() }
                         .add(c.getString(1))
                 }
-            db.rawQuery("SELECT id,name FROM playlists ORDER BY name", null).use { c ->
-                while (c.moveToNext()) {
-                    lists += Playlist(c.getLong(0), c.getString(1), members[c.getLong(0)].orEmpty())
+            db.rawQuery(
+                    "SELECT id,name FROM playlists WHERE account=? ORDER BY name",
+                    arrayOf(sync.account.toString()),
+                )
+                .use { c ->
+                    while (c.moveToNext()) {
+                        lists +=
+                            Playlist(c.getLong(0), c.getString(1), members[c.getLong(0)].orEmpty())
+                    }
                 }
-            }
             val snapshot = LibraryState(tracks, sources, lists)
             if (snapshot != state.value) {
                 snapshot.byId
@@ -259,6 +271,12 @@ class Library(private val platform: Platform) : AutoCloseable {
                         db.insertOrThrow("tracks", null, v)
                     }
                 }
+                val imports = tracks.filter { it.chatId == 0L }.map { it.id }
+                if (imports.isNotEmpty()) {
+                    val values = linkedMapOf<String, Any?>()
+                    sync.references(db, imports, values)
+                    sync.edit(db, values)
+                }
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
@@ -267,17 +285,26 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     suspend fun source(choice: ChatChoice, enabled: Boolean) =
         withContext(Dispatchers.IO) {
-            if (enabled)
-                writableDatabase.insertWithOnConflict(
-                    "sources",
-                    null,
-                    Values().apply {
-                        put("id", choice.id)
-                        put("title", choice.title)
-                    },
-                    SqlDatabase.CONFLICT_IGNORE,
+            writableDatabase.transaction {
+                if (enabled)
+                    insertWithOnConflict(
+                        "sources",
+                        null,
+                        Values().apply {
+                            put("id", choice.id)
+                            put("title", choice.title)
+                        },
+                        SqlDatabase.CONFLICT_IGNORE,
+                    )
+                else delete("sources", "id=?", arrayOf(choice.id.toString()))
+                sync.edit(
+                    this,
+                    mapOf(
+                        "source/${choice.id}" to
+                            JSONObject().put("enabled", enabled).put("title", choice.title)
+                    ),
                 )
-            else writableDatabase.delete("sources", "id=?", arrayOf(choice.id.toString()))
+            }
             reload()
         }
 
@@ -348,6 +375,10 @@ class Library(private val platform: Platform) : AutoCloseable {
                         statement.executeUpdateDelete()
                     }
                 }
+                val changed = if (value) listOf(track.id) else previous
+                val values = changed.associate { "favorite/$it" to value as Any? }.toMutableMap()
+                sync.references(this, changed, values)
+                sync.edit(this, values)
                 value to previous
             }
             reload()
@@ -363,6 +394,9 @@ class Library(private val platform: Platform) : AutoCloseable {
                         statement.executeUpdateDelete()
                     }
                 }
+                val values = ids.associate { "favorite/$it" to true as Any? }.toMutableMap()
+                sync.references(this, ids, values)
+                sync.edit(this, values)
             }
             reload()
         }
@@ -419,9 +453,26 @@ class Library(private val platform: Platform) : AutoCloseable {
                     insertOrThrow(
                         "playlists",
                         null,
-                        Values().apply { put("name", name.trim().take(80)) },
+                        Values().apply {
+                            put("name", name.trim().take(80))
+                            put("account", sync.account)
+                        },
                     )
                 addTracks(this, created, tracks)
+                val uid = UUID.randomUUID().toString()
+                execSQL(
+                    "UPDATE playlists SET sync_id=?,account=? WHERE id=?",
+                    arrayOf<Any>(uid, sync.account, created),
+                )
+                val ids = sync.playlistTracks(this, created)
+                val values =
+                    linkedMapOf<String, Any?>(
+                        "playlist/$uid/name" to name.trim().take(80),
+                        "playlist/$uid/order" to JSONArray(ids),
+                    )
+                for (track in ids) values["playlist/$uid/member/$track"] = true
+                sync.references(this, ids, values)
+                sync.edit(this, values)
                 created
             }
             reload()
@@ -430,9 +481,13 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     private fun addTracks(db: SqlDatabase, playlist: Long, tracks: List<String>) {
         check(
-            db.rawQuery("SELECT id FROM playlists WHERE id=?", arrayOf(playlist.toString())).use {
-                it.moveToFirst()
-            }
+            db.rawQuery(
+                    "SELECT id FROM playlists WHERE id=? AND account=?",
+                    arrayOf(playlist.toString(), sync.account.toString()),
+                )
+                .use {
+                    it.moveToFirst()
+                }
         ) {
             tr(R.string.playlist_deleted)
         }
@@ -463,7 +518,17 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     suspend fun addToPlaylist(playlist: Long, tracks: List<String>) =
         withContext(Dispatchers.IO) {
-            writableDatabase.transaction { addTracks(this, playlist, tracks) }
+            writableDatabase.transaction {
+                addTracks(this, playlist, tracks)
+                val uid = sync.playlistId(this, playlist)
+                val ids = sync.playlistTracks(this, playlist)
+                val members = ids.toSet()
+                val values = linkedMapOf<String, Any?>("playlist/$uid/order" to JSONArray(ids))
+                for (track in tracks.filter { it in members }) values[
+                    "playlist/$uid/member/$track"] = true
+                sync.references(this, tracks, values)
+                sync.edit(this, values)
+            }
             reload()
         }
 
@@ -473,6 +538,7 @@ class Library(private val platform: Platform) : AutoCloseable {
     suspend fun removeFromPlaylist(playlist: Long, tracks: List<String>) =
         withContext(Dispatchers.IO) {
             writableDatabase.transaction {
+                val uid = sync.playlistId(this, playlist)
                 tracks.forEach { track ->
                     delete(
                         "playlist_tracks",
@@ -480,6 +546,7 @@ class Library(private val platform: Platform) : AutoCloseable {
                         arrayOf(playlist.toString(), track),
                     )
                 }
+                sync.edit(this, tracks.associate { "playlist/$uid/member/$it" to false })
             }
             reload()
         }
@@ -487,12 +554,16 @@ class Library(private val platform: Platform) : AutoCloseable {
     suspend fun renamePlaylist(id: Long, name: String) =
         withContext(Dispatchers.IO) {
             require(name.isNotBlank()) { tr(R.string.playlist_name_required) }
-            writableDatabase.update(
-                "playlists",
-                Values().apply { put("name", name.trim().take(80)) },
-                "id=?",
-                arrayOf(id.toString()),
-            )
+            writableDatabase.transaction {
+                val uid = sync.playlistId(this, id)
+                update(
+                    "playlists",
+                    Values().apply { put("name", name.trim().take(80)) },
+                    "id=?",
+                    arrayOf(id.toString()),
+                )
+                sync.edit(this, mapOf("playlist/$uid/name" to name.trim().take(80)))
+            }
             reload()
         }
 
@@ -522,6 +593,10 @@ class Library(private val platform: Platform) : AutoCloseable {
                             statement.executeUpdateDelete()
                         }
                     }
+                sync.edit(
+                    this,
+                    mapOf("playlist/${sync.playlistId(this, id)}/order" to JSONArray(merged)),
+                )
             }
             reload()
         }
@@ -529,8 +604,10 @@ class Library(private val platform: Platform) : AutoCloseable {
     suspend fun deletePlaylist(id: Long) =
         withContext(Dispatchers.IO) {
             writableDatabase.transaction {
+                val uid = sync.playlistId(this, id)
                 delete("playlist_tracks", "playlist=?", arrayOf(id.toString()))
                 delete("playlists", "id=?", arrayOf(id.toString()))
+                sync.edit(this, mapOf("playlist/$uid/deleted" to true))
             }
             reload()
         }
@@ -586,8 +663,21 @@ class Library(private val platform: Platform) : AutoCloseable {
                     check(!artwork.exists() || artwork.delete()) { tr(R.string.file_unavailable) }
                 }
                 writableDatabase.transaction {
+                    val values = linkedMapOf<String, Any?>("favorite/${track.id}" to false)
+                    sync.descriptor(this, track.id)?.let {
+                        values["track/${track.id}"] = it.put("deleted", true)
+                    }
+                    rawQuery(
+                            "SELECT playlists.sync_id FROM playlists JOIN playlist_tracks ON playlists.id=playlist_tracks.playlist WHERE playlist_tracks.track=? AND playlists.account=?",
+                            arrayOf(track.id, sync.account.toString()),
+                        )
+                        .use { c ->
+                            while (c.moveToNext()) values[
+                                "playlist/${c.getString(0)}/member/${track.id}"] = false
+                        }
                     delete("playlist_tracks", "track=?", arrayOf(track.id))
                     delete("tracks", "id=?", arrayOf(track.id))
+                    sync.edit(this, values)
                 }
             } else
                 writableDatabase.transaction {
@@ -643,6 +733,7 @@ class Library(private val platform: Platform) : AutoCloseable {
                     "DELETE FROM playlist_tracks WHERE track IN (SELECT id FROM tracks WHERE chat!=0)"
                 )
                 execSQL("DELETE FROM tracks WHERE chat!=0")
+                execSQL("DELETE FROM tracks WHERE cloud=1 AND path=''")
                 delete("sources", null, null)
                 delete("downloads", null, null)
                 delete("temporary_audio", null, null)

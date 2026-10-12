@@ -45,7 +45,7 @@
     <string name="random_pool_help">%1$s · each next song is chosen independently. Playback continues until you stop it.</string>
     <string name="next_named">Next: %1$s</string>
     <string name="language">Language</string>
-    <string name="language_help">Follows your device language. English and Russian are supported.</string>
+    <string name="language_help">Choose English, Russian or your device language.</string>
     <string name="language_phone_settings">Change the language in your phone settings.</string>
     <string name="action_failed">"Could not complete the action. Please try again."</string>
     <string name="add_chats">"Add chats"</string>
@@ -57,13 +57,13 @@
     <string name="all_sources">"All sources"</string>
     <string name="source_filter">Sources</string>
     <string name="alphabetical">"Alphabetical"</string>
-    <string name="app_description">"A personal music player using the Telegram API. No own server, app ads or analytics. Music and your session stay on this device."</string>
+    <string name="app_description">"A personal music player using the Telegram API. No own server, app ads or analytics. Your library syncs through a private, muted channel in your Telegram archive. Audio and sessions stay on each device."</string>
     <string name="appearance">"Appearance"</string>
     <string name="audio_read_failed">"Could not read the audio file"</string>
     <string name="audio_recording">"Audio recording"</string>
     <string name="audio_unavailable">"Audio file unavailable"</string>
     <string name="auth_payment_help">"Telegram requires payment for this sign-in method. Try signing in through the official app first."</string>
-    <string name="auth_privacy_help">"An unofficial Telegram API app. Signing in creates a session with account access; only selected chats are indexed for music. The session stays on this device."</string>
+    <string name="auth_privacy_help">"An unofficial Telegram API app. Signing in creates a session with account access. Spotygram automatically creates a private, muted channel in your archive to sync your library. Only selected chats are indexed for music. The session stays on this device."</string>
     <string name="back">"Back"</string>
     <string name="cancel">"Cancel"</string>
     <string name="resume_long_audio">Remember audio positions</string>
@@ -331,4 +331,13 @@
     <string name="audio_in_use">This file is still needed by the player. Switch the playback collection before removing it.</string>
     <string name="hide_duplicates">Hide duplicates</string>
     <string name="hide_duplicates_help">Show one entry per recording in Music, Favorites and On device. Nothing is deleted. Existing playlists and the current queue stay unchanged.</string>
+    <string name="sync_title">Library sync</string>
+    <string name="sync_ready">Up to date across your devices.</string>
+    <string name="sync_working">Saving and receiving library changes…</string>
+    <string name="sync_offline">Changes stay on this device until Telegram reconnects.</string>
+    <string name="sync_paused">Sync is paused. Your changes are saved; Spotygram will try again.</string>
+    <string name="sync_newer_version">Update Spotygram to read this library format.</string>
+    <string name="sync_history_incomplete">Telegram library history is not available yet.</string>
+    <string name="sync_invalid_data">The library file could not be verified.</string>
+    <string name="sync_storage_missing">The private storage channel is unavailable. Restore access to it to continue syncing.</string>
 </resources>

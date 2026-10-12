@@ -11,6 +11,9 @@ flowchart LR
     UI[Compose screens] --> App[SpotygramApp]
     App --> Library[Library / SQLite]
     App --> Telegram[Telegram / TDLib]
+    App --> Sync[CloudSync / LibrarySync]
+    Sync --> Library
+    Sync --> Telegram
     Telegram --> TG[Telegram servers]
     UI --> Queue[PlaybackQueue]
     Queue --> Engine[Media3 / libmpv]
@@ -55,10 +58,10 @@ resolution, keeps desktop alive when the window closes.
 
 ## Catalog and data
 
-SQLite schema 5 stores tracks, sources, playlists, playlist membership, pending
+SQLite schema 6 stores tracks, sources, playlists, playlist membership, pending
 downloads, temporary-file ownership and long-recording progress. Both adapters
 apply the same incremental migrations. Playback progress has a cascading track
-reference. Playlist edits, batch favorite changes, message removal and Telegram
+reference. Account-scoped sync values and metadata share this database. Playlist edits, batch favorite changes, message removal and Telegram
 catalog cleanup use transactions; a migration never resets the library.
 
 A Telegram track's identity is `chat_id:message_id`. Numeric TDLib file IDs belong
@@ -105,6 +108,50 @@ Imports create an app-owned copy. Copying checks cancellation between chunks;
 failed imports remove their staged audio and artwork. Once SQLite owns the entry,
 a later reload or notification failure keeps its files. Deletion removes a catalog
 entry only after the corresponding local files have actually been removed.
+
+## Automatic library sync
+
+`LibrarySync` owns portable user data and its durable pending flags. User edits
+write the local catalog and the corresponding sync values in one SQLite transaction.
+Playlists have stable UUIDs independent of their local numeric row IDs. Track
+descriptors carry metadata and Telegram message references, never local paths or
+native file IDs. This lets favorites and playlist membership exist before indexing.
+Imported audio remains local; peers receive an unavailable metadata entry.
+
+Each field has a logical clock and a device UUID. Receiving a version advances the
+local clock; ties use the writer UUID, so replay and duplicate sends converge.
+Playlist membership is versioned per song; ordering retains concurrent additions.
+Deletion tombstones survive snapshots and prevent old offline playlist edits from
+restoring a removed identity. The first migration seeds existing playlists,
+favorites, sources, referenced tracks, preferences, positions and queue state.
+Signing out detaches that account's records without publishing catalog cleanup.
+
+`CloudSync` owns channel discovery and one coalesced IO worker. It loads both chat
+lists and checks owned channels for an account-bound description marker, including
+renamed storage. Simultaneous first-run channels converge on the same canonical
+channel while reading the others. The channel gets a random `spotygram-` title,
+permanent mute, archive placement and no message auto-deletion. Sends are silent;
+`openChat` supplies live events. Startup and reconnection reconcile history.
+There is no idle polling; server delays and bounded retry backoff preserve pending
+edits. Missing remembered storage reports an error instead of silently replacing it.
+
+Gzip JSON documents carry format, account, record versions and a SHA-256 digest in
+the caption. Small batches carry changes; an initial or large pending batch and
+every 32 delta batches produce a full snapshot. Its `through` boundary permits
+deleting only protocol messages already incorporated from that channel. Versions
+and tombstones remain in the snapshot. Confirmation waits for TDLib's final send
+result before clearing the exact sent versions; newer edits remain pending.
+Reads validate the complete incoming collection before one merge transaction.
+Unknown formats and invalid documents retain the catalog and pending edits.
+Documents are bounded to 8 MiB compressed and 32 MiB expanded; downloaded sync
+documents and upload staging files are discarded after use.
+
+Settings apply through the same shared app controls. Queue reception is paused and
+does not replace a queue used in the current session. Received bookmarks do not
+seek the active track. Local five-second checkpoints stay local; pause, seek,
+track change and orderly exit publish positions. Audio copies, downloads, indexing
+checkpoints, native sessions and installation state belong to each device.
+The channel uses Telegram cloud protection; there is no separate encryption key.
 
 ## Playback and persistence
 
@@ -184,8 +231,9 @@ reads that key before creating the Telegram database and file directories, then 
 absolute native paths to TDLib. Directory creation runs on IO. Android
 backups are disabled. The catalog and audio use private per-user storage without
 separate per-file encryption. Telegram sign-in grants a full account session; source
-selection limits indexing, not account permissions. Logout clears Telegram catalog
-records and playlist references while keeping imports. Network payloads are not logged.
+selection limits indexing, not account permissions. Logout clears this device's Telegram catalog
+records and playlist references while keeping imports and account-scoped sync data.
+Network payloads are not logged.
 
 During unfinished phone sign-in, Back opens phone entry while retaining TDLib's
 actual code, password or email state. Submitting another number uses

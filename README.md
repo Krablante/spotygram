@@ -29,6 +29,10 @@ make playlists, download music for later. You can also import files from your
 device and use the player without connecting Telegram. All versions share the
 same screens, glass material, library and playback rules.
 
+Sign in to the same Telegram account on another device to restore your playlists,
+favorites, selected chats, settings and listening positions automatically. Spotygram
+keeps its library documents in a private, muted channel in your Telegram archive.
+
 <p align="center">
   <img src="docs/screenshots/library-dark.png" width="30%" alt="Music library in the dark theme">
   &nbsp;
@@ -141,7 +145,8 @@ disk space. Returning to older songs may require another download.
 
 ## Your files and your account
 
-Music, playlists and the Telegram session live on the device. Spotygram has no
+Audio files and the Telegram session live on each device. Library data also syncs
+through your Telegram account using Telegram's ordinary cloud protection. Spotygram has no
 backend, separate registration or analytics. It connects directly to Telegram;
 release checks contact GitHub, which sees your connection IP and app version.
 
@@ -153,8 +158,8 @@ You can revoke it from Telegram's device settings.
 Imported files, favorites, playlists and sign-in remain. If the original
 message is no longer accessible, a deleted local copy may not be recoverable.
 Uninstalling the Android app removes its local music and settings. Deleting the
-desktop application folder leaves its separate user data in place. Playlists are
-not backed up to the cloud or synchronized between devices.
+desktop application folder leaves its separate user data in place. Synced library
+data returns after sign-in; imported audio files need their own backup.
 
 ## Under the cover
 
@@ -168,8 +173,8 @@ For the details, start with [architecture](docs/architecture.md) or
 [building from source](docs/build.md). The [documentation index](docs/README.md)
 links both language editions.
 
-This is an early public release. Secret chats, voice notes and playlist sync
-are not supported. The [verification record](docs/verification.md) separates
+This is an early public release. Secret chats, voice notes and automatic transfer
+of imported audio files are not supported. The [verification record](docs/verification.md) separates
 observed behavior from untested cases, including physical-device and
 authenticated Telegram checks. Screenshots show the real app with local
 demonstration recordings, not music bundled with the APK.

@@ -153,7 +153,8 @@ the library entry or signing out removes the corresponding positions.
 Positions are saved about every five seconds while playing and immediately on
 pause, seek and track changes. An abrupt process kill can lose progress since the
 last completed save. Recordings with unknown duration qualify once the player
-learns their length. Positions stay on this device, without cloud synchronization.
+learns their length. Positions sync on pause, seek, track changes and orderly exit;
+receiving a position does not seek another device's active player.
 
 ## Favorites and playlists
 
@@ -173,6 +174,37 @@ Open a playlist's action menu, or long-press the playlist, to rename, delete
 or reorder it. In the ordering view, hold the handle beside a song and drag;
 up/down arrows are also available. Removing a song from a playlist or deleting
 the playlist does not delete the audio files.
+
+## One library across devices
+
+Sign in to the same Telegram account on each device. Spotygram automatically
+creates or finds a private channel named `spotygram-` followed by random characters,
+mutes it and moves it to Telegram's archive. It stays out of the music-source picker.
+You do not need to choose files or start a sync manually.
+
+Playlists, their song order, favorites, selected chats, playback preferences,
+appearance, language and long-recording positions sync automatically. The last
+queue restores paused on a device where you have not started another queue.
+Referenced songs appear before their source finishes indexing. Imported songs
+retain their place in playlists, but their audio stays on the device that imported
+it; a metadata entry alone cannot make such a song playable elsewhere.
+
+Edits save locally first and send in small batches. Offline edits survive closing
+the app and send after reconnection. Different song additions are kept together.
+Conflicting edits of the same field resolve consistently using their saved
+versions; a deleted playlist cannot return through an older device's edits.
+Separate existing playlists keep their identities even when their names match.
+
+**Settings → Library sync** shows the current state and offers Retry after an
+error. Sync runs while Spotygram is running and Telegram is connected; a closed
+device catches up on its next launch. Downloaded files, native sessions, download
+jobs, indexing cursors and update-installation state remain device-specific.
+
+The channel uses Telegram's ordinary cloud protection, without a separate key
+or device-pairing step. Keep it private and accessible. Deleting it prevents new
+devices from restoring its contents; an already connected device keeps its local
+data and reports the unavailable storage. Signing out clears that device's
+Telegram catalog without deleting the shared library.
 
 ## Listen offline
 
@@ -224,9 +256,8 @@ not be recoverable. Cleanup requires a connected Telegram account.
 ## Language and appearance
 
 The interface follows your system language: English or Russian, with English
-for other languages. On Android 13+, **Settings → Language** opens a per-app
-language setting. Earlier Android versions follow the phone's language. Desktop
-**Settings → Language** offers English, Russian or the system language.
+for other languages. **Settings → Language** offers English, Russian or the
+system language on every supported platform.
 Song and chat names are not translated.
 
 Choose light or dark appearance in Settings. Until then, the app follows your
@@ -284,8 +315,8 @@ over the old one preserves data. **Uninstalling the Android app removes its libr
 and settings.** On Windows, remove Spotygram through **Settings → Apps**; on macOS,
 move the installed app to Trash; on Ubuntu, use your software manager or `sudo apt remove spotygram`.
 Desktop removal preserves the separate user profile, imported music and sign-in.
-Deleting a portable application folder has the same effect. Playlists are not synced
-to the cloud or between devices.
+Deleting a portable application folder has the same effect. Library changes already
+sent to Telegram return after sign-in, including after Android reinstallation.
 
 Telegram sign-in creates a full account session, not access restricted to the
 chosen chats. You can revoke it from the official Telegram app's device settings.
@@ -309,7 +340,7 @@ to private storage. Restore it at the same path while the app is closed.
 The Telegram database key stays in the OS credential store and is not included
 in that folder copy. A profile backup is therefore not a portable Telegram
 session, and cannot recover a session whose credential-store key is lost.
-Keep your original imported files too. There is no in-app export or device sync.
+Keep your original imported files too: library sync does not upload their audio.
 `SPOTYGRAM_STATE` controls developer build files, not this user profile.
 
 ## When something goes wrong

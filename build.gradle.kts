@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.compose") version "1.12.0" apply false
 }
 
-version = "0.15.7"
+version = "0.16.0"
 
 subprojects {
     plugins.withId("org.jetbrains.kotlin.plugin.compose") {
@@ -16,6 +16,7 @@ subprojects {
             "dev.chrisbanes.haze:haze:2.0.1",
             "dev.chrisbanes.haze:haze-glass:2.0.1",
             "com.google.zxing:core:3.5.4",
+            "com.googlecode.libphonenumber:libphonenumber:9.0.41",
         ).forEach { dependencies.add("implementation", it) }
     }
 }

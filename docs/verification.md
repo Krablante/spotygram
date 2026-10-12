@@ -7,6 +7,52 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.16.0 — automatic library sync
+
+Two independent Spotygram TDLib sessions on Linux used a controlled production
+Telegram account. Both found the same private storage channel, with archive
+placement and notifications disabled. Playlists and favorites changed in both
+directions. A fresh second catalog recovered the library, settings and selected
+source even after the channel was renamed. That source indexed an actual uploaded
+MP3. The channel name was restored after the check.
+
+A playlist with 10,000 synthetic song descriptors transferred through Telegram
+in a full snapshot of about 763 kB compressed. After separate offline additions
+and a restart of the second client, both playlists contained all 10,002 songs.
+The clients' portable records matched exactly; a stale offline rename did not
+restore a deleted playlist. A 125,000 ms bookmark and paused queue metadata also
+reached the second catalog. SQLite integrity was `ok`. These are metadata and
+transport checks; the synthetic entries do not establish media availability.
+
+A document advertising an unknown protocol version paused both clients without
+changing their playlists. A new local edit remained pending. Removing that
+temporary document allowed the edit to send. Reading the channel after the large
+snapshot showed that incorporated older protocol documents had been compacted.
+
+A signed APK upgraded the retained Android 16 catalog from schema 5 to 6, keeping
+all three tracks, two favorites, two playlists and three memberships. That emulator
+later terminated with host exit code 139 during sign-in; its System UI had also
+reported an ANR. A fresh Android 15 emulator with the SWANGLE renderer completed
+sign-in and recovered the same library, including the 10,002-song playlist,
+bookmark, source, Russian language and light appearance. Removing a favorite,
+creating a one-song playlist and selecting a Telegram recording through Android's
+UI reached the desktop client. The recording downloaded; application crash logs
+were empty during these checks. Physical audio output was not checked.
+
+Actual desktop screenshots covered the sync error, Retry and ready states, English
+in dark appearance and Russian in light appearance at wide and narrow sizes.
+Android's Russian library, playlists and ready status were inspected, including
+controls at 320 dp with font scale 1.3. A bad document digest retained the library;
+removing the temporary document and using Retry returned the desktop UI to ready.
+
+The final Android debug/release assemblies, both Lint checks and the Linux image
+build passed. The final signed APK reopened the retained Android 15 session and
+10,002-song playlist with no pending edits or application crash; SQLite integrity
+was `ok`. Separate local runtime checks retained a speed change made while detached
+after rebinding the same account, and decoded a descriptor whose long title had
+been bounded to the protocol's 8,192-character limit. Imported placeholders now
+report unavailable audio rather than a deleted Telegram message.
+
 ## 0.15.7 — Windows streaming and seeking
 
 The published 0.15.6 reproduced stalled seeks and an absolute-random end transition

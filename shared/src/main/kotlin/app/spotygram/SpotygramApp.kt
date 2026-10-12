@@ -57,6 +57,8 @@ class SpotygramApp(val platform: Platform) {
     val musicCache by lazy { MusicCache(this) }
     val listeningCache by lazy { ListeningCache(this) }
     val updates by lazy { AppUpdates(this) }
+    val cloudSync by lazy { CloudSync(this) }
+    var suppressCloudWrites = false
     val playbackMode = MutableStateFlow(PlaybackMode())
     val queueRevision = MutableStateFlow(0L)
 
@@ -88,6 +90,7 @@ class SpotygramApp(val platform: Platform) {
         libraryReady = scope.async {
             try {
                 library.verifyFiles()
+                applyCloudPreferences(library.sync.preferences())
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 startupError.value = tr(R.string.library_open_failed)
@@ -112,6 +115,7 @@ class SpotygramApp(val platform: Platform) {
                 }
                 .distinctUntilChanged()
                 .collectLatest { connected ->
+                    cloudSync.connection(connected)
                     listeningCache.signal()
                     if (!connected) scanJob?.cancelAndJoin()
                     else {
@@ -144,25 +148,22 @@ class SpotygramApp(val platform: Platform) {
         scanJob?.cancelAndJoin()
         downloadService?.cancelForCacheCleanup()
         playback?.close()?.join()
+        cloudSync.close()
         telegram.close()
         scope.coroutineContext.job.cancelAndJoin()
         withContext(Dispatchers.IO) { library.close() }
     }
 
     fun changeTheme(value: String) {
-        prefs.edit().putString("theme", value).apply()
-        theme.value = value
+        changeSetting("theme", value)
     }
 
     fun changeLanguage(value: String) {
-        prefs.edit().putString("language", value).apply()
-        language.value = platform.locale.language
-        AppText.languageChanged()
+        changeSetting("language", value)
     }
 
     fun changeHideDuplicates(value: Boolean) {
-        prefs.edit().putBoolean("hide_duplicates", value).apply()
-        hideDuplicates.value = value
+        changeSetting("hide_duplicates", value)
     }
 
     fun localMode() {
@@ -171,17 +172,76 @@ class SpotygramApp(val platform: Platform) {
 
     fun changeResumeLongAudio(value: Boolean) {
         playback?.savePosition()
-        prefs.edit().putBoolean("resume_long_audio", value).apply()
-        resumeLongAudio.value = value
-        playback?.savePosition()
+        changeSetting("resume_long_audio", value)
     }
 
     fun changeResumeMinutes(value: Int) {
         if (value < 1) return
         playback?.savePosition()
-        prefs.edit().putInt("resume_minutes", value).apply()
-        resumeMinutes.value = value
-        playback?.savePosition()
+        changeSetting("resume_minutes", value)
+    }
+
+    fun changeSetting(key: String, value: Any) = action {
+        awaitLibrary()
+        if (!suppressCloudWrites) library.sync.setting(key, value)
+        applyCloudPreferences(mapOf(key to value))
+    }
+
+    fun applyCloudPreferences(values: Map<String, Any>) {
+        val edit = prefs.edit()
+        for ((key, value) in values) {
+            if (key !in LibrarySync.settings || key in setOf("speed", "order", "repeat")) continue
+            when (value) {
+                is Boolean -> edit.putBoolean(key, value)
+                is Number -> edit.putInt(key, value.toInt())
+                is String -> edit.putString(key, value)
+            }
+        }
+        edit.apply()
+        theme.value = prefs.getString("theme", "system") ?: "system"
+        hideDuplicates.value = prefs.getBoolean("hide_duplicates", true)
+        resumeLongAudio.value = prefs.getBoolean("resume_long_audio", true)
+        resumeMinutes.value = prefs.getInt("resume_minutes", 30).coerceAtLeast(1)
+        val locale = platform.locale.language
+        if (language.value != locale) {
+            language.value = locale
+            AppText.languageChanged()
+        }
+        values["discard_listened"]?.let {
+            listeningCache.setEnabled(it as Boolean, publish = false)
+        }
+        val position = getSharedPreferences("playback_position").edit()
+        values["speed"]?.let {
+            val speed = (it as Number).toFloat()
+            position.putFloat("speed", speed)
+            if (player?.playbackParameters?.speed != speed) player?.setPlaybackSpeed(speed)
+        }
+        values["order"]?.let { position.putString("order", it as String) }
+        values["repeat"]?.let { position.putInt("repeat", (it as Number).toInt()) }
+        position.apply()
+        val queue = values["queue"] as? JSONObject
+        if (queue != null && (playback == null || playback?.canReceiveCloudQueue() == true)) {
+            val version = UUID.nameUUIDFromBytes(queue.toString().toByteArray()).toString()
+            val order = values["order"] as? String ?: PlaybackOrder.ORDERED.name
+            val repeat = (values["repeat"] as? Number)?.toInt() ?: Player.REPEAT_MODE_OFF
+            for (name in listOf("playback_queue", "playback_position")) getSharedPreferences(name)
+                .edit()
+                .putString("version", version)
+                .putString("ids", queue.getJSONArray("ids").toString())
+                .putString("path", queue.getJSONArray("path").toString())
+                .putString("random_path", queue.getJSONArray("path").toString())
+                .putInt("cursor", queue.getInt("cursor"))
+                .putLong("position", queue.getLong("position"))
+                .putString("order", order)
+                .putInt("repeat", repeat)
+                .commit()
+            playback?.receiveCloudQueue()
+        }
+    }
+
+    fun cloudLibraryChanged(keys: Set<String>) {
+        playback?.receiveCloudProgress()
+        if (keys.any { it.startsWith("source/") }) action { refresh() }
     }
 
     fun track(id: String) = library.state.value.byId[id]
@@ -237,6 +297,7 @@ class SpotygramApp(val platform: Platform) {
             ids += savedId
         val choices = mutableListOf<ChatChoice>()
         for (id in ids) {
+            if (id in telegram.storageChats) continue
             currentCoroutineContext().ensureActive()
             val cached = telegram.chats[id]
             if (cached != null) {
@@ -674,17 +735,24 @@ class SpotygramApp(val platform: Platform) {
         }
 
     suspend fun logout() {
-        listeningCache.exclusive {
-            scanJob?.cancelAndJoin()
-            playback?.clear()
-            playback?.forgetTelegramProgress()
-            platform.stopDownloads(this)
-            telegram.request(json("logOut"))
-            prefs.edit().putBoolean("telegram_connected", false).apply()
-            library.clearTelegram()
-            resolvedFiles.clear()
-            thumbnails.clear()
-            artworkFiles.clear()
+        cloudSync.stop()
+        suppressCloudWrites = true
+        try {
+            listeningCache.exclusive {
+                scanJob?.cancelAndJoin()
+                playback?.clear()
+                playback?.forgetTelegramProgress()
+                platform.stopDownloads(this)
+                telegram.request(json("logOut"))
+                prefs.edit().putBoolean("telegram_connected", false).apply()
+                library.clearTelegram()
+                library.sync.detach()
+                resolvedFiles.clear()
+                thumbnails.clear()
+                artworkFiles.clear()
+            }
+        } finally {
+            suppressCloudWrites = false
         }
     }
 }

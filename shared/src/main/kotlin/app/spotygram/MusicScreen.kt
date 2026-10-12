@@ -646,7 +646,11 @@ fun TrackRow(
                         tint = MaterialTheme.colorScheme.secondary,
                     )
                 Text(
-                    if (!track.available && !track.local) tr(R.string.message_deleted)
+                    if (!track.available && !track.local)
+                        tr(
+                            if (track.chatId == 0L) R.string.audio_unavailable
+                            else R.string.message_deleted
+                        )
                     else track.subtitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

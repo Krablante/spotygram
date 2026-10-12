@@ -41,7 +41,9 @@ fun SettingsSheet(
     val resumeLongAudio by app.resumeLongAudio.collectAsStateWithLifecycle()
     val resumeMinutes by app.resumeMinutes.collectAsStateWithLifecycle()
     var editingResume by rememberSaveable { mutableStateOf(false) }
-    var wifi by remember { mutableStateOf(app.prefs.getBoolean("wifi_only", false)) }
+    val syncState by app.cloudSync.state.collectAsStateWithLifecycle()
+    var wifi by
+        remember(syncState.lastSync) { mutableStateOf(app.prefs.getBoolean("wifi_only", false)) }
     val download by app.downloading.collectAsStateWithLifecycle()
     Column(
         Modifier.fillMaxWidth()
@@ -226,7 +228,7 @@ fun SettingsSheet(
                 wifi,
                 {
                     wifi = it
-                    app.prefs.edit().putBoolean("wifi_only", it).apply()
+                    app.changeSetting("wifi_only", it)
                 },
             )
         }
@@ -251,6 +253,43 @@ fun SettingsSheet(
             if (connected) tr(R.string.logout_telegram) else tr(R.string.connect_telegram),
             if (connected) onLogout else onConnect,
         )
+        if (connected) {
+            ListItem(
+                headlineContent = { Text(tr(R.string.sync_title)) },
+                supportingContent = {
+                    val status =
+                        tr(
+                            when (syncState.phase) {
+                                "ready" -> R.string.sync_ready
+                                "syncing" -> R.string.sync_working
+                                "error" -> R.string.sync_paused
+                                else -> R.string.sync_offline
+                            }
+                        )
+                    Text(
+                        if (syncState.phase == "error" && syncState.error.isNotBlank())
+                            "$status\n${syncState.error}"
+                        else status
+                    )
+                },
+                leadingContent = {
+                    Icon(
+                        if (syncState.phase == "ready") Icons.Rounded.CloudDone
+                        else Icons.Rounded.CloudSync,
+                        null,
+                    )
+                },
+                trailingContent =
+                    if (syncState.phase == "error") {
+                        {
+                            IconButton(onClick = { app.cloudSync.retry() }) {
+                                Icon(Icons.Rounded.Refresh, tr(R.string.retry_chat_loading))
+                            }
+                        }
+                    } else null,
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+        }
         UpdateSettings(app)
         Text(
             "Spotygram ${BuildConfig.VERSION_NAME}",
@@ -320,17 +359,28 @@ fun SettingsSheet(
             title = { Text(tr(R.string.language)) },
             text = {
                 Column {
-                    listOf("system" to R.string.system_default, "en" to R.string.language_english,
-                        "ru" to R.string.language_russian).forEach { (value, label) ->
-                        TextButton(onClick = {
-                            app.changeLanguage(value)
-                            app.languagePicker.value = false
-                        }, modifier = Modifier.fillMaxWidth()) { Text(tr(label)) }
-                    }
+                    listOf(
+                            "system" to R.string.system_default,
+                            "en" to R.string.language_english,
+                            "ru" to R.string.language_russian,
+                        )
+                        .forEach { (value, label) ->
+                            TextButton(
+                                onClick = {
+                                    app.changeLanguage(value)
+                                    app.languagePicker.value = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(tr(label))
+                            }
+                        }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { app.languagePicker.value = false }) { Text(tr(R.string.cancel)) }
+                TextButton(onClick = { app.languagePicker.value = false }) {
+                    Text(tr(R.string.cancel))
+                }
             },
         )
     }
