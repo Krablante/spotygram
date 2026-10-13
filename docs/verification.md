@@ -46,6 +46,14 @@ Its archive manifest, all 278 payload entries and installer signature verified
 with the existing desktop key; the application reported 0.18.0 with DEBUG false.
 The final packaged volume control adjusted to 55%, muted to zero and restored 55%.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38398113189)
+built on their native runners. Four installer signatures, four archive manifests
+and every archived payload verified with the existing key. The compiled applications
+reported 0.18.0 with DEBUG false and included reverse order and volume controls.
+The release Linux archive reopened the retained queue and 55% volume; manual Next
+and a native end-of-file transition followed the reversed queue. SHA256SUMS covers
+both APKs and every desktop package, archive and detached signature.
+
 These checks used isolated catalogs and local recordings. Production Telegram
 exchange, physical audio output, physical devices and interactive Windows/macOS
 behavior were not exercised in this cycle.
