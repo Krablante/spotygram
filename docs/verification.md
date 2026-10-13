@@ -31,9 +31,10 @@ At 320 pixels with font scale 1.3, profile controls and the song menu remained
 usable. Adding one preview song to a new playlist kept both profiles unselected;
 Music showed exactly the favorite and that playlist song. SQLite integrity was `ok`.
 
-The compiled format 3 reader restored profile identity, username, a favorite and
-a selected profile on a fresh peer. Native file IDs were zero until that peer
-resolved the profile through TDLib; legacy cloud playback fields were ignored.
+The compiled format 3 reader restored profile identity, username, a favorite,
+a one-song playlist and a selected profile on a fresh peer. Saving individual
+songs left their profile unselected. Native file IDs were reset to zero for
+resolution through TDLib on that device; legacy cloud playback fields were ignored.
 These were controlled metadata checks, without a new two-device Telegram exchange.
 
 A signed x86-64 APK updated 0.18.0 on a fresh Android 15 emulator, preserving an
@@ -48,6 +49,17 @@ rebuild after the welcome-text update also passed Lint. Both release APKs retain
 the original signer and application ID, used versionCode 38 and passed 16 KB
 alignment. The production Linux image, signed archive and DEB built successfully;
 the packaged launcher reopened the 536-track catalog and My profile screen.
+
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38430850916)
+built on their native runners from `da94a32`. Four installer signatures, four
+archive manifests and every payload hash verified with the existing desktop key.
+All compiled applications reported 0.19.0 with DEBUG false and contained the new
+profile and Sources implementation. The release Linux archive reopened the
+retained catalog and own-profile screen, then closed normally. The final installed
+Android APK matched the release file byte-for-byte; Media3 played the retained
+MP3 and the crash log was empty. SHA256SUMS covers both APKs and every desktop
+package, archive and detached signature. All fifteen GitHub draft asset names,
+sizes and SHA-256 digests matched the local files before publication.
 
 Positive profile playback used controlled responses and local recordings;
 production profiles with pinned songs were not available for that check. Physical
