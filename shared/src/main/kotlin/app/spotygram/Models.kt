@@ -187,4 +187,4 @@ fun bytes(value: Long): String =
     if (value >= 1_073_741_824) tr(R.string.gigabytes).format(value / 1_073_741_824.0)
     else tr(R.string.megabytes).format(value / 1_048_576.0)
 
-fun trackCount(value: Int): String = AppText.platform.plural(R.plurals.track_count, value, value)
+fun trackCount(value: Int): String = AppText.plural(R.plurals.track_count, value, value)

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -329,30 +330,33 @@ class Profiles(private val app: SpotygramApp) {
             return
         }
         try {
-            if (
-                telegram.auth.value.type != "authorizationStateReady" ||
-                    telegram.connection.value.isNotEmpty()
-            )
-                return
-            val user = telegram.request(json("getUser", "user_id" to profile.id))
-            val small = user.optJSONObject("profile_photo")?.optJSONObject("small") ?: return
-            telegram.updateFile(small)
-            val response =
-                telegram.request(
-                    json(
-                        "downloadFile",
-                        "file_id" to small.getInt("id"),
-                        "priority" to 1,
-                        "offset" to 0,
-                        "limit" to 0,
-                        "synchronous" to true,
-                    )
+            telegram.avatarSlots.withPermit {
+                if (
+                    telegram.auth.value.type != "authorizationStateReady" ||
+                        telegram.connection.value.isNotEmpty()
                 )
-            val local = response.getJSONObject("local")
-            if (local.optBoolean("is_downloading_completed")) {
-                val path = local.getString("path")
-                library.profilePhoto(profile.id, path)
-                photos.update { it + (profile.id to path) }
+                    return@withPermit
+                val user = telegram.request(json("getUser", "user_id" to profile.id))
+                val small =
+                    user.optJSONObject("profile_photo")?.optJSONObject("small") ?: return@withPermit
+                telegram.updateFile(small)
+                val response =
+                    telegram.request(
+                        json(
+                            "downloadFile",
+                            "file_id" to small.getInt("id"),
+                            "priority" to 1,
+                            "offset" to 0,
+                            "limit" to 0,
+                            "synchronous" to true,
+                        )
+                    )
+                val local = response.getJSONObject("local")
+                if (local.optBoolean("is_downloading_completed")) {
+                    val path = local.getString("path")
+                    library.profilePhoto(profile.id, path)
+                    photos.update { it + (profile.id to path) }
+                }
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e

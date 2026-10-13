@@ -533,6 +533,7 @@ fun SpotygramUI(
                                                     },
                                                     onImport = onImport,
                                                     onChats = { navigate(3) },
+                                                    onChooseSource = { sheet = "sourceFilter" },
                                                     onRefresh = {
                                                         app.action {
                                                             if (profile != null)
@@ -779,6 +780,22 @@ fun SpotygramUI(
                                             },
                                             onProfile = ::openProfile,
                                         )
+                                    "sourceFilter" ->
+                                        Box(Modifier.navigationBarsPadding().imePadding()) {
+                                            SourceSelectionPanel(
+                                                library,
+                                                source,
+                                                onSource = {
+                                                    sourceId = it
+                                                    sheet = ""
+                                                },
+                                                onManage = {
+                                                    sheet = ""
+                                                    navigate(3)
+                                                },
+                                                onClose = { sheet = "" },
+                                            )
+                                        }
                                     "queue" -> QueueSheet(library, playing, app)
                                     "speed" ->
                                         PlaybackSpeedSheet(

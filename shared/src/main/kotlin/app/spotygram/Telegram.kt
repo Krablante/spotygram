@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Semaphore
 import org.json.JSONObject
 
 class Telegram(
@@ -23,6 +24,8 @@ class Telegram(
     val connection = MutableStateFlow("")
     val files = ConcurrentHashMap<Int, FileState>()
     val chats = ConcurrentHashMap<Long, ChatChoice>()
+    internal val avatarSlots = Semaphore(2)
+    val chatPhotos = ChatPhotos(this)
     val chatRevision = MutableStateFlow(0L)
     val fileRevision = MutableStateFlow(0L)
     val updates = Channel<JSONObject>(Channel.UNLIMITED)
@@ -81,8 +84,7 @@ class Telegram(
                                 cloudUpdates.trySend(Unit)
                             }
                             if (chat.getJSONObject("type").kind() != "chatTypeSecret") {
-                                chats[chat.getLong("id")] =
-                                    ChatChoice(chat.getLong("id"), chat.getString("title"))
+                                rememberChat(chat)
                                 updates.send(
                                     json(
                                         "updateChatTitle",
@@ -106,6 +108,8 @@ class Telegram(
                             )
                                 cloudUpdates.trySend(Unit)
                         }
+                        "updateChatPhoto" ->
+                            chatPhotos.changed(obj.getLong("chat_id"), obj.optJSONObject("photo"))
                         "updateNewMessage" -> {
                             val content =
                                 obj.getJSONObject("message").optJSONObject("content")?.kind()
@@ -166,6 +170,13 @@ class Telegram(
         } finally {
             requests.remove(id)
         }
+    }
+
+    fun rememberChat(chat: JSONObject): ChatChoice {
+        val choice = ChatChoice(chat.getLong("id"), chat.getString("title"))
+        chats[choice.id] = choice
+        chatPhotos.changed(choice.id, chat.optJSONObject("photo"))
+        return choice
     }
 
     suspend fun sendConfirmed(query: JSONObject): JSONObject {
@@ -288,6 +299,7 @@ class Telegram(
                 sendResults.clear()
                 sendRevision.update { it + 1 }
                 chats.clear()
+                chatPhotos.reset()
                 channelChats.clear()
                 networkObserver?.close()
                 networkObserver = null

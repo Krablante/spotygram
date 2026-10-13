@@ -101,6 +101,14 @@ directory events coalesce over 200 ms. Picker work stops with its visible lifecy
 errors wait for refresh, reconnection or a new query rather than retrying in a loop.
 Only events used by the music catalog enter the application's update queue.
 
+`ChatPhotos` retains photo metadata only for requested chats. Visible rows request
+the small JPEG through `getChat` and reuse TDLib's file cache; chat-photo events
+invalidate changed or removed pictures. Chat and profile avatar jobs share two
+slots and low download priority. Leaving a row stops its work; reconnecting,
+returning to the view or explicit refresh retries missing chat images. Client
+closure cancels the jobs and clears native identities. Photos stay on each device
+and add no catalog schema or library-sync fields.
+
 `Library.reload` reads the entire visible catalog and all playlist membership in
 five queries, regardless of the number of playlists. ID lookup and enabled duplicate
 grouping are prepared on IO before publishing a changed snapshot. Local-file groups
@@ -311,6 +319,14 @@ At 840 dp, navigation becomes a side rail; wide players separate artwork and con
 Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with 48 dp
 secondary touch targets. Sheet glass travels inside its native placement transform;
 keyboard layout changes preserve text-field identity and focus.
+
+Sources uses lazy rows inside common glass panels. Each visible group draws one
+surface bounded to the viewport, including groups taller than the screen. The
+source chooser keeps search and management controls outside its scrolling list,
+reveals the current choice and uses denser rows in wide-window popups. Its inner
+glass surfaces select the environment capture only, so library text cannot show
+through source names or the search field. Narrow widths use the existing native
+bottom sheet; widths from 600 dp use an anchored popup.
 
 SQLite, copying, metadata and page parsing stay off the UI thread. Indexing publishes
 at most twice per second plus completion. UI progress timers belong to visible player

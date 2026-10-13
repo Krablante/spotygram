@@ -10,6 +10,10 @@ object AppText {
         languageRevision.intValue
         return platform.string(id, *arguments)
     }
+    fun plural(id: Int, quantity: Int, vararg arguments: Any?): String {
+        languageRevision.intValue
+        return platform.plural(id, quantity, *arguments)
+    }
     lateinit var platform: Platform
         private set
 

@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeSourceSelection
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.glass.GlassStyle
 import dev.chrisbanes.haze.glass.RefractionProfile
@@ -105,6 +106,8 @@ private val Light =
 
 /** Shared captures contain only the environment and content, never their glass consumers. */
 val LocalGlassState = staticCompositionLocalOf<HazeState?> { null }
+val LocalGlassSourceSelection =
+    staticCompositionLocalOf<HazeSourceSelection> { HazeSourceSelection.Behind }
 val LocalDockInset = staticCompositionLocalOf { 0.dp }
 
 @OptIn(ExperimentalHazeApi::class)
@@ -156,6 +159,7 @@ fun Modifier.liquidGlass(
 ): Modifier {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val state = LocalGlassState.current
+    val selection = LocalGlassSourceSelection.current
     val background = MaterialTheme.colorScheme.background
     val shape = RoundedCornerShape(radius)
     val fullOptics = LocalApp.current.platform.fullOptics
@@ -214,7 +218,11 @@ fun Modifier.liquidGlass(
         }
     val optical =
         if (state != null)
-            Modifier.hazeGlass(HazeInput.Sources(state), style, interactionSource = interaction)
+            Modifier.hazeGlass(
+                HazeInput.Sources(state, selection = selection),
+                style,
+                interactionSource = interaction,
+            )
         else Modifier.background(background.copy(alpha = 0.72f), shape)
     return this.shadow(
             if (strong) 10.dp else 5.dp,
@@ -352,6 +360,7 @@ fun GlassDialog(
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
 ) {
+    BackHandler(onBack = onDismissRequest)
     AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = confirmButton,

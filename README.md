@@ -29,18 +29,21 @@ make playlists, download music for later. You can also import files from your
 device and use the player without connecting Telegram. All versions share the
 same screens, glass material, library and playback rules.
 
-**Sources** keeps your Telegram profile at the top, followed by connected profiles
-and chats. Open a profile to listen to its pinned music, then choose **Add to library**
+**Sources** keeps your Telegram profile at the top, with connected profiles and
+chats in shared glass panels below. Their avatars also appear in the searchable
+source menu in Music. Open a profile to listen to its pinned music, then choose **Add to library**
 if you want all its songs in your collection. A heart or playlist saves an individual
 song without connecting the profile. Other people’s music follows Telegram’s privacy settings.
 
 <p align="center">
-  <img src="docs/screenshots/sources-dark.png" width="35%" alt="Sources with My profile pinned at the top">
+  <img src="docs/screenshots/sources-dark.png" width="30%" alt="Glass source groups with chat avatars and My profile pinned at the top">
   &nbsp;
-  <img src="docs/screenshots/profile-dark.png" width="35%" alt="Listening to a profile before adding it to the library">
+  <img src="docs/screenshots/source-picker-light.png" width="30%" alt="Searchable source selection with avatars">
+  &nbsp;
+  <img src="docs/screenshots/profile-dark.png" width="30%" alt="Listening to a profile before adding it to the library">
 </p>
 
-These profile screens use demonstration data in the shared desktop interface.
+These screens show demonstration sources and recordings in the shared desktop interface.
 
 Sign in to the same Telegram account on another device to restore your playlists,
 favorites, selected chats and profiles, and library settings automatically. Each device keeps its own

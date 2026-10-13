@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
@@ -23,6 +24,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -31,8 +35,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +80,7 @@ fun MusicScreen(
     profileError: String? = null,
     onProfileSelected: (Boolean) -> Unit = {},
     onProfileTelegram: () -> Unit = {},
+    onChooseSource: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(false) }
@@ -81,6 +92,14 @@ fun MusicScreen(
         playlist != null && (configuration.screenWidthDp < 400 || configuration.fontScale > 1.2f)
     var removeSelected by remember { mutableStateOf(false) }
     var removeProfile by remember { mutableStateOf(false) }
+    var sourceTitleOverflow by remember(source?.key) { mutableStateOf(false) }
+    var showSourceTitle by remember(source?.key) { mutableStateOf(false) }
+    val heading =
+        (if (ownProfile) tr(R.string.my_profile) else profile?.title)
+            ?: playlist?.name
+            ?: source?.displayTitle
+            ?: if (favorites) tr(R.string.favorites)
+            else if (offline) tr(R.string.on_device) else tr(R.string.music)
     val haptic = LocalHapticFeedback.current
     val scroll = rememberLazyListState()
     val dockInset = LocalDockInset.current
@@ -180,19 +199,33 @@ fun MusicScreen(
                     Modifier.padding(end = 8.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
-            Text(
-                if (selecting) tr(R.string.selected_count, selected.size)
-                else
-                    (if (ownProfile) tr(R.string.my_profile) else profile?.title)
-                        ?: playlist?.name
-                        ?: source?.displayTitle
-                        ?: if (favorites) tr(R.string.favorites)
-                        else if (offline) tr(R.string.on_device) else tr(R.string.music),
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            val expandable = !selecting && source != null && sourceTitleOverflow
+            Row(
+                Modifier.weight(1f)
+                    .heightIn(min = 48.dp)
+                    .then(
+                        if (expandable)
+                            Modifier.clickable(role = Role.Button) { showSourceTitle = true }
+                        else Modifier
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (selecting) tr(R.string.selected_count, selected.size) else heading,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { sourceTitleOverflow = it.hasVisualOverflow },
+                )
+                if (expandable)
+                    Icon(
+                        Icons.Rounded.UnfoldMore,
+                        null,
+                        Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+            }
             if (!selecting) {
                 if (profile == null)
                     Text(
@@ -337,6 +370,8 @@ fun MusicScreen(
                     onSource,
                     onOffline,
                     { sort = !sort },
+                    onChooseSource,
+                    onChats,
                 )
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -517,6 +552,23 @@ fun MusicScreen(
                 TextButton(onClick = { removeProfile = false }) { Text(tr(R.string.cancel)) }
             },
         )
+    if (showSourceTitle)
+        GlassDialog(
+            onDismissRequest = { showSourceTitle = false },
+            title = { Text(tr(R.string.source_full_name)) },
+            text = {
+                SelectionContainer {
+                    Text(
+                        heading,
+                        Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSourceTitle = false }) { Text(tr(R.string.close)) }
+            },
+        )
     if (removeSelected)
         GlassDialog(
             onDismissRequest = { removeSelected = false },
@@ -550,8 +602,16 @@ private fun MusicFilters(
     onSource: (String?) -> Unit,
     onOffline: (Boolean) -> Unit,
     onSort: () -> Unit,
+    onChooseSource: () -> Unit,
+    onManageSources: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val popup = configuration.screenWidthDp >= 600
+    var availableHeight by remember { mutableStateOf(400.dp) }
+    val menuWidth = minOf(360.dp, (configuration.screenWidthDp - 32).dp)
+    val menuPosition = remember(density) { SourceMenuPosition(with(density) { 8.dp.roundToPx() }) }
     BackHandler(enabled = expanded) { expanded = false }
     val sourceLabel = source?.displayTitle ?: tr(R.string.all_sources)
     Row(
@@ -559,51 +619,62 @@ private fun MusicFilters(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier.weight(1f)) {
+        Box(
+            Modifier.weight(1f).onGloballyPositioned { coordinates ->
+                val bounds = coordinates.boundsInWindow()
+                availableHeight =
+                    with(density) {
+                        maxOf(bounds.top, configuration.screenHeightDp.dp.toPx() - bounds.bottom)
+                            .toDp()
+                            .minus(24.dp)
+                            .coerceIn(180.dp, 560.dp)
+                    }
+            }
+        ) {
             GlassButton(
-                onClick = { expanded = true },
+                onClick = { if (popup) expanded = true else onChooseSource() },
                 modifier = Modifier.fillMaxWidth().semantics { stateDescription = sourceLabel },
             ) {
+                if (source != null) {
+                    SourceAvatar(source, library, 28.dp)
+                    Spacer(Modifier.width(8.dp))
+                } else {
+                    Icon(Icons.Rounded.LibraryMusic, null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(
-                    source?.displayTitle ?: tr(R.string.source_filter),
+                    sourceLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(Icons.Rounded.ArrowDropDown, null)
             }
-            DropdownMenu(
-                expanded,
-                onDismissRequest = { expanded = false },
-                containerColor = Color.Transparent,
-                modifier = Modifier.liquidGlass(24.dp, strong = true),
-            ) {
-                DropdownMenuItem(
-                    text = { Text(tr(R.string.all_sources)) },
-                    onClick = {
-                        expanded = false
-                        onSource(null)
-                    },
-                )
-                val selfId by LocalApp.current.profiles.selfId.collectAsStateWithLifecycle()
-                val own = library.profiles.firstOrNull { it.id == selfId }?.source()
-                val sources = (listOfNotNull(own) + library.allSources).distinctBy { it.key }
-                sources.forEach { s ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                if (s.profile && s.id == selfId) tr(R.string.my_profile)
-                                else if (s.profile) tr(R.string.profile_music_named, s.title)
-                                else s.displayTitle
-                            )
-                        },
-                        onClick = {
+            if (expanded && popup)
+                Popup(
+                    popupPositionProvider = menuPosition,
+                    onDismissRequest = { expanded = false },
+                    properties = PopupProperties(focusable = true),
+                ) {
+                    SourceSelectionPanel(
+                        library,
+                        source,
+                        onSource = {
                             expanded = false
-                            onSource(s.key)
+                            onSource(it)
                         },
+                        onManage = {
+                            expanded = false
+                            onManageSources()
+                        },
+                        onClose = { expanded = false },
+                        modifier =
+                            Modifier.width(menuWidth)
+                                .liquidGlass(24.dp, strong = true)
+                                .padding(vertical = 8.dp),
+                        maxHeight = availableHeight,
                     )
                 }
-            }
         }
         GlassIconButton(
             onClick = { onOffline(!offline) },
@@ -621,6 +692,33 @@ private fun MusicFilters(
                     else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+private class SourceMenuPosition(private val margin: Int) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x =
+            if (layoutDirection == LayoutDirection.Ltr) anchorBounds.left
+            else anchorBounds.right - popupContentSize.width
+        val below = anchorBounds.bottom + margin
+        val y =
+            if (below + popupContentSize.height <= windowSize.height - margin) below
+            else anchorBounds.top - margin - popupContentSize.height
+        return IntOffset(
+            x.coerceIn(
+                margin,
+                (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin),
+            ),
+            y.coerceIn(
+                margin,
+                (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin),
+            ),
+        )
     }
 }
 

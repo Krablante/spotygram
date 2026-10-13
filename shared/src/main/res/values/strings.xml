@@ -4,6 +4,12 @@
     <string name="add_source">Add</string>
     <string name="add_source_title">Add source</string>
     <string name="source_actions">Source actions</string>
+    <string name="choose_source">Choose source</string>
+    <string name="find_source">Find a source</string>
+    <string name="manage_sources">Manage sources</string>
+    <string name="source_not_found">No matching sources</string>
+    <string name="remove_source">Remove source</string>
+    <string name="source_full_name">Full source name</string>
     <string name="profiles">Profiles</string>
     <string name="refresh_profiles">Refresh profile search</string>
     <string name="my_profile">My profile</string>

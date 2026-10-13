@@ -4,6 +4,12 @@
     <string name="add_source">Добавить</string>
     <string name="add_source_title">Добавить источник</string>
     <string name="source_actions">Действия с источником</string>
+    <string name="choose_source">Выбрать источник</string>
+    <string name="find_source">Найти источник</string>
+    <string name="manage_sources">Управление источниками</string>
+    <string name="source_not_found">Нет подходящих источников</string>
+    <string name="remove_source">Убрать источник</string>
+    <string name="source_full_name">Полное название источника</string>
     <string name="profiles">Профили</string>
     <string name="refresh_profiles">Обновить поиск профилей</string>
     <string name="my_profile">Мой профиль</string>

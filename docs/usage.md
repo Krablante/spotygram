@@ -56,6 +56,20 @@ Use the refresh icon **inside Add source** to retry directory loading and search
 Offline, already loaded chats remain selectable. The refresh button on the
 main Sources screen updates music in sources you have already selected.
 
+Connected profiles and chats appear in separate glass panels, with an avatar and
+track count in each row. Photos use Telegram's local cache; missing photos use
+initials, and Saved Messages keeps its bookmark. Refresh also retries visible chat
+photos. Open a source by tapping its row. Its **⋮** menu disconnects it after
+confirmation; favorites, playlists and downloaded tracks are kept.
+
+In Music, the source button shows **All sources** or the current source's avatar
+and name. Open it and search by name or a profile's `@username`; tapping a result
+applies the choice immediately. Narrow screens use a bottom panel, while wider
+windows use a menu beside the button. The current choice is marked and brought
+into view. **Manage sources** opens the Sources page. Long names take at most two
+lines in these lists; tap an abbreviated heading after opening a source to read
+and copy its full name.
+
 History loads progressively: you can listen to the first songs while more
 appear. The app scans all accessible history, not just the last hundred
 messages. Interrupted loading resumes from its saved position. Use refresh

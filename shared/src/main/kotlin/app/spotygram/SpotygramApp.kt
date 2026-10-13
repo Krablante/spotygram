@@ -340,7 +340,7 @@ class SpotygramApp(val platform: Platform) {
             }
             val chat = telegram.request(json("getChat", "chat_id" to id))
             if (chat.optJSONObject("type")?.kind() != "chatTypeSecret")
-                choices += ChatChoice(chat.getLong("id"), chat.getString("title"))
+                choices += telegram.rememberChat(chat)
         }
         return choices
     }
@@ -355,7 +355,7 @@ class SpotygramApp(val platform: Platform) {
                 .substringBefore('/')
         require(name.matches(Regex("[A-Za-z0-9_]{4,}"))) { tr(R.string.channel_name_required) }
         val chat = telegram.request(json("searchPublicChat", "username" to name))
-        val choice = ChatChoice(chat.getLong("id"), chat.getString("title"))
+        val choice = telegram.rememberChat(chat)
         library.source(choice, true)
     }
 

@@ -59,6 +59,13 @@ fun SourcesScreen(
     val loading by app.profiles.loading.collectAsStateWithLifecycle()
     val errors by app.profiles.errors.collectAsStateWithLifecycle()
     val self = library.profiles.firstOrNull { it.id == selfId }
+    val selectedProfiles =
+        remember(library.profiles, selfId) {
+            library.profiles.filter { it.selected && it.id != selfId }
+        }
+    val inlineActions =
+        LocalConfiguration.current.screenWidthDp >= 600 &&
+            LocalConfiguration.current.fontScale <= 1.2f
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(connected, lifecycle) {
         if (connected)
@@ -72,11 +79,17 @@ fun SourcesScreen(
             }
     }
     Column(Modifier.fillMaxSize()) {
-        Text(
-            tr(R.string.sources),
-            Modifier.padding(start = 16.dp, top = 10.dp, bottom = 12.dp),
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                tr(R.string.sources),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            if (connected && inlineActions) SourceToolbar(busy, onAdd, onRefresh)
+        }
         if (!connected) {
             Column(Modifier.padding(24.dp)) {
                 Text(
@@ -93,54 +106,36 @@ fun SourcesScreen(
                 }
             }
         } else {
-            Row(
-                Modifier.padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                GlassButton(onClick = onAdd, tint = spectrumAccent(3)) {
-                    Icon(Icons.Rounded.Add, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(tr(R.string.add_source))
+            if (!inlineActions)
+                Box(Modifier.padding(start = 20.dp, bottom = 8.dp)) {
+                    SourceToolbar(busy, onAdd, onRefresh)
                 }
-                GlassIconButton(onClick = onRefresh, enabled = !busy) {
-                    if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
-                }
-            }
-            LazyColumn(
-                Modifier.weight(1f).padding(horizontal = 4.dp, vertical = 8.dp).glassContent(),
+            SourceGroupList(
+                Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
                 contentPadding = PaddingValues(top = 4.dp, bottom = LocalDockInset.current + 12.dp),
             ) {
-                item {
-                    Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            .fillMaxWidth()
-                            .liquidGlass(22.dp, tint = spectrumAccent(0))
-                            .clip(RoundedCornerShape(22.dp))
-                            .clickable(enabled = self != null) { self?.let(onProfile) }
-                            .heightIn(min = 88.dp)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ProfileAvatar(self, 48.dp)
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text(
-                                tr(R.string.my_profile),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                tr(R.string.profile_music) +
-                                    if (self?.loadedAt != 0L && self != null)
-                                        " · ${trackCount(self.count)}"
-                                    else "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (selfId in loading)
-                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Rounded.ChevronRight, null)
-                    }
+                item(key = "self") {
+                    SourceRow(
+                        tr(R.string.my_profile),
+                        tr(R.string.profile_music) +
+                            if (self != null && self.loadedAt != 0L) " · ${trackCount(self.count)}"
+                            else "",
+                        avatar = { ProfileAvatar(self, 44.dp) },
+                        onClick = { self?.let(onProfile) },
+                        modifier =
+                            Modifier.liquidGlass(22.dp, tint = spectrumAccent(0))
+                                .heightIn(min = 76.dp),
+                        trailing = {
+                            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                if (selfId in loading)
+                                    CircularProgressIndicator(
+                                        Modifier.size(22.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                else Icon(Icons.Rounded.ChevronRight, null)
+                            }
+                        },
+                    )
                     if (errors[selfId] != null && self?.loadedAt == 0L)
                         Text(
                             tr(R.string.profile_open_to_retry),
@@ -149,85 +144,44 @@ fun SourcesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                 }
-                val selectedProfiles = library.profiles.filter { it.selected && it.id != selfId }
                 if (selectedProfiles.isNotEmpty()) {
                     item { SourceGroupTitle(tr(R.string.profiles)) }
-                    items(selectedProfiles, key = { "profile:${it.id}" }) { profile ->
-                        var expanded by remember { mutableStateOf(false) }
-                        ListItem(
-                            headlineContent = {
-                                Text(profile.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val group =
+                        SourceGroup(
+                            selectedProfiles.first().source().key,
+                            selectedProfiles.last().source().key,
+                        )
+                    items(selectedProfiles, key = { it.source().key }, contentType = { group }) {
+                        profile ->
+                        SourceRow(
+                            profile.title,
+                            (if (profile.loadedAt != 0L) trackCount(profile.count) + " · "
+                            else "") + tr(R.string.in_library),
+                            avatar = { ProfileAvatar(profile, 44.dp) },
+                            onClick = { onProfile(profile) },
+                            divider = profile.id != selectedProfiles.first().id,
+                            trailing = {
+                                SourceMenu(profile.source()) { removing = profile.source() }
                             },
-                            supportingContent = {
-                                Text(
-                                    (if (profile.loadedAt != 0L) trackCount(profile.count) + " · "
-                                    else "") + tr(R.string.in_library)
-                                )
-                            },
-                            leadingContent = { ProfileAvatar(profile, 44.dp) },
-                            trailingContent = {
-                                Box {
-                                    IconButton(onClick = { expanded = true }) {
-                                        Icon(Icons.Rounded.MoreVert, tr(R.string.source_actions))
-                                    }
-                                    DropdownMenu(
-                                        expanded,
-                                        onDismissRequest = { expanded = false },
-                                        containerColor = Color.Transparent,
-                                        modifier = Modifier.liquidGlass(20.dp, strong = true),
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(tr(R.string.remove_profile_source)) },
-                                            onClick = {
-                                                expanded = false
-                                                removing = profile.source()
-                                            },
-                                        )
-                                    }
-                                }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.fillMaxWidth().clickable { onProfile(profile) },
                         )
                     }
                 }
                 if (library.sources.isNotEmpty()) item { SourceGroupTitle(tr(R.string.chats)) }
-                items(library.sources, key = { it.id }) { source ->
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                source.displayTitle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                trackCount(counts[source.id] ?: 0) +
-                                    if (source.fullyIndexed) ""
-                                    else if (busy) tr(R.string.history_loading_suffix)
-                                    else tr(R.string.history_incomplete_suffix)
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                if (source.id == AppText.savedChatId) Icons.Rounded.Bookmark
-                                else Icons.Rounded.Forum,
-                                null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        trailingContent = {
-                            IconButton(onClick = { removing = source }) {
-                                Icon(
-                                    Icons.Rounded.Close,
-                                    tr(R.string.remove_source_named, source.displayTitle),
-                                )
-                            }
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.fillMaxWidth().clickable { onOpen(source.id) },
-                    )
+                if (library.sources.isNotEmpty()) {
+                    val group = SourceGroup(library.sources.first().key, library.sources.last().key)
+                    items(library.sources, key = { it.key }, contentType = { group }) { source ->
+                        SourceRow(
+                            source.displayTitle,
+                            trackCount(counts[source.id] ?: 0) +
+                                if (source.fullyIndexed) ""
+                                else if (busy) tr(R.string.history_loading_suffix)
+                                else tr(R.string.history_incomplete_suffix),
+                            avatar = { SourceAvatar(source, library) },
+                            onClick = { onOpen(source.id) },
+                            divider = source.id != library.sources.first().id,
+                            trailing = { SourceMenu(source) { removing = source } },
+                        )
+                    }
                 }
                 if (library.sources.isEmpty() && selectedProfiles.isEmpty())
                     item {
@@ -278,13 +232,56 @@ fun SourcesScreen(
 }
 
 @Composable
-private fun SourceGroupTitle(title: String) {
-    Text(
-        title,
-        Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp),
-        style = MaterialTheme.typography.titleSmall,
-        color = spectrumAccent(0),
-    )
+private fun SourceToolbar(busy: Boolean, onAdd: () -> Unit, onRefresh: () -> Unit) {
+    val app = LocalApp.current
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        GlassButton(onClick = onAdd, tint = spectrumAccent(3)) {
+            Icon(Icons.Rounded.Add, null)
+            Spacer(Modifier.width(6.dp))
+            Text(tr(R.string.add_source))
+        }
+        GlassIconButton(
+            onClick = {
+                app.telegram.chatPhotos.retry()
+                onRefresh()
+            },
+            enabled = !busy,
+        ) {
+            if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
+        }
+    }
+}
+
+@Composable
+private fun SourceMenu(source: Source, onRemove: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Rounded.MoreVert, "${tr(R.string.source_actions)}: ${source.displayTitle}")
+        }
+        DropdownMenu(
+            expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = Color.Transparent,
+            modifier = Modifier.liquidGlass(20.dp, strong = true),
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        tr(
+                            if (source.profile) R.string.remove_profile_source
+                            else R.string.remove_source
+                        )
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onRemove()
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -297,16 +294,13 @@ fun ProfileAvatar(profile: UserProfile?, size: androidx.compose.ui.unit.Dp) {
         if (profile != null && profile.id != 0L) app.profiles.loadPhoto(profile)
     }
     val photo = profile?.photo?.takeIf { it.isNotEmpty() } ?: photos[profile?.id]
-    val color =
-        spectrumAccent(
-            if (profile?.id == selfId) 0 else ((profile?.id ?: 0L) % 4).toInt()
-        )
+    val color = spectrumAccent(if (profile?.id == selfId) 0 else ((profile?.id ?: 0L) % 4).toInt())
     Box(
         Modifier.size(size).clip(CircleShape).background(color.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            profile?.title?.trim()?.take(1)?.uppercase() ?: "♪",
+            profile?.title?.let(::sourceInitial) ?: "♪",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.titleLarge,
         )
@@ -652,7 +646,7 @@ fun ChatPicker(
             ) {
                 Text(tr(R.string.add_query, search))
             }
-        LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 400.dp)) {
+        SourceGroupList(Modifier.weight(1f, fill = false).heightIn(max = 400.dp)) {
             if (!online)
                 item {
                     Text(
@@ -697,28 +691,18 @@ fun ChatPicker(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            items(chats, key = { it.id }) { chat ->
+            val group =
+                chats.takeIf { it.isNotEmpty() }?.let { SourceGroup(it.first().id, it.last().id) }
+            items(chats, key = { it.id }, contentType = { group }) { chat ->
                 val selected = library.sources.any { it.id == chat.id }
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clickable { onChoice(chat, !selected) }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        if (chat.id == AppText.savedChatId) Icons.Rounded.Bookmark
-                        else Icons.Rounded.Forum,
-                        null,
-                        Modifier.padding(end = 14.dp),
-                    )
-                    Text(
-                        chat.displayTitle,
-                        Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Checkbox(selected, { onChoice(chat, it) })
-                }
+                SourceRow(
+                    chat.displayTitle,
+                    "",
+                    avatar = { SourceAvatar(Source(chat.id, chat.title), library) },
+                    onClick = { onChoice(chat, !selected) },
+                    divider = chat.id != chats.first().id,
+                    trailing = { Checkbox(selected, { onChoice(chat, it) }) },
+                )
             }
             item {
                 Text(

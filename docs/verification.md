@@ -7,6 +7,53 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.20.0 — grouped glass sources and chat photos
+
+The production Linux image's compiled shared screens used an isolated catalog,
+controlled TDLib responses and real JPEG files. Screenshots covered the continuous
+profile/chat panels, scrolling beyond the viewport, photo placeholders, selected
+source, search by name and @username, and the anchored desktop picker. Narrow
+screens used the bottom sheet. English/Russian, light/dark and a 320-pixel viewport
+with font scale 1.3 remained readable. The full-name dialog showed an otherwise
+truncated source title; Esc dismissed it while retaining the source. Switching
+language immediately updated counts in lazy rows. README images use this working
+shared interface with demonstration data.
+
+Photo replacement and removal events changed the visible avatar. Downloads used
+priority 1 and at most two shared chat/profile slots; restarting reused cached
+files. A native TDLib request through an owned Spotygram production session fetched
+and decoded a public chat's 160×160 JPEG. Its source remained unselected, and the
+536-track catalog was unchanged.
+
+The final packaged Linux launcher also reopened that owned catalog and displayed
+its connected Sources with real chat/profile photos and the Saved Messages bookmark.
+Android debug/release assemblies and both Lint checks passed. The two release APKs
+retained the original signer and application ID, used versionCode 39 and passed
+16 KB alignment. The production Linux image, signed archive and DEB built successfully.
+
+A signed x86-64 APK updated 0.19.0 on the retained Android 15 emulator. Its imported
+song, favorite, playlist, memberships, sources and profile rows matched the baseline
+exactly; schema 8 and SQLite integrity were retained.
+The installed APK matched the final release file byte-for-byte; Media3 retained
+the local queue's song and its 8,910 ms position after restart. The bottom sheet and
+its current-selection mark were inspected. With the keyboard open, search, the
+empty-result message and management footer remained within the available area.
+The emulator's software graphics repeatedly stalled in native shader compilation,
+also affecting System UI and keyboard startup. Mesa allowed the initial app and
+picker screens to render, but keyboard interaction still produced ANRs. This does
+not establish responsiveness or performance on Android; physical-device validation
+remains outstanding.
+
+Native Linux libmpv played a local WAV recording with null audio output. Removing
+and reconnecting its chat source retained the favorite, local file and queue;
+SQLite integrity remained `ok`. Shared panel clipping during scrolling and text
+bleed through picker cards were corrected and rechecked in the actual interface.
+
+Physical-device behavior, physical sound and interactive Windows/macOS operation
+were not exercised. Long source lists and photo-change/removal scenarios used
+controlled responses; production checks covered native photo requests, their cache
+and the retained catalog's Sources screen.
+
 ## 0.19.0 — profile music and unified Sources
 
 An owned Spotygram production Telegram session exercised native TDLib `getMe`,
