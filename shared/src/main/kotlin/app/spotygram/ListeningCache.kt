@@ -129,7 +129,7 @@ class ListeningCache(private val app: SpotygramApp) {
     /** Called on the loader's IO coroutine; there is no suspension after registering the lease. */
     suspend fun acquire(track: Track): Lease {
         check(!app.musicCache.state.value.clearing) { tr(R.string.cache_clearing) }
-        if (track.chatId == 0L) {
+        if (track.imported) {
             check(track.local) { tr(R.string.audio_unavailable) }
             return lease(0, track.path, "")
         }

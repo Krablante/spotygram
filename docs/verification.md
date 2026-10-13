@@ -7,6 +7,53 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.19.0 — profile music and unified Sources
+
+An owned Spotygram production Telegram session exercised native TDLib `getMe`,
+`getUser`, `getUserFullInfo` and `getUserProfileAudios`. Its own profile and an
+accessible public user returned empty music lists. The actual UI handled these
+states; public channels were excluded from profile results, and an unused username
+became an ordinary empty search result. The retained schema 6 catalog upgraded to
+8 with all 536 tracks and unchanged playlist counts; SQLite integrity was `ok`.
+
+The compiled shared interface and native Linux libmpv player also used an isolated
+catalog with controlled TDLib responses and local recordings. My profile stayed
+at the top of Sources. Its five recordings played and advanced automatically;
+restart retained the paused local queue. Liking one song left the profile
+unselected and added only that song to Music. Retained listening copies remained
+in On device. A second profile loaded 230 songs in three pages, preserving profile
+order. Opening it did not add its songs to Music. Explicit connection added the
+collection, and removal returned Music to the individual favorite without deleting
+it or the retained local queue. A shared recording displayed its existing heart
+in both profiles. Real screenshots covered the profile list, source picker,
+connected Sources and removal confirmation in the shared glass interface.
+At 320 pixels with font scale 1.3, profile controls and the song menu remained
+usable. Adding one preview song to a new playlist kept both profiles unselected;
+Music showed exactly the favorite and that playlist song. SQLite integrity was `ok`.
+
+The compiled format 3 reader restored profile identity, username, a favorite and
+a selected profile on a fresh peer. Native file IDs were zero until that peer
+resolved the profile through TDLib; legacy cloud playback fields were ignored.
+These were controlled metadata checks, without a new two-device Telegram exchange.
+
+A signed x86-64 APK updated 0.18.0 on a fresh Android 15 emulator, preserving an
+imported MP3, its favorite and paused queue. Media3 reported the retained track and
+position. Creating a playlist and restarting preserved its name. The new Sources
+connection screen was inspected at 320 dp with font scale 1.3; its text, Connect
+button and four navigation tabs remained usable. The normal-width library and
+playlist screens were also inspected after upgrade.
+
+Android debug/release assemblies and both Lint checks passed. A final release
+rebuild after the welcome-text update also passed Lint. Both release APKs retained
+the original signer and application ID, used versionCode 38 and passed 16 KB
+alignment. The production Linux image, signed archive and DEB built successfully;
+the packaged launcher reopened the 536-track catalog and My profile screen.
+
+Positive profile playback used controlled responses and local recordings;
+production profiles with pinned songs were not available for that check. Physical
+audio output, physical-device behavior and interactive Windows/macOS operation
+were not exercised in this cycle.
+
 ## 0.18.0 — reverse order and local sound controls
 
 The actual Linux application used native libmpv with null audio output and four

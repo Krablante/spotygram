@@ -58,15 +58,17 @@ resolution, keeps desktop alive when the window closes.
 
 ## Catalog and data
 
-SQLite schema 7 stores tracks, sources, playlists, playlist membership, pending
+SQLite schema 8 stores tracks, chat and profile sources, playlists, playlist membership, pending
 downloads, temporary-file ownership and long-recording progress. Both adapters
 apply the same incremental migrations. Playback progress has a cascading track
 reference. Account-scoped sync values and metadata share this database. Playlist edits, batch favorite changes, message removal and Telegram
 catalog cleanup use transactions; a migration never resets the library.
 
-A Telegram track's identity is `chat_id:message_id`. Numeric TDLib file IDs belong
+A chat track's identity is `chat_id:message_id`. Profile tracks use the profile user
+ID and a SHA-256 encoding of TDLib's stable remote file key. Chat and profile source
+keys have separate namespaces even when both refer to the same person. Numeric TDLib file IDs belong
 to one native client lifetime. Startup and client closure invalidate those bindings;
-messages are resolved again when needed. Stable remote file keys identify shared
+messages or profile audio are resolved again when needed. Stable remote file keys identify shared
 copies across restarts. A completed local copy must match its known byte size.
 Startup reconciliation clears invalid catalog paths without deleting the files.
 Failure to open the catalog fails startup and cannot acknowledge a desktop update.
@@ -76,6 +78,22 @@ Each source has separate audio/document cursors and newest-message checkpoints.
 Short pages are not treated as the end. Interrupted indexing resumes without
 skipping the catch-up range. Discovery collects metadata and does not prefetch audio.
 
+`Profiles` owns user lookup, paginated `getUserProfileAudios` requests and profile
+loading state. Metadata parsing and stable-key encoding run off the UI thread.
+A full, consistent response replaces profile membership in one transaction; failure,
+count changes or missing pages keep the prior list. Profile file lookup registers
+TDLib's native file-reference refresh source. Portable descriptors include the user
+ID and username; a fresh client can resolve that username while checking the ID,
+or load its account contact directory when needed.
+
+Browsing stores metadata independently of library membership. Only selected profiles,
+favorite songs and playlist members enter Music and the playlist editor; retained
+playback copies remain available in On device. Preview metadata keeps twelve recent
+profiles plus selected/current profiles and users referenced by the local queue.
+Cleanup preserves favorites, playlist members, downloaded files, pending downloads
+and long-audio bookmarks. Profile work is cancelled before logout or application
+closure. There is no contact-wide music scan or idle profile polling.
+
 TDLib owns the chat directory. The picker loads main/archive lists independently
 of typing, displays local search first, and supplements it with debounced server
 results. IDs are unique in the merged view; secret chats stay excluded. Native
@@ -84,7 +102,7 @@ errors wait for refresh, reconnection or a new query rather than retrying in a l
 Only events used by the music catalog enter the application's update queue.
 
 `Library.reload` reads the entire visible catalog and all playlist membership in
-four queries, regardless of the number of playlists. ID lookup and enabled duplicate
+five queries, regardless of the number of playlists. ID lookup and enabled duplicate
 grouping are prepared on IO before publishing a changed snapshot. Local-file groups
 are cached on demand. Shared-thumbnail aliases update in one transaction and one
 reload. Missing paths are checked once per distinct path/size pair.
@@ -114,7 +132,7 @@ entry only after the corresponding local files have actually been removed.
 `LibrarySync` owns portable user data and its durable pending flags. User edits
 write the local catalog and the corresponding sync values in one SQLite transaction.
 Playlists have stable UUIDs independent of their local numeric row IDs. Track
-descriptors carry metadata and Telegram message references, never local paths or
+descriptors carry metadata and Telegram message or profile references, never local paths or
 native file IDs. This lets favorites and playlist membership exist before indexing.
 Imported audio remains local; peers receive an unavailable metadata entry.
 
@@ -138,9 +156,10 @@ There is no idle polling; server delays and bounded retry backoff preserve pendi
 edits. Missing remembered storage reports an error instead of silently replacing it.
 
 Gzip JSON documents carry format, account, record versions and a SHA-256 digest in
-the caption. Small batches carry changes. Format 2 reads format 1 library records but
-ignores its queue and progress. A confirmed format 2 snapshot causes old clients to
-pause sync until upgraded. Full snapshots omit track descriptors used only by playback.
+the caption. Small batches carry changes. Format 3 adds selected profiles and profile
+audio references, and reads formats 1 and 2 while ignoring legacy cloud playback.
+Clients through 0.18.0 pause on format 3 until upgraded. Full snapshots omit track
+descriptors used only by playback or profile previews.
 An initial or large pending batch produces a full snapshot. A one-shot deferred pass
 consolidates a dirty channel after 60 seconds; 16 retained tail documents trigger
 earlier consolidation, counting shared history across writers. This does not poll
@@ -158,7 +177,7 @@ Library settings apply through the same shared app controls. Speed, order, repea
 volume and mute stay local, together with the queue, last track and listening
 positions. Startup removes old speed/order/repeat records from local sync storage;
 incoming legacy settings are ignored without rejecting other library records.
-The format remains 2, so existing library-sync clients remain compatible.
+The profile extension uses format 3; existing library records remain readable.
 Five-second checkpoints, pause, seek, track change and orderly exit write only local
 playback storage. Audio copies, downloads, indexing
 checkpoints, native sessions and installation state belong to each device.

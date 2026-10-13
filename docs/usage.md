@@ -2,8 +2,9 @@
 
 [Documentation](README.md) · **English** · [Русский](usage.ru.md)
 
-Spotygram brings audio from selected chats into a music library. Messages stay
-in Telegram; favorites, playlists and downloaded copies live on your device.
+Spotygram plays audio from Telegram chats, music pinned to user profiles and local
+files. Favorites, playlists and selected sources sync through your account;
+audio copies and playback stay on each device.
 
 ## First launch
 
@@ -43,7 +44,7 @@ Importing creates a separate copy in the player's library.
 
 ## Add music from chats
 
-Open **Chats → Add chats**, choose Saved Messages, groups or channels, then
+Open **Sources → Add → Chats**, choose Saved Messages, groups or channels, then
 confirm your selection. An accessible public channel can also be added by
 `@username`. Spotygram does not automatically subscribe you to it.
 
@@ -51,9 +52,9 @@ Private channels accessible to the connected account can be selected by name;
 they do not need a public username. The picker searches loaded chats immediately
 and adds online matches when available. Typing does not stop the chat list from
 loading, and newly received chats can appear while the picker stays open.
-Use the refresh icon **inside Add chats** to retry directory loading and search.
+Use the refresh icon **inside Add source** to retry directory loading and search.
 Offline, already loaded chats remain selectable. The refresh button on the
-main Chats screen updates music in sources you have already selected.
+main Sources screen updates music in sources you have already selected.
 
 History loads progressively: you can listen to the first songs while more
 appear. The app scans all accessible history, not just the last hundred
@@ -63,6 +64,39 @@ or pull down to update the list; unfinished history can be resumed.
 Library search uses music already found. If a song is missing, **Search selected
 chats** searches Telegram. Secret chats, voice notes and videos are excluded
 from the music library.
+
+## Music on Telegram profiles
+
+**Sources → My profile** opens the music pinned to your own Telegram profile.
+It stays at the top even when you have not connected it to the library.
+This music is separate from files in Saved Messages or a conversation.
+
+To find another person, open **Sources → Add → Profiles** and enter a name,
+`@username` or a `t.me/username` link. The search includes contacts, known private
+chats and public username matches; channels and bots are excluded. Recent profiles
+are available without another search. Opening a result does not start playback.
+
+Tap a song or **Play all** to listen with the ordinary player. The list follows
+Telegram’s profile order, while your current playback mode stays in effect.
+Use the search field to filter this profile. Its heart and song menu can save one
+song to Favorites or a playlist without connecting the entire profile.
+
+**Add to library** makes the profile a permanent source. Its songs then appear in
+Music, ordinary search and the Sources filter. Click **In library** to remove that
+connection; favorites, playlists, downloaded songs and the active queue stay.
+Listening copies remain under On device according to your cache setting and do
+not add the profile’s other songs to Music or the playlist editor.
+
+Telegram privacy settings determine which other profiles you can read. An empty
+list may mean no songs or hidden music. **Refresh** updates the profile; a failed
+or incomplete request keeps the previous list. Songs removed from a profile become
+unavailable remotely, while valid downloaded copies still play. Native file IDs
+are restored after restart, so listening does not depend on finding the original
+chat message.
+
+Profile selections, favorites and playlists use library-sync format 3. Clients
+through 0.18.0 need an update to continue synchronizing once format 3 is received;
+their local library is preserved. New clients also read the previous library formats.
 
 ## Listen
 
@@ -82,7 +116,7 @@ list get one representative per group. Existing playlists and the current queue
 are not rewritten; independent draws in absolute random can still repeat.
 
 The four bottom destinations are **Music**, **Favorites**, **Playlists** and
-**Chats**. Your last destination is remembered. Tap a song to play; the small
+**Sources**. Your last destination is remembered. Tap a song to play; the small
 bottom player opens the full player. Android lock-screen and desktop system media
 controls work too. Wide windows move navigation to the side.
 
@@ -274,8 +308,8 @@ asks to stop playback and clear them; playback and downloads stop, and the
 result reports the space freed.
 
 Favorites, playlists, imported files and sign-in remain. Downloading again
-requires access to the original message: if it is gone, the deleted copy may
-not be recoverable. Cleanup requires a connected Telegram account.
+requires access to the original message or profile audio: if it is no longer
+accessible, the deleted copy may not be recoverable. Cleanup requires a connected Telegram account.
 
 ## Language and appearance
 

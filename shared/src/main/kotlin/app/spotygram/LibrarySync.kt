@@ -36,7 +36,7 @@ class LibrarySync(
     }
 
     companion object {
-        const val FORMAT = 2
+        const val FORMAT = 3
         private val localPlaybackSettings =
             setOf("setting/speed", "setting/order", "setting/repeat")
         val settings =
@@ -50,7 +50,10 @@ class LibrarySync(
                 "discard_listened",
             )
         private val uuid = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
-        private val trackId = Regex("(?:-?[0-9]{1,16}:[0-9]{1,16}|local:[a-f0-9-]{36})")
+        private val trackId =
+            Regex(
+                "(?:-?[0-9]{1,16}:[0-9]{1,16}|local:[a-f0-9-]{36}|profile:[0-9]{1,16}:[a-f0-9]{64})"
+            )
 
         // Android preserves insertion order, while desktop JSON uses a hash map.
         // Portable equality must not depend on either implementation's field ordering.
@@ -107,13 +110,24 @@ class LibrarySync(
                     )
                     require(value.getLong("message") in 0..9_007_199_254_740_991L)
                     require(
-                        if (parts[1].startsWith("local:")) value.getLong("chat") == 0L
-                        else parts[1] == "${value.getLong("chat")}:${value.getLong("message")}"
+                        if (parts[1].startsWith("profile:"))
+                            value.getLong("chat") == 0L &&
+                                value.getLong("message") == 0L &&
+                                value.getLong("profile") in 1..9_007_199_254_740_991L &&
+                                value.getString("key").isNotEmpty() &&
+                                parts[1] ==
+                                    profileTrackId(value.getLong("profile"), value.getString("key"))
+                        else if (parts[1].startsWith("local:"))
+                            value.getLong("chat") == 0L && value.optLong("profile") == 0L
+                        else
+                            value.optLong("profile") == 0L &&
+                                parts[1] == "${value.getLong("chat")}:${value.getLong("message")}"
                     )
                     for (field in listOf("title", "artist", "source", "key", "remote")) require(
                         value.optString(field).length <= 8192
                     )
                     require(value.optLong("size") >= 0 && value.optInt("duration") >= 0)
+                    require(value.optString("username").length <= 64)
                 }
                 "favorite" ->
                     require(parts.size == 2 && trackId.matches(parts[1]) && value is Boolean)
@@ -124,6 +138,17 @@ class LibrarySync(
                     require(
                         value.get("enabled") is Boolean && value.getString("title").length <= 256
                     )
+                }
+                "profile" -> {
+                    require(
+                        parts.size == 2 &&
+                            (parts[1].toLongOrNull() ?: 0L) in 1..9_007_199_254_740_991L &&
+                            value is JSONObject
+                    )
+                    require(
+                        value.get("enabled") is Boolean && value.getString("title").length <= 256
+                    )
+                    require(value.optString("username").length <= 64)
                 }
                 "playlist" -> {
                     require(parts.size >= 3 && uuid.matches(parts[1]))
@@ -289,7 +314,9 @@ class LibrarySync(
                 !r.key.startsWith("track/") ||
                     r.removesIdentity() ||
                     r.key.removePrefix("track/") in referenced ||
-                    JSONObject(r.value).getJSONObject("v").getLong("chat") == 0L
+                    JSONObject(r.value).getJSONObject("v").let {
+                        it.getLong("chat") == 0L && it.optLong("profile") == 0L
+                    }
             if (!keep)
                 db.execSQL(
                     "DELETE FROM sync_values WHERE account=? AND key=?",
@@ -344,7 +371,7 @@ class LibrarySync(
 
     fun descriptor(db: SqlDatabase, id: String): JSONObject? =
         db.rawQuery(
-                "SELECT id,chat,message,title,artist,duration,size,source,date,document,file_key,remote_id FROM tracks WHERE id=?",
+                "SELECT id,chat,message,title,artist,duration,size,source,date,document,file_key,remote_id,profile_user,COALESCE((SELECT username FROM profiles WHERE profiles.id=tracks.profile_user),'') FROM tracks WHERE id=?",
                 arrayOf(id),
             )
             .use { c ->
@@ -365,10 +392,12 @@ class LibrarySync(
             .put("document", c.getInt(9) == 1)
             .put("key", c.getString(10))
             .put("remote", c.getString(11))
+            .put("profile", c.getLong(12))
+            .put("username", c.getString(13))
 
     fun references(db: SqlDatabase, ids: Collection<String>, values: MutableMap<String, Any?>) {
         for (chunk in ids.distinct().chunked(400)) db.rawQuery(
-                "SELECT id,chat,message,title,artist,duration,size,source,date,document,file_key,remote_id FROM tracks WHERE id IN(${chunk.joinToString(",") { "?" }})",
+                "SELECT id,chat,message,title,artist,duration,size,source,date,document,file_key,remote_id,profile_user,COALESCE((SELECT username FROM profiles WHERE profiles.id=tracks.profile_user),'') FROM tracks WHERE id IN(${chunk.joinToString(",") { "?" }})",
                 chunk.toTypedArray(),
             )
             .use { c -> while (c.moveToNext()) values["track/${c.getString(0)}"] = descriptor(c) }
@@ -527,8 +556,17 @@ class LibrarySync(
                 db.execSQL("DELETE FROM tracks WHERE id=? AND path=''", arrayOf(id))
                 continue
             }
+            if (t.optLong("profile") != 0L)
+                db.execSQL(
+                    "INSERT OR IGNORE INTO profiles(id,title,username) VALUES(?,?,?)",
+                    arrayOf<Any>(
+                        t.getLong("profile"),
+                        t.optString("source").take(256),
+                        t.optString("username"),
+                    ),
+                )
             db.execSQL(
-                "INSERT OR IGNORE INTO tracks(id,chat,message,file,title,artist,duration,size,source,date,document,file_key,remote_id,available,saved,cloud) VALUES(?,?,?,0,?,?,?,?,?,?,?,?,?,?,0,1)",
+                "INSERT OR IGNORE INTO tracks(id,chat,message,file,title,artist,duration,size,source,date,document,file_key,remote_id,available,saved,cloud,profile_user) VALUES(?,?,?,0,?,?,?,?,?,?,?,?,?,?,0,1,?)",
                 arrayOf<Any>(
                     id,
                     chat,
@@ -542,7 +580,8 @@ class LibrarySync(
                     if (t.optBoolean("document")) 1 else 0,
                     t.optString("key"),
                     t.optString("remote"),
-                    if (chat == 0L) 0 else 1,
+                    if (chat == 0L && t.optLong("profile") == 0L) 0 else 1,
+                    t.optLong("profile"),
                 ),
             )
             db.execSQL(
@@ -563,6 +602,23 @@ class LibrarySync(
                     arrayOf<Any>(id, v.getString("title")),
                 )
             else db.execSQL("DELETE FROM sources WHERE id=?", arrayOf(id))
+        }
+        for (key in changed.filter { it.startsWith("profile/") }) {
+            val v = value(key) as? JSONObject ?: continue
+            val id = key.removePrefix("profile/").toLong()
+            db.execSQL(
+                "INSERT OR IGNORE INTO profiles(id,title,username) VALUES(?,?,?)",
+                arrayOf<Any>(id, v.getString("title"), v.optString("username")),
+            )
+            db.execSQL(
+                "UPDATE profiles SET selected=?,title=?,username=? WHERE id=?",
+                arrayOf<Any>(
+                    if (v.getBoolean("enabled")) 1 else 0,
+                    v.getString("title"),
+                    v.optString("username"),
+                    id,
+                ),
+            )
         }
         val playlists =
             changed.filter { it.startsWith("playlist/") }.map { it.split('/')[1] }.toSet()

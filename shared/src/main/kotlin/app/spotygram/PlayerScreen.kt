@@ -92,8 +92,8 @@ fun PlayerScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        if (track.chatId == 0L) tr(R.string.from_device)
-                        else chatTitle(track.chatId, track.source),
+                        if (track.imported) tr(R.string.from_device)
+                        else track.sourceTitle,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

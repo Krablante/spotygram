@@ -15,7 +15,7 @@ class Library(private val platform: Platform) : AutoCloseable {
     val sync: LibrarySync = LibrarySync(platform, { writableDatabase }, { reload() })
     private val publishing = Mutex()
     private val storage = lazy {
-        platform.openDatabase("library.db", 7, ::onCreate, ::onUpgrade, ::onOpen)
+        platform.openDatabase("library.db", 8, ::onCreate, ::onUpgrade, ::onOpen)
     }
     private val database
         get() = storage.value
@@ -32,7 +32,7 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     private fun onCreate(db: SqlDatabase) {
         db.execSQL(
-            "CREATE TABLE tracks(id TEXT PRIMARY KEY,chat INTEGER,message INTEGER,file INTEGER,title TEXT,artist TEXT,duration INTEGER,size INTEGER,source TEXT,date INTEGER,art TEXT DEFAULT '',path TEXT DEFAULT '',liked INTEGER DEFAULT 0,available INTEGER DEFAULT 1,document INTEGER DEFAULT 0,file_key TEXT DEFAULT '',remote_id TEXT DEFAULT '',saved INTEGER DEFAULT 0)"
+            "CREATE TABLE tracks(id TEXT PRIMARY KEY,chat INTEGER,message INTEGER,file INTEGER,title TEXT,artist TEXT,duration INTEGER,size INTEGER,source TEXT,date INTEGER,art TEXT DEFAULT '',path TEXT DEFAULT '',liked INTEGER DEFAULT 0,available INTEGER DEFAULT 1,document INTEGER DEFAULT 0,file_key TEXT DEFAULT '',remote_id TEXT DEFAULT '',saved INTEGER DEFAULT 0,profile_user INTEGER NOT NULL DEFAULT 0,profile_position INTEGER NOT NULL DEFAULT -1)"
         )
         db.execSQL("CREATE INDEX tracks_file ON tracks(file)")
         db.execSQL("CREATE INDEX tracks_chat ON tracks(chat)")
@@ -46,6 +46,7 @@ class Library(private val platform: Platform) : AutoCloseable {
         db.execSQL("CREATE TABLE downloads(track TEXT PRIMARY KEY,position INTEGER)")
         createTemporaryStorage(db)
         createPlaybackProgress(db)
+        createProfileStorage(db)
         sync.install(db)
     }
 
@@ -69,8 +70,20 @@ class Library(private val platform: Platform) : AutoCloseable {
             db.execSQL("ALTER TABLE sources ADD COLUMN document_cursor INTEGER DEFAULT 0")
             db.execSQL("ALTER TABLE sources ADD COLUMN documents_complete INTEGER DEFAULT 0")
         }
+        if (oldVersion < 8) {
+            db.execSQL("ALTER TABLE tracks ADD COLUMN profile_user INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE tracks ADD COLUMN profile_position INTEGER NOT NULL DEFAULT -1")
+            createProfileStorage(db)
+        }
         if (oldVersion < 6) sync.install(db)
         if (oldVersion < 7) sync.migrate(db)
+    }
+
+    private fun createProfileStorage(db: SqlDatabase) {
+        db.execSQL(
+            "CREATE TABLE profiles(id INTEGER PRIMARY KEY,title TEXT NOT NULL,username TEXT NOT NULL DEFAULT '',photo TEXT NOT NULL DEFAULT '',selected INTEGER NOT NULL DEFAULT 0,audio_count INTEGER NOT NULL DEFAULT 0,loaded_at INTEGER NOT NULL DEFAULT 0,opened_at INTEGER NOT NULL DEFAULT 0)"
+        )
+        db.execSQL("CREATE INDEX tracks_profile ON tracks(profile_user,profile_position)")
     }
 
     private fun createPlaybackProgress(db: SqlDatabase) {
@@ -133,7 +146,7 @@ class Library(private val platform: Platform) : AutoCloseable {
         sync.opened(db)
         // TDLib file IDs belong to one client lifetime, not to the persisted catalog.
         // Clear old bindings before any new audio/thumbnail completion can match them.
-        db.execSQL("UPDATE tracks SET file=0 WHERE chat!=0 AND file!=0")
+        db.execSQL("UPDATE tracks SET file=0 WHERE (chat!=0 OR profile_user!=0) AND file!=0")
     }
 
     suspend fun clearFileBindings() =
@@ -165,8 +178,27 @@ class Library(private val platform: Platform) : AutoCloseable {
                 }
             val tracks = mutableListOf<Track>()
             val sourceTitles = sources.associate { it.id to it.title }
+            val profiles = mutableListOf<UserProfile>()
             db.rawQuery(
-                    "SELECT tracks.*,CASE WHEN temporary_audio.file_key IS NULL THEN 0 ELSE 1 END FROM tracks LEFT JOIN temporary_audio ON tracks.file_key=temporary_audio.file_key WHERE chat=0 OR tracks.path!='' OR liked=1 OR id IN (SELECT track FROM playlist_tracks) OR chat IN (SELECT id FROM sources) ORDER BY date DESC,id DESC",
+                    "SELECT id,title,username,photo,selected,audio_count,loaded_at,opened_at FROM profiles ORDER BY title",
+                    null,
+                )
+                .use { c ->
+                    while (c.moveToNext()) profiles +=
+                        UserProfile(
+                            c.getLong(0),
+                            c.getString(1),
+                            c.getString(2),
+                            c.getString(3),
+                            c.getInt(4) == 1,
+                            c.getInt(5),
+                            c.getLong(6),
+                            c.getLong(7),
+                        )
+                }
+            val profileTitles = profiles.associate { it.id to it.title }
+            db.rawQuery(
+                    "SELECT tracks.id,chat,message,file,tracks.title,artist,duration,size,source,date,art,tracks.path,liked,available,document,tracks.file_key,tracks.remote_id,saved,profile_user,profile_position,CASE WHEN temporary_audio.file_key IS NULL THEN 0 ELSE 1 END,CASE WHEN profile_user=0 OR liked=1 OR tracks.id IN(SELECT track FROM playlist_tracks) OR (profile_position>=0 AND profile_user IN(SELECT id FROM profiles WHERE selected=1)) THEN 1 ELSE 0 END FROM tracks LEFT JOIN temporary_audio ON tracks.file_key=temporary_audio.file_key WHERE profile_user!=0 OR chat=0 OR tracks.path!='' OR liked=1 OR tracks.id IN (SELECT track FROM playlist_tracks) OR chat IN (SELECT id FROM sources) ORDER BY date DESC,tracks.id DESC",
                     null,
                 )
                 .use { c ->
@@ -180,7 +212,8 @@ class Library(private val platform: Platform) : AutoCloseable {
                             c.getString(5),
                             c.getInt(6),
                             c.getLong(7),
-                            sourceTitles[c.getLong(1)] ?: c.getString(8),
+                            (if (c.getLong(18) != 0L) profileTitles[c.getLong(18)]
+                            else sourceTitles[c.getLong(1)]) ?: c.getString(8),
                             c.getLong(9),
                             c.getString(10),
                             c.getString(11),
@@ -190,7 +223,10 @@ class Library(private val platform: Platform) : AutoCloseable {
                             c.getString(15),
                             c.getString(16),
                             c.getInt(17) == 1,
-                            c.getInt(19) == 1,
+                            c.getInt(20) == 1,
+                            c.getLong(18),
+                            c.getInt(19),
+                            c.getInt(21) == 1,
                         )
                 }
             val lists = mutableListOf<Playlist>()
@@ -214,7 +250,7 @@ class Library(private val platform: Platform) : AutoCloseable {
                             Playlist(c.getLong(0), c.getString(1), members[c.getLong(0)].orEmpty())
                     }
                 }
-            val snapshot = LibraryState(tracks, sources, lists)
+            val snapshot = LibraryState(tracks, sources, lists, profiles)
             if (snapshot != state.value) {
                 snapshot.byId
                 if (platform.preferences("settings").getBoolean("hide_duplicates", true))
@@ -238,51 +274,50 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     suspend fun upsert(tracks: List<Track>) =
         withContext(Dispatchers.IO) {
-            val db = writableDatabase
-            db.beginTransaction()
-            try {
-                tracks.forEach { t ->
-                    if (t.fileKey.isNotEmpty())
-                        db.execSQL(
-                            "UPDATE tracks SET path='' WHERE id=? AND file_key!='' AND file_key!=?",
-                            arrayOf(t.id, t.fileKey),
-                        )
-                    val v =
-                        Values().apply {
-                            put("chat", t.chatId)
-                            put("message", t.messageId)
-                            put("file", t.fileId)
-                            put("title", t.title)
-                            put("artist", t.artist)
-                            put("duration", t.duration)
-                            put("size", t.size)
-                            put("source", t.source)
-                            put("date", t.date)
-                            put("available", if (t.available) 1 else 0)
-                            put("document", if (t.document) 1 else 0)
-                            if (t.fileKey.isNotEmpty()) put("file_key", t.fileKey)
-                            if (t.remoteId.isNotEmpty()) put("remote_id", t.remoteId)
-                            if (t.art.isNotEmpty()) put("art", t.art)
-                            if (t.path.isNotEmpty())
-                                put("path", t.path.takeIf { validAudioCopy(it, t.size) }.orEmpty())
-                        }
-                    if (db.update("tracks", v, "id=?", arrayOf(t.id)) == 0) {
-                        v.put("id", t.id)
-                        v.put("saved", if (t.saved) 1 else 0)
-                        db.insertOrThrow("tracks", null, v)
-                    }
+            writableDatabase.transaction { upsertRows(this, tracks) }
+        }
+
+    private fun upsertRows(db: SqlDatabase, tracks: List<Track>) {
+        tracks.forEach { t ->
+            if (t.fileKey.isNotEmpty())
+                db.execSQL(
+                    "UPDATE tracks SET path='' WHERE id=? AND file_key!='' AND file_key!=?",
+                    arrayOf(t.id, t.fileKey),
+                )
+            val v =
+                Values().apply {
+                    put("chat", t.chatId)
+                    put("message", t.messageId)
+                    put("file", t.fileId)
+                    put("title", t.title)
+                    put("artist", t.artist)
+                    put("duration", t.duration)
+                    put("size", t.size)
+                    put("source", t.source)
+                    put("date", t.date)
+                    put("available", if (t.available) 1 else 0)
+                    put("document", if (t.document) 1 else 0)
+                    put("profile_user", t.profileUserId)
+                    put("profile_position", t.profilePosition)
+                    if (t.fileKey.isNotEmpty()) put("file_key", t.fileKey)
+                    if (t.remoteId.isNotEmpty()) put("remote_id", t.remoteId)
+                    if (t.art.isNotEmpty()) put("art", t.art)
+                    if (t.path.isNotEmpty())
+                        put("path", t.path.takeIf { validAudioCopy(it, t.size) }.orEmpty())
                 }
-                val imports = tracks.filter { it.chatId == 0L }.map { it.id }
-                if (imports.isNotEmpty()) {
-                    val values = linkedMapOf<String, Any?>()
-                    sync.references(db, imports, values)
-                    sync.edit(db, values)
-                }
-                db.setTransactionSuccessful()
-            } finally {
-                db.endTransaction()
+            if (db.update("tracks", v, "id=?", arrayOf(t.id)) == 0) {
+                v.put("id", t.id)
+                v.put("saved", if (t.saved) 1 else 0)
+                db.insertOrThrow("tracks", null, v)
             }
         }
+        val imports = tracks.filter { it.imported }.map { it.id }
+        if (imports.isNotEmpty()) {
+            val values = linkedMapOf<String, Any?>()
+            sync.references(db, imports, values)
+            sync.edit(db, values)
+        }
+    }
 
     suspend fun source(choice: ChatChoice, enabled: Boolean) =
         withContext(Dispatchers.IO) {
@@ -326,6 +361,129 @@ class Library(private val platform: Platform) : AutoCloseable {
                 )
             }
             reload()
+        }
+
+    suspend fun profileIdentity(profile: UserProfile, opened: Boolean = false) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                insertWithOnConflict(
+                    "profiles",
+                    null,
+                    Values().apply {
+                        put("id", profile.id)
+                        put("title", profile.title)
+                    },
+                    SqlDatabase.CONFLICT_IGNORE,
+                )
+                update(
+                    "profiles",
+                    Values().apply {
+                        put("title", profile.title)
+                        put("username", profile.username)
+                        put("photo", profile.photo)
+                        if (opened) put("opened_at", System.currentTimeMillis())
+                    },
+                    "id=?",
+                    arrayOf(profile.id.toString()),
+                )
+            }
+            reload()
+        }
+
+    suspend fun profilePhoto(id: Long, photo: String) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.update(
+                "profiles",
+                Values().apply { put("photo", photo) },
+                "id=?",
+                arrayOf(id.toString()),
+            )
+            reload()
+        }
+
+    suspend fun selectProfile(profile: UserProfile, enabled: Boolean) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                insertWithOnConflict(
+                    "profiles",
+                    null,
+                    Values().apply {
+                        put("id", profile.id)
+                        put("title", profile.title)
+                        put("username", profile.username)
+                    },
+                    SqlDatabase.CONFLICT_IGNORE,
+                )
+                update(
+                    "profiles",
+                    Values().apply { put("selected", if (enabled) 1 else 0) },
+                    "id=?",
+                    arrayOf(profile.id.toString()),
+                )
+                sync.edit(
+                    this,
+                    mapOf(
+                        "profile/${profile.id}" to
+                            JSONObject()
+                                .put("enabled", enabled)
+                                .put("title", profile.title.take(256))
+                                .put("username", profile.username)
+                    ),
+                )
+            }
+            reload()
+        }
+
+    suspend fun profileAudios(id: Long, tracks: List<Track>) =
+        withContext(Dispatchers.IO) {
+            writableDatabase.transaction {
+                // Replace membership only after every page has arrived successfully.
+                execSQL(
+                    "UPDATE tracks SET profile_position=-1,available=0 WHERE profile_user=?",
+                    arrayOf(id),
+                )
+                upsertRows(this, tracks)
+                update(
+                    "profiles",
+                    Values().apply {
+                        put("audio_count", tracks.size)
+                        put("loaded_at", System.currentTimeMillis())
+                    },
+                    "id=?",
+                    arrayOf(id.toString()),
+                )
+            }
+            reload()
+        }
+
+    suspend fun pruneProfilePreviews(protectedUsers: Set<Long>): Set<String> =
+        withContext(Dispatchers.IO) {
+            val removed = mutableSetOf<String>()
+            writableDatabase.transaction {
+                val old =
+                    rawQuery(
+                            "SELECT id FROM profiles WHERE selected=0 AND loaded_at!=0 AND id NOT IN(SELECT id FROM profiles ORDER BY opened_at DESC LIMIT 12)",
+                            null,
+                        )
+                        .use { c ->
+                            buildList {
+                                while (c.moveToNext()) if (c.getLong(0) !in protectedUsers)
+                                    add(c.getLong(0))
+                            }
+                        }
+                val metadataOnly =
+                    "profile_user=? AND liked=0 AND path='' AND id NOT IN(SELECT track FROM playlist_tracks) AND id NOT IN(SELECT track FROM downloads) AND id NOT IN(SELECT track FROM playback_progress)"
+                for (id in old) {
+                    rawQuery("SELECT id FROM tracks WHERE $metadataOnly", arrayOf(id.toString()))
+                        .use { c ->
+                            while (c.moveToNext()) removed += c.getString(0)
+                        }
+                    delete("tracks", metadataOnly, arrayOf(id.toString()))
+                    execSQL("UPDATE profiles SET loaded_at=0 WHERE id=?", arrayOf(id))
+                }
+            }
+            if (removed.isNotEmpty()) reload()
+            removed
         }
 
     suspend fun cursor(id: Long, cursor: Long, complete: Boolean, document: Boolean = false) =
@@ -656,7 +814,7 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     suspend fun removeLocal(track: Track) =
         withContext(Dispatchers.IO) {
-            if (track.chatId == 0L) {
+            if (track.imported) {
                 val audio = File(track.path)
                 check(!audio.exists() || audio.delete()) { tr(R.string.file_unavailable) }
                 if (track.art.isNotEmpty()) {
@@ -731,11 +889,12 @@ class Library(private val platform: Platform) : AutoCloseable {
         withContext(Dispatchers.IO) {
             writableDatabase.transaction {
                 execSQL(
-                    "DELETE FROM playlist_tracks WHERE track IN (SELECT id FROM tracks WHERE chat!=0)"
+                    "DELETE FROM playlist_tracks WHERE track IN (SELECT id FROM tracks WHERE chat!=0 OR profile_user!=0)"
                 )
-                execSQL("DELETE FROM tracks WHERE chat!=0")
+                execSQL("DELETE FROM tracks WHERE chat!=0 OR profile_user!=0")
                 execSQL("DELETE FROM tracks WHERE cloud=1 AND path=''")
                 delete("sources", null, null)
+                delete("profiles", null, null)
                 delete("downloads", null, null)
                 delete("temporary_audio", null, null)
             }

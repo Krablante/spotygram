@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>A music player for your Telegram chats and local files.</strong><br>
+  <strong>A music player for Telegram chats, profile music and local files.</strong><br>
   Android · Windows · Linux · macOS
 </p>
 
@@ -29,8 +29,21 @@ make playlists, download music for later. You can also import files from your
 device and use the player without connecting Telegram. All versions share the
 same screens, glass material, library and playback rules.
 
+**Sources** keeps your Telegram profile at the top, followed by connected profiles
+and chats. Open a profile to listen to its pinned music, then choose **Add to library**
+if you want all its songs in your collection. A heart or playlist saves an individual
+song without connecting the profile. Other people’s music follows Telegram’s privacy settings.
+
+<p align="center">
+  <img src="docs/screenshots/sources-dark.png" width="35%" alt="Sources with My profile pinned at the top">
+  &nbsp;
+  <img src="docs/screenshots/profile-dark.png" width="35%" alt="Listening to a profile before adding it to the library">
+</p>
+
+These profile screens use demonstration data in the shared desktop interface.
+
 Sign in to the same Telegram account on another device to restore your playlists,
-favorites, selected chats and library settings automatically. Each device keeps its own
+favorites, selected chats and profiles, and library settings automatically. Each device keeps its own
 queue, last track and listening positions, including long-recording bookmarks. Spotygram
 keeps its library documents in a private, muted channel in your Telegram archive.
 
@@ -42,14 +55,18 @@ keeps its library documents in a private, muted channel in your Telegram archive
   <img src="docs/screenshots/playlists-light.png" width="30%" alt="Playlists">
 </p>
 
+The library, player and playlist screenshots above were captured in 0.18.0;
+the fourth tab is now Sources.
+
 ## Put it on your phone
 
 Download **`spotygram-…-arm64.apk`** from the [latest release](https://github.com/Krablante/spotygram/releases/latest).
 It requires **Android 8.0 or newer** and a 64-bit ARM device. The separate
 `x86_64` APK is for x86-64 Android environments; there is no 32-bit ARM build.
 
-Install the APK, connect your Telegram account, then open **Chats → Add chats**.
-Choose Saved Messages, groups or channels containing music. You do not need
+Install the APK, connect your Telegram account, then open **Sources**.
+Your profile is ready to open. **Add → Chats** selects Saved Messages, groups or channels;
+**Add → Profiles** finds people by name, @username or a t.me link. You do not need
 developer API keys to use the published APK. Prefer local files? Skip sign-in
 and choose **Settings → Import audio files**.
 
@@ -165,7 +182,7 @@ You can revoke it from Telegram's device settings.
 
 **Clear music cache also removes Telegram songs you explicitly downloaded.**
 Imported files, favorites, playlists and sign-in remain. If the original
-message is no longer accessible, a deleted local copy may not be recoverable.
+message or profile audio is no longer accessible, a deleted local copy may not be recoverable.
 Uninstalling the Android app removes its local music and settings. Deleting the
 desktop application folder leaves its separate user data in place. Synced library
 data returns after sign-in; imported audio files need their own backup.

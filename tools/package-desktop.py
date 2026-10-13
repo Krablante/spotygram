@@ -150,7 +150,7 @@ def installer(image, target, version, state, destination):
         '--verbose',
         '--icon', str(icon),
         '--app-version', package_version, '--dest', str(output), '--vendor', 'Krablante',
-        '--description', 'Music and long recordings from Telegram chats and local files',
+        '--description', 'Music and long recordings from Telegram chats, profiles and local files',
         '--about-url', 'https://github.com/Krablante/spotygram']
     if system == 'windows':
         compiler = os.environ.get('INNO_SETUP_COMPILER') or shutil.which('ISCC.exe')

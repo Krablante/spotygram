@@ -172,7 +172,8 @@ fun PlaylistEditor(
     val tracks =
         remember(library.tracks, query, members) {
             library.tracks.filter {
-                it.id !in members &&
+                it.inLibrary &&
+                    it.id !in members &&
                     "${it.title} ${it.artist} ${it.source}"
                         .contains(query.trim(), ignoreCase = true)
             }

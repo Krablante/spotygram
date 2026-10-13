@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -67,7 +68,12 @@ fun SpotygramUI(
     var sheet by remember { mutableStateOf("") }
     var selectedTrackId by remember { mutableStateOf<String?>(null) }
     var playlistId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var sourceId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var sourceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var profileId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var profileHint by remember { mutableStateOf<UserProfile?>(null) }
+    val profileLoading by app.profiles.loading.collectAsStateWithLifecycle()
+    val profileErrors by app.profiles.errors.collectAsStateWithLifecycle()
+    val selfProfileId by app.profiles.selfId.collectAsStateWithLifecycle()
     var offline by rememberSaveable { mutableStateOf(false) }
     var editor by rememberSaveable { mutableStateOf(false) }
     var addingTo by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -87,12 +93,24 @@ fun SpotygramUI(
     val pages = rememberSaveableStateHolder()
     val glassState = rememberHazeState()
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
-    val source = library.sources.firstOrNull { it.id == sourceId }
+    val selectedSource = library.allSources.firstOrNull { it.key == sourceId }
+    val activeProfileId =
+        profileId
+            ?: sourceId?.takeIf { it.startsWith("profile:") }?.substringAfter(':')?.toLongOrNull()
+    val profile =
+        library.profiles.firstOrNull { it.id == activeProfileId }
+            ?: profileHint?.takeIf { it.id == activeProfileId }
+    val source = profile?.source() ?: selectedSource
     val offlineView = tab == 0 && offline
-    val groupedView = hideDuplicates && playlist == null && tab in 0..1
+    val groupedView =
+        hideDuplicates &&
+            playlist == null &&
+            profile == null &&
+            (tab in 0..1 || tab == 3 && selectedSource != null)
+    val groupedFavorites = hideDuplicates && (groupedView || profile != null)
     val current =
         library.byId[playing.id]?.let {
-            if (groupedView) library.duplicates.display(it)
+            if (groupedFavorites) library.duplicates.display(it)
             else if (offlineView && it.local) library.localDisplay(it) else it
         }
     LaunchedEffect(Unit) { app.notices.collectLatest { snackbar.showSnackbar(it) } }
@@ -115,6 +133,18 @@ fun SpotygramUI(
         app.prefs.edit().putString("last_destination", destinationKeys[tab]).apply()
     }
     LaunchedEffect(auth.type) { if (auth.type == "authorizationStateReady") connect = false }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(activeProfileId, auth.type, connection, lifecycle) {
+        val id = activeProfileId ?: return@LaunchedEffect
+        if (auth.type == "authorizationStateReady")
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                try {
+                    app.profiles.load(id)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                }
+            }
+    }
     LaunchedEffect(sheet) { if (sheet.isNotEmpty()) focus.clearFocus() }
     val authVisible =
         connect ||
@@ -126,7 +156,8 @@ fun SpotygramUI(
         val sameFile = offlineView && track.local
         app.action {
             val aliases =
-                if (groupedView) library.duplicates.aliases(track.id).map { it.id } else emptyList()
+                if (groupedFavorites) library.duplicates.aliases(track.id).map { it.id }
+                else emptyList()
             val (liked, previousLikes) = app.library.like(track, sameFile, aliases)
             if (!liked)
                 scope.launch {
@@ -165,20 +196,35 @@ fun SpotygramUI(
         selectionReset++
         tab = index
         sourceId = null
+        profileId = null
+        profileHint = null
         playlistId = null
+    }
+    fun openProfile(value: UserProfile) {
+        navigate(3)
+        sheet = ""
+        profileId = value.id
+        profileHint = value
+        app.action { app.profiles.open(value) }
     }
     BackHandler(
         enabled =
             sheet.isEmpty() &&
                 !editor &&
                 !authVisible &&
-                (fullPlayer || sourceId != null || playlistId != null || connect)
+                (fullPlayer ||
+                    sourceId != null ||
+                    profileId != null ||
+                    playlistId != null ||
+                    connect)
     ) {
         when {
             fullPlayer -> fullPlayer = false
             connect -> connect = false
             else -> {
                 sourceId = null
+                profileId = null
+                profileHint = null
                 playlistId = null
             }
         }
@@ -337,8 +383,8 @@ fun SpotygramUI(
                                                                 (tr(R.string.playlists) to
                                                                     Icons.Rounded.PlaylistPlay),
                                                             3 to
-                                                                (tr(R.string.chats) to
-                                                                    Icons.Rounded.Forum),
+                                                                (tr(R.string.sources) to
+                                                                    Icons.Rounded.Widgets),
                                                         )
                                                     destinations.forEach { (index, destination) ->
                                                         val (label, icon) = destination
@@ -405,7 +451,7 @@ fun SpotygramUI(
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
-                                if (!keyboardVisible)
+                                if (!keyboardVisible && profile == null)
                                     Row(
                                         Modifier.widthIn(max = 720.dp)
                                             .fillMaxWidth()
@@ -447,16 +493,23 @@ fun SpotygramUI(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 Box(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth()) {
-                                    pages.SaveableStateProvider("$tab:$playlistId:$sourceId") {
+                                    pages.SaveableStateProvider(
+                                        "$tab:$playlistId:$sourceId:$profileId"
+                                    ) {
                                         when {
-                                            tab == 0 || tab == 1 || tab == 2 && playlist != null ->
+                                            tab == 0 ||
+                                                tab == 1 ||
+                                                tab == 2 && playlist != null ||
+                                                tab == 3 && (source != null || profileId != null) ->
                                                 MusicScreen(
                                                     hideDuplicates = groupedView,
                                                     library,
                                                     playing.id,
                                                     playing.order,
                                                     download,
-                                                    busy,
+                                                    if (profile != null)
+                                                        profile.id in profileLoading
+                                                    else busy,
                                                     tab == 1,
                                                     if (tab == 0) offline else false,
                                                     source,
@@ -467,6 +520,8 @@ fun SpotygramUI(
                                                     onBack = {
                                                         playlistId = null
                                                         sourceId = null
+                                                        profileId = null
+                                                        profileHint = null
                                                     },
                                                     onPlay = { track, tracks ->
                                                         play(track, tracks)
@@ -478,7 +533,16 @@ fun SpotygramUI(
                                                     },
                                                     onImport = onImport,
                                                     onChats = { navigate(3) },
-                                                    onRefresh = { app.action { app.refresh() } },
+                                                    onRefresh = {
+                                                        app.action {
+                                                            if (profile != null)
+                                                                app.profiles.load(
+                                                                    profile.id,
+                                                                    force = true,
+                                                                )
+                                                            else app.refresh()
+                                                        }
+                                                    },
                                                     onOrder = { app.changePlaybackOrder(it) },
                                                     onDownload = onDownload,
                                                     onAddToPlaylist = { addToPlaylist(it) },
@@ -500,6 +564,26 @@ fun SpotygramUI(
                                                             }
                                                         }
                                                     },
+                                                    profile = profile,
+                                                    profileFavorites = groupedFavorites,
+                                                    ownProfile = profile?.id == selfProfileId,
+                                                    profileError = profileErrors[profile?.id],
+                                                    onProfileSelected = { selected ->
+                                                        profile?.let {
+                                                            app.action {
+                                                                app.profiles.select(it, selected)
+                                                            }
+                                                        }
+                                                    },
+                                                    onProfileTelegram = {
+                                                        profile?.let {
+                                                            app.platform.openUrl(
+                                                                if (it.username.isNotEmpty())
+                                                                    "https://t.me/${it.username}"
+                                                                else "tg://user?id=${it.id}"
+                                                            )
+                                                        }
+                                                    },
                                                 )
                                             tab == 2 ->
                                                 PlaylistsScreen(
@@ -512,7 +596,8 @@ fun SpotygramUI(
                                                     },
                                                 )
                                             else ->
-                                                ChatsScreen(
+                                                SourcesScreen(
+                                                    app,
                                                     library,
                                                     busy,
                                                     auth.type == "authorizationStateReady",
@@ -522,15 +607,25 @@ fun SpotygramUI(
                                                     },
                                                     onAdd = { sheet = "chats" },
                                                     onOpen = {
-                                                        navigate(0)
-                                                        sourceId = it
+                                                        sourceId = "chat:$it"
                                                     },
+                                                    onProfile = ::openProfile,
                                                     onRemove = { s ->
                                                         app.action {
-                                                            app.library.source(
-                                                                ChatChoice(s.id, s.title),
-                                                                false,
-                                                            )
+                                                            if (s.profile)
+                                                                library.profiles
+                                                                    .firstOrNull { it.id == s.id }
+                                                                    ?.let {
+                                                                        app.profiles.select(
+                                                                            it,
+                                                                            false,
+                                                                        )
+                                                                    }
+                                                            else
+                                                                app.library.source(
+                                                                    ChatChoice(s.id, s.title),
+                                                                    false,
+                                                                )
                                                         }
                                                     },
                                                     onRefresh = { app.action { app.refresh() } },
@@ -554,7 +649,7 @@ fun SpotygramUI(
                                 R.string.music to Icons.Rounded.MusicNote,
                                 R.string.favorites to Icons.Rounded.Favorite,
                                 R.string.playlists to Icons.Rounded.PlaylistPlay,
-                                R.string.chats to Icons.Rounded.Forum,
+                                R.string.sources to Icons.Rounded.Widgets,
                             )
                             .forEachIndexed { index, (label, icon) ->
                                 Column(
@@ -676,13 +771,13 @@ fun SpotygramUI(
                                             },
                                         )
                                     "chats" ->
-                                        ChatPicker(
+                                        SourcePicker(
                                             app,
                                             library,
                                             onDone = {
                                                 sheet = ""
-                                                app.action { app.refresh() }
                                             },
+                                            onProfile = ::openProfile,
                                         )
                                     "queue" -> QueueSheet(library, playing, app)
                                     "speed" ->
@@ -769,7 +864,7 @@ fun SpotygramUI(
                                     "track" ->
                                         library.byId[selectedTrackId]
                                             ?.let {
-                                                if (groupedView) library.duplicates.display(it)
+                                                if (groupedFavorites) library.duplicates.display(it)
                                                 else if (offlineView && it.local)
                                                     library.localDisplay(it)
                                                 else it

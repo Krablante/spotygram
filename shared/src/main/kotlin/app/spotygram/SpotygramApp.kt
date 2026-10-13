@@ -60,6 +60,7 @@ class SpotygramApp(val platform: Platform) {
     val listeningCache by lazy { ListeningCache(this) }
     val updates by lazy { AppUpdates(this) }
     val cloudSync by lazy { CloudSync(this) }
+    val profiles by lazy { Profiles(this) }
     var suppressCloudWrites = false
     val playbackMode =
         MutableStateFlow(
@@ -148,6 +149,7 @@ class SpotygramApp(val platform: Platform) {
                     listeningCache.signal()
                     if (!connected) scanJob?.cancelAndJoin()
                     else {
+                        profiles.resume()
                         try {
                             refresh()
                         } catch (e: Exception) {
@@ -175,6 +177,7 @@ class SpotygramApp(val platform: Platform) {
 
     suspend fun close() {
         scanJob?.cancelAndJoin()
+        profiles.stop()
         downloadService?.cancelForCacheCleanup()
         playback?.close()?.join()
         preferencesSaving?.join()
@@ -267,10 +270,15 @@ class SpotygramApp(val platform: Platform) {
     }
 
     fun cloudLibraryChanged(keys: Set<String>) {
-        if (keys.any { it.startsWith("source/") }) action { refresh() }
+        if (keys.any { it.startsWith("source/") || it.startsWith("profile/") }) action { refresh() }
     }
 
     fun track(id: String) = library.state.value.byId[id]
+
+    internal fun forgetTrackBinding(id: String) {
+        resolvedFiles.remove(id)
+        thumbnails.remove(id)
+    }
 
     suspend fun loadChats() {
         // Populate TDLib's own index. Typing in the picker must not cancel this job.
@@ -357,6 +365,16 @@ class SpotygramApp(val platform: Platform) {
         scanJob = currentCoroutineContext().job
         busy.value = true
         try {
+            profiles.currentUser()
+            for (profile in library.state.value.profiles.filter { it.selected }) {
+                try {
+                    profiles.load(profile.id, force = true)
+                } catch (e: Exception) {
+                    if (e is CancellationException || (e as? TelegramException)?.code == 429)
+                        throw e
+                    notices.emit("${profile.title}: ${friendly(e)}")
+                }
+            }
             for (source in library.state.value.sources) for (document in listOf(false, true)) {
                 val cursor = if (document) source.documentCursor else source.cursor
                 val complete = if (document) source.documentsComplete else source.complete
@@ -532,6 +550,49 @@ class SpotygramApp(val platform: Platform) {
         )
     }
 
+    internal fun parseProfileAudio(audio: JSONObject, profile: UserProfile, position: Int): Track {
+        val file = audio.getJSONObject("audio")
+        telegram.updateFile(file)
+        val key = file.getJSONObject("remote").getString("unique_id")
+        require(key.isNotEmpty()) { tr(R.string.profile_audio_unavailable) }
+        val id = profileTrackId(profile.id, key)
+        val previous = track(id)
+        val thumbnail = audio.optJSONObject("album_cover_thumbnail")?.optJSONObject("file")
+        thumbnail?.let(telegram::updateFile)
+        thumbnails[id] = thumbnail?.getInt("id") ?: 0
+        resolvedFiles[id] = file.getInt("id")
+        val local = file.optJSONObject("local")
+        val cover = thumbnail?.optJSONObject("local")
+        return Track(
+            id = id,
+            chatId = 0,
+            messageId = 0,
+            fileId = file.getInt("id"),
+            title =
+                audio.optString("title").ifBlank {
+                    audio.optString("file_name").substringBeforeLast('.').ifBlank {
+                        tr(R.string.audio_recording)
+                    }
+                },
+            artist = audio.optString("performer"),
+            duration = audio.optInt("duration"),
+            size = file.optLong("size"),
+            source = profile.title,
+            date = previous?.date ?: System.currentTimeMillis() / 1000,
+            art =
+                if (cover?.optBoolean("is_downloading_completed") == true) cover.optString("path")
+                else "",
+            path =
+                if (local?.optBoolean("is_downloading_completed") == true) local.optString("path")
+                else "",
+            saved = false,
+            fileKey = key,
+            remoteId = file.getJSONObject("remote").getString("id"),
+            profileUserId = profile.id,
+            profilePosition = position,
+        )
+    }
+
     private suspend fun handleUpdate(update: JSONObject) {
         when (update.kind()) {
             "updateChatTitle" -> {
@@ -611,10 +672,11 @@ class SpotygramApp(val platform: Platform) {
     }
 
     suspend fun resolve(track: Track): Int {
-        if (track.chatId == 0L) return 0
+        if (track.imported) return 0
         resolvedFiles[track.id]?.let {
             return it
         }
+        if (track.profileUserId != 0L) return profiles.resolve(track)
         val response =
             telegram.request(
                 json("getMessage", "chat_id" to track.chatId, "message_id" to track.messageId)
@@ -627,7 +689,7 @@ class SpotygramApp(val platform: Platform) {
 
     suspend fun loadArtwork(track: Track) = artworkSlots.withPermit {
         if (
-            track.chatId == 0L ||
+            track.imported ||
                 track.art.isNotEmpty() ||
                 !track.available ||
                 telegram.auth.value.type != "authorizationStateReady"
@@ -669,7 +731,7 @@ class SpotygramApp(val platform: Platform) {
         require(current?.id != track.id && !(track.local && current?.path == track.path)) {
             tr(R.string.switch_track_first)
         }
-        if (track.chatId != 0L) listeningCache.removeCopy(track)
+        if (!track.imported) listeningCache.removeCopy(track)
         else {
             playback?.removeTrack(track.id)
             library.removeLocal(track)
@@ -768,9 +830,11 @@ class SpotygramApp(val platform: Platform) {
                 scanJob?.cancelAndJoin()
                 playback?.clear()
                 playback?.forgetTelegramProgress()
+                profiles.stop()
                 platform.stopDownloads(this)
                 telegram.request(json("logOut"))
                 prefs.edit().putBoolean("telegram_connected", false).apply()
+                profiles.reset()
                 library.clearTelegram()
                 library.sync.detach()
                 resolvedFiles.clear()
@@ -779,6 +843,7 @@ class SpotygramApp(val platform: Platform) {
             }
         } finally {
             suppressCloudWrites = false
+            if (prefs.getBoolean("telegram_connected", false)) profiles.resume()
         }
     }
 }

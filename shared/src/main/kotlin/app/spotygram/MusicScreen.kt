@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +49,7 @@ fun MusicScreen(
     playlist: Playlist?,
     selectionReset: Int,
     onOffline: (Boolean) -> Unit,
-    onSource: (Long?) -> Unit,
+    onSource: (String?) -> Unit,
     onBack: () -> Unit,
     onPlay: (Track, List<Track>) -> Unit,
     onLike: (Track) -> Unit,
@@ -63,6 +64,12 @@ fun MusicScreen(
     onAddTracks: () -> Unit,
     onPlaylistMenu: () -> Unit,
     onRemoveTracks: (List<String>) -> Unit,
+    profile: UserProfile? = null,
+    profileFavorites: Boolean = false,
+    ownProfile: Boolean = false,
+    profileError: String? = null,
+    onProfileSelected: (Boolean) -> Unit = {},
+    onProfileTelegram: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(false) }
@@ -73,6 +80,7 @@ fun MusicScreen(
     val compactPlaylist =
         playlist != null && (configuration.screenWidthDp < 400 || configuration.fontScale > 1.2f)
     var removeSelected by remember { mutableStateOf(false) }
+    var removeProfile by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val scroll = rememberLazyListState()
     val dockInset = LocalDockInset.current
@@ -116,22 +124,33 @@ fun MusicScreen(
             query,
             sort,
             hideDuplicates,
+            profileFavorites,
         ) {
             val positions = playlist?.tracks?.withIndex()?.associate { it.value to it.index }
             val matching =
                 library.tracks.filter { track ->
                     (!favorites || track.liked) &&
                         (!offline || (track.local && !track.temporary)) &&
-                        (source == null || track.chatId == source.id) &&
+                        (source != null ||
+                            favorites ||
+                            offline ||
+                            playlist != null ||
+                            track.inLibrary) &&
+                        (source == null || track.sourceKey == source.key) &&
+                        (profile == null || track.profilePosition >= 0) &&
                         (positions == null || track.id in positions) &&
                         (query.isBlank() ||
                             "${track.title} ${track.artist} ${track.source}"
                                 .contains(query.trim(), ignoreCase = true))
                 }
             val local = if (offline) library.localView(matching) else matching
-            val result = if (hideDuplicates) library.duplicates.view(local) else local
+            val result =
+                if (hideDuplicates) library.duplicates.view(local)
+                else if (profile != null && profileFavorites) local.map(library.duplicates::display)
+                else local
             if (sort) result.sortedBy { it.title.lowercase() }
-            else if (positions != null) result.sortedBy { positions[it.id] } else result
+            else if (positions != null) result.sortedBy { positions[it.id] }
+            else if (profile != null) result.sortedBy { it.profilePosition } else result
         }
     val visibleIds = remember(tracks) { tracks.map { it.id } }
     val playable = remember(tracks) { tracks.any { it.local || it.available } }
@@ -164,7 +183,8 @@ fun MusicScreen(
             Text(
                 if (selecting) tr(R.string.selected_count, selected.size)
                 else
-                    playlist?.name
+                    (if (ownProfile) tr(R.string.my_profile) else profile?.title)
+                        ?: playlist?.name
                         ?: source?.displayTitle
                         ?: if (favorites) tr(R.string.favorites)
                         else if (offline) tr(R.string.on_device) else tr(R.string.music),
@@ -174,12 +194,13 @@ fun MusicScreen(
                 overflow = TextOverflow.Ellipsis,
             )
             if (!selecting) {
-                Text(
-                    trackCount(tracks.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
+                if (profile == null)
+                    Text(
+                        trackCount(tracks.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
                 if (playlist != null)
                     IconButton(onClick = onPlaylistMenu) {
                         Icon(Icons.Rounded.MoreVert, tr(R.string.playlist_actions))
@@ -192,10 +213,71 @@ fun MusicScreen(
                     }
             }
         }
+        if (profile != null && !selecting) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ProfileAvatar(profile, 52.dp)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(
+                        if (profile.username.isEmpty() || ownProfile) tr(R.string.profile_music)
+                        else "@${profile.username}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        if (ownProfile)
+                            (if (profile.loadedAt != 0L) trackCount(profile.count) + " · "
+                            else "") + tr(R.string.profile_order)
+                        else
+                            tr(R.string.profile_music_source) +
+                                if (profile.loadedAt != 0L) " · ${trackCount(profile.count)}"
+                                else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (profile.selected)
+                        TextButton(
+                            onClick = { removeProfile = true },
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            Icon(Icons.Rounded.CheckCircle, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(tr(R.string.in_library))
+                            Icon(Icons.Rounded.ArrowDropDown, null, Modifier.size(18.dp))
+                        }
+                    else
+                        GlassButton(
+                            onClick = { onProfileSelected(true) },
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(tr(R.string.add_to_library))
+                        }
+                }
+            }
+            if (profileError != null)
+                Row(
+                    Modifier.padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        profileError,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = onRefresh, enabled = !busy) {
+                        Text(tr(R.string.retry_chat_loading))
+                    }
+                }
+        }
         MusicSearch(
             query,
             { query = it },
-            if (favorites) tr(R.string.search_favorites) else tr(R.string.search_music),
+            if (profile != null) tr(R.string.search_profile)
+            else if (favorites) tr(R.string.search_favorites) else tr(R.string.search_music),
         )
         if (selecting) {
             Row(
@@ -246,7 +328,7 @@ fun MusicScreen(
                     }
             }
         } else {
-            if (!favorites && playlist == null)
+            if (!favorites && playlist == null && profile == null)
                 MusicFilters(
                     library,
                     source,
@@ -299,6 +381,7 @@ fun MusicScreen(
         if (
             query.isNotBlank() &&
                 !favorites &&
+                profile == null &&
                 playlist == null &&
                 library.sources.isNotEmpty() &&
                 !selecting
@@ -337,6 +420,11 @@ fun MusicScreen(
                                 if (query.isNotBlank() || offline) tr(R.string.no_results)
                                 else if (favorites) tr(R.string.favorites_empty_title)
                                 else if (playlist != null) tr(R.string.playlist_empty_title)
+                                else if (profile != null)
+                                    tr(
+                                        if (busy) R.string.loading_profile
+                                        else R.string.profile_empty_title
+                                    )
                                 else tr(R.string.music_empty_title),
                                 style = MaterialTheme.typography.titleLarge,
                             )
@@ -344,6 +432,11 @@ fun MusicScreen(
                                 if (query.isNotBlank() || offline) tr(R.string.search_empty_help)
                                 else if (favorites) tr(R.string.favorites_empty_help)
                                 else if (playlist != null) tr(R.string.playlist_empty_help)
+                                else if (profile != null)
+                                    tr(
+                                        if (ownProfile) R.string.own_profile_empty_help
+                                        else R.string.profile_empty_help
+                                    )
                                 else tr(R.string.music_empty_help),
                                 Modifier.padding(vertical = 12.dp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -352,7 +445,11 @@ fun MusicScreen(
                                 GlassButton(onClick = onAddTracks, tint = spectrumAccent(2)) {
                                     Text(tr(R.string.add_tracks))
                                 }
-                            else if (!favorites && query.isBlank() && !offline && !selecting) {
+                            else if (profile != null && query.isBlank() && !busy) {
+                                TextButton(onClick = onProfileTelegram) {
+                                    Text(tr(R.string.open_in_telegram))
+                                }
+                            } else if (!favorites && query.isBlank() && !offline && !selecting) {
                                 TextButton(onClick = onChats) { Text(tr(R.string.choose_chats)) }
                                 TextButton(onClick = onImport) {
                                     Text(tr(R.string.import_from_device))
@@ -401,6 +498,25 @@ fun MusicScreen(
             }
         }
     }
+    if (removeProfile && profile != null)
+        GlassDialog(
+            onDismissRequest = { removeProfile = false },
+            title = { Text(tr(R.string.remove_profile_source)) },
+            text = { Text(tr(R.string.remove_profile_help, profile.title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        removeProfile = false
+                        onProfileSelected(false)
+                    }
+                ) {
+                    Text(tr(R.string.remove))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { removeProfile = false }) { Text(tr(R.string.cancel)) }
+            },
+        )
     if (removeSelected)
         GlassDialog(
             onDismissRequest = { removeSelected = false },
@@ -431,7 +547,7 @@ private fun MusicFilters(
     source: Source?,
     offline: Boolean,
     sort: Boolean,
-    onSource: (Long?) -> Unit,
+    onSource: (String?) -> Unit,
     onOffline: (Boolean) -> Unit,
     onSort: () -> Unit,
 ) {
@@ -469,12 +585,21 @@ private fun MusicFilters(
                         onSource(null)
                     },
                 )
-                library.sources.forEach { s ->
+                val selfId by LocalApp.current.profiles.selfId.collectAsStateWithLifecycle()
+                val own = library.profiles.firstOrNull { it.id == selfId }?.source()
+                val sources = (listOfNotNull(own) + library.allSources).distinctBy { it.key }
+                sources.forEach { s ->
                     DropdownMenuItem(
-                        text = { Text(s.displayTitle) },
+                        text = {
+                            Text(
+                                if (s.profile && s.id == selfId) tr(R.string.my_profile)
+                                else if (s.profile) tr(R.string.profile_music_named, s.title)
+                                else s.displayTitle
+                            )
+                        },
                         onClick = {
                             expanded = false
-                            onSource(s.id)
+                            onSource(s.key)
                         },
                     )
                 }
@@ -626,7 +751,8 @@ fun TrackRow(
                 Text(
                     if (!track.available && !track.local)
                         tr(
-                            if (track.chatId == 0L) R.string.audio_unavailable
+                            if (track.imported) R.string.audio_unavailable
+                            else if (track.profileUserId != 0L) R.string.profile_audio_unavailable
                             else R.string.message_deleted
                         )
                     else track.subtitle,

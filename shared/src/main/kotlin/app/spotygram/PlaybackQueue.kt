@@ -606,7 +606,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
     }
 
     fun forgetTelegramProgress() {
-        val removed = progress.keys.filter { app.track(it)?.chatId != 0L }
+        val removed = progress.keys.filter { app.track(it)?.imported != true }
         for (id in removed) {
             progress.remove(id)
             progressUpdates[id] = null
