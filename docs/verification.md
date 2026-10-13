@@ -54,6 +54,16 @@ were not exercised. Long source lists and photo-change/removal scenarios used
 controlled responses; production checks covered native photo requests, their cache
 and the retained catalog's Sources screen.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38486421547)
+built from `e37bece` on native runners. Four installer signatures, four archive
+manifests and every payload hash verified with the existing desktop key. Each
+compiled application reported 0.20.0 with DEBUG false and contained the chat-photo
+and grouped-source components. The verified Linux release archive reopened the
+retained Sources screen with real photos and closed through the ordinary Quit
+action. All fifteen GitHub draft asset names, sizes and SHA-256 digests matched
+the local files; SHA256SUMS covers both APKs and every desktop package, archive
+and detached signature. The complete ordinary release is published as Latest.
+
 ## 0.19.0 — profile music and unified Sources
 
 An owned Spotygram production Telegram session exercised native TDLib `getMe`,
