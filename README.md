@@ -30,7 +30,7 @@ device and use the player without connecting Telegram. All versions share the
 same screens, glass material, library and playback rules.
 
 Sign in to the same Telegram account on another device to restore your playlists,
-favorites, selected chats and settings automatically. Each device keeps its own
+favorites, selected chats and library settings automatically. Each device keeps its own
 queue, last track and listening positions, including long-recording bookmarks. Spotygram
 keeps its library documents in a private, muted channel in your Telegram archive.
 
@@ -103,7 +103,7 @@ Portable copies update their writable application folder and reopen automaticall
 Your library and Telegram session are stored separately from the program.
 
 <p align="center">
-  <img src="docs/screenshots/desktop-player-light.png" width="900" alt="The shared player and glass controls on macOS">
+  <img src="docs/screenshots/desktop-player-light.png" width="900" alt="The shared desktop player with reverse order and volume controls">
 </p>
 
 ## While you listen
@@ -113,10 +113,18 @@ desktop system media controls.
 The small player opens the full player and queue. Long-press a song to select
 several tracks for a playlist or download; drag tracks to reorder a playlist.
 
-The order button cycles through **in order**, **shuffle**, and **absolute random**.
-Shuffle plays a pass without repeats. The dice mode draws each next song
+Choose **in order**, **in reverse order**, **shuffle**, or **absolute random**
+from the order button in the player, above a song list, or in a song's menu.
+Reverse follows the list upward; Play all starts at its last available song.
+Changing order keeps the current song and position. Shuffle plays a pass without
+repeats. The dice mode draws each next song
 independently, so the same song can come up twice in a row. It keeps going
 until you stop it; Previous retraces your recent listening history.
+
+Desktop has a **0–100% volume slider** beneath the full player's controls.
+The mini-player's speaker button opens a compact slider. Click the speaker inside
+the slider to mute or restore the previous level; the mouse wheel adjusts volume.
+Volume, mute, order, repeat and speed stay on each device.
 
 The round speed button below Play opens a **0.3×–4×** slider, fine adjustment
 and quick choices. Speed changes keep the original pitch and carry across songs

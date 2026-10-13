@@ -37,6 +37,13 @@
         <item quantity="other">%d cached files</item>
     </plurals>
     <string name="ordered_mode">In order</string>
+    <string name="reversed_mode">In reverse order</string>
+    <string name="reversed_queue">Reverse order · %1$s</string>
+    <string name="playback_order">Playback order</string>
+    <string name="selected_mode">Selected mode</string>
+    <string name="volume">Volume</string>
+    <string name="mute">Mute</string>
+    <string name="unmute">Unmute</string>
     <string name="shuffle_no_repeats">Shuffle · no repeats</string>
     <string name="random_mode">Absolute random · repeats possible</string>
     <string name="random_play">Random play</string>

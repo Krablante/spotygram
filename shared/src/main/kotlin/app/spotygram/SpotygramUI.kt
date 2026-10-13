@@ -52,9 +52,7 @@ fun SpotygramUI(
     val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
     val cache by app.musicCache.state.collectAsStateWithLifecycle()
     val startupError by app.startupError.collectAsStateWithLifecycle()
-    val playing =
-        observePlayer(player)
-            .copy(shuffle = mode.shuffle, random = mode.random, repeat = mode.repeat)
+    val playing = observePlayer(player).copy(order = mode.order, repeat = mode.repeat)
     var localMode by rememberSaveable { mutableStateOf(app.prefs.getBoolean("local_mode", false)) }
     var connect by rememberSaveable { mutableStateOf(false) }
     val destinationKeys = listOf("music", "favorites", "playlists", "chats")
@@ -170,7 +168,11 @@ fun SpotygramUI(
         playlistId = null
     }
     BackHandler(
-        enabled = !editor && !authVisible && (fullPlayer || sourceId != null || playlistId != null || connect)
+        enabled =
+            sheet.isEmpty() &&
+                !editor &&
+                !authVisible &&
+                (fullPlayer || sourceId != null || playlistId != null || connect)
     ) {
         when {
             fullPlayer -> fullPlayer = false
@@ -181,6 +183,7 @@ fun SpotygramUI(
             }
         }
     }
+    BackHandler(enabled = sheet.isNotEmpty()) { sheet = "" }
     CompositionLocalProvider(
         LocalGlassState provides glassState,
         LocalDockInset provides
@@ -211,7 +214,10 @@ fun SpotygramUI(
                 }
                 when {
                     startupError.isNotEmpty() ->
-                        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier.fillMaxSize().padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
                             Text(startupError, style = MaterialTheme.typography.bodyLarge)
                         }
                     authVisible ->
@@ -255,7 +261,7 @@ fun SpotygramUI(
                             onDownload = { onDownload(listOf(current.id)) },
                             onQueue = { sheet = "queue" },
                             onSpeed = { sheet = "speed" },
-                            onShuffle = { app.playback?.setMode(order = mode.order.next()) },
+                            onOrder = { app.changePlaybackOrder(it) },
                             onRepeat = { app.playback?.setMode(repeat = it) },
                         )
                     else ->
@@ -448,8 +454,7 @@ fun SpotygramUI(
                                                     hideDuplicates = groupedView,
                                                     library,
                                                     playing.id,
-                                                    playing.shuffle,
-                                                    playing.random,
+                                                    playing.order,
                                                     download,
                                                     busy,
                                                     tab == 1,
@@ -474,20 +479,7 @@ fun SpotygramUI(
                                                     onImport = onImport,
                                                     onChats = { navigate(3) },
                                                     onRefresh = { app.action { app.refresh() } },
-                                                    onShuffle = { tracks ->
-                                                        randomTrack(tracks)?.let {
-                                                            val available = tracks.filter { t ->
-                                                                t.local || t.available
-                                                            }
-                                                            onStartPlayback(
-                                                                available,
-                                                                available.indexOf(it),
-                                                                if (mode.random)
-                                                                    PlaybackOrder.RANDOM
-                                                                else PlaybackOrder.SHUFFLE,
-                                                            )
-                                                        }
-                                                    },
+                                                    onOrder = { app.changePlaybackOrder(it) },
                                                     onDownload = onDownload,
                                                     onAddToPlaylist = { addToPlaylist(it) },
                                                     onSearchChats = { q ->
@@ -699,6 +691,23 @@ fun SpotygramUI(
                                             player,
                                             onClose = { sheet = "" },
                                         )
+                                    "playbackOrder" ->
+                                        Column(
+                                            Modifier.fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
+                                                .navigationBarsPadding()
+                                        ) {
+                                            Text(
+                                                tr(R.string.playback_order),
+                                                style = MaterialTheme.typography.headlineSmall,
+                                                modifier = Modifier.padding(bottom = 12.dp),
+                                            )
+                                            PlaybackOrderChoices(mode.order) {
+                                                app.changePlaybackOrder(it)
+                                                sheet = ""
+                                            }
+                                            Spacer(Modifier.height(12.dp))
+                                        }
                                     "addPlaylist" ->
                                         AddToPlaylistSheet(
                                             app,
@@ -806,6 +815,14 @@ fun SpotygramUI(
                                                         app.playback?.addNext(track)
                                                         sheet = ""
                                                     }
+                                                    ActionRow(
+                                                        playbackOrderIcon(mode.order),
+                                                        tr(R.string.playback_order),
+                                                        supportingText =
+                                                            playbackOrderLabel(mode.order),
+                                                    ) {
+                                                        sheet = "playbackOrder"
+                                                    }
                                                     if (track.local && track.temporary)
                                                         ActionRow(
                                                             Icons.Rounded.Download,
@@ -852,7 +869,9 @@ fun SpotygramUI(
                                                             snackbar.currentSnackbarData?.dismiss()
                                                             app.action {
                                                                 try {
-                                                                    app.platform.openUrl(app.messageLink(track))
+                                                                    app.platform.openUrl(
+                                                                        app.messageLink(track)
+                                                                    )
                                                                 } catch (_: Exception) {
                                                                     error(
                                                                         tr(
@@ -956,7 +975,12 @@ fun SpotygramUI(
 }
 
 @Composable
-fun ActionRow(icon: ImageVector, text: String, onClick: () -> Unit) {
+fun ActionRow(
+    icon: ImageVector,
+    text: String,
+    supportingText: String? = null,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth()
             .clickable(onClick = onClick)
@@ -965,7 +989,15 @@ fun ActionRow(icon: ImageVector, text: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, Modifier.size(24.dp))
-        Text(text, Modifier.padding(start = 18.dp), style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.weight(1f).padding(start = 18.dp)) {
+            Text(text, style = MaterialTheme.typography.bodyLarge)
+            if (supportingText != null)
+                Text(
+                    supportingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+        }
     }
 }
 
@@ -980,6 +1012,10 @@ private fun MiniPlayer(
 ) {
     val state = observePlayer(player, positionUpdates = true)
     val narrow = LocalConfiguration.current.screenWidthDp < 360
+    val controlSize =
+        if (player?.supportsVolumeControl == true && LocalConfiguration.current.screenWidthDp < 480)
+            40.dp
+        else 48.dp
     Column(
         Modifier.widthIn(max = 720.dp)
             .fillMaxWidth()
@@ -1024,10 +1060,10 @@ private fun MiniPlayer(
                             )
                     }
             }
-            IconButton(onClick = onPrevious) {
+            IconButton(onClick = onPrevious, modifier = Modifier.size(controlSize)) {
                 Icon(Icons.Rounded.SkipPrevious, tr(R.string.previous_track))
             }
-            GlassIconButton(onClick = onToggle, tint = spectrumAccent(0)) {
+            GlassIconButton(onClick = onToggle, tint = spectrumAccent(0), size = controlSize) {
                 if (state.loading)
                     CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                 else
@@ -1036,7 +1072,11 @@ private fun MiniPlayer(
                         if (state.playing) tr(R.string.pause) else tr(R.string.continue_action),
                     )
             }
-            IconButton(onClick = onNext) { Icon(Icons.Rounded.SkipNext, tr(R.string.next_track)) }
+            IconButton(onClick = onNext, modifier = Modifier.size(controlSize)) {
+                Icon(Icons.Rounded.SkipNext, tr(R.string.next_track))
+            }
+            if (player?.supportsVolumeControl == true)
+                PlaybackVolumeButton(player, state, controlSize)
         }
         LinearProgressIndicator(
             progress = {

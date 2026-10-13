@@ -7,6 +7,49 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.18.0 — reverse order and local sound controls
+
+The actual Linux application used native libmpv with null audio output and four
+local WAV recordings. Reverse Play all started at the last available entry;
+manual and automatic transitions followed the reversed queue. Changing mode kept
+the paused song and position. Play next, upward movement and removal followed the
+displayed order, including intentional repeated entries. Repeat-all crossed the
+reverse boundary and repeat-one restarted the same recording.
+
+The full-player and mini-player volume controls changed the same engine state.
+Pointer adjustment, the mouse wheel and focused keyboard arrows worked. Mute
+survived restart and restored the previous nonzero level. Real screenshots covered
+English/Russian, light/dark, wide windows and a 360-pixel desktop window. Percentage
+wrapping and cramped mini-player controls were corrected; Esc dismissed sheets and
+playback menus before their underlying player.
+
+A signed Android APK updated 0.17.0 on an Android 15 emulator. Its four tracks,
+two favorites, one playlist and four memberships survived, with SQLite integrity
+`ok`. The local random mode, repeat-one, 1.5× speed and 9,074 ms paused position
+were retained. Three legacy sound-setting sync rows were removed while the library
+remained intact. Reverse playback from the playlist started at its last entry;
+system Next and an actual end transition advanced in the intended order. The new
+mode choices and track-action row were inspected in Russian at 320 dp with font
+scale 1.3, and the player was inspected in both appearances. Android kept its
+existing touch controls without a desktop volume control.
+
+The compiled sync reader ignored legacy speed/order/repeat fields and retained a
+favorite in the same document. Independent local profiles kept independent modes;
+mode and speed changes created no sound-setting sync rows. Format 2 is unchanged.
+
+Android debug/release assemblies and both Lint checks passed. The final release
+APKs kept the original signer and application ID, used versionCode 37 and passed
+16 KB alignment. The installed x86-64 APK matched the release file byte-for-byte;
+a fresh launch retained reverse order, the paused song, position and 1.5× speed.
+The final production Linux image rebuilt and reopened the retained local catalog.
+Its archive manifest, all 278 payload entries and installer signature verified
+with the existing desktop key; the application reported 0.18.0 with DEBUG false.
+The final packaged volume control adjusted to 55%, muted to zero and restored 55%.
+
+These checks used isolated catalogs and local recordings. Production Telegram
+exchange, physical audio output, physical devices and interactive Windows/macOS
+behavior were not exercised in this cycle.
+
 ## 0.17.0 — local playback and bounded sync history
 
 Temporary runtime checks used the compiled application with isolated catalogs and

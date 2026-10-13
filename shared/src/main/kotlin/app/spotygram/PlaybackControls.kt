@@ -5,6 +5,7 @@ class PlaybackControls(private val app: SpotygramApp, private val engine: Player
     override var volume: Float
         get() = engine.volume
         set(value) { command { engine.volume = value } }
+    override fun toggleMute() = command { engine.toggleMute() }
     private inline fun command(action: () -> Unit) {
         if (!app.musicCache.state.value.clearing) action()
     }

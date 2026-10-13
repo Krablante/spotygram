@@ -23,6 +23,16 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     private var seeking = false
     private var state = Player.STATE_IDLE
     private var speed = 1f
+    private val audioPreferences = app.getSharedPreferences("desktop_audio")
+    private val volumeTasks = MainTasks(app.scope)
+    private var volumeBeforeMute =
+        audioPreferences.getFloat("unmuted_volume", 1f).coerceIn(0f, 1f).takeIf { it > 0f } ?: 1f
+    private val persistVolume = Runnable {
+        audioPreferences.edit()
+            .putFloat("volume", volume)
+            .putFloat("unmuted_volume", volumeBeforeMute)
+            .apply()
+    }
     @Volatile private var released = false
     @Volatile private var generation = 0L
     @Volatile private var expectedUri = ""
@@ -116,6 +126,7 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
         put("video", "no")
         put("audio-client-name", "Spotygram")
         put("audio-pitch-correction", "yes")
+        put("volume", (audioPreferences.getFloat("volume", 1f).coerceIn(0f, 1f) * 100).toString())
         put("demuxer-readahead-secs", "30")
         put("demuxer-max-bytes", "8MiB")
         put("cache-pause-initial", "yes")
@@ -150,12 +161,19 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     override val playWhenReady get() = wanted
     override val playbackParameters get() = PlaybackParameters(speed)
     override var repeatMode = Player.REPEAT_MODE_OFF
-    override var volume = 1f
+    override val supportsVolumeControl = true
+    override var volume = audioPreferences.getFloat("volume", 1f).coerceIn(0f, 1f)
         set(value) {
-            field = value.coerceIn(0f, 1f)
-            check(Mpv.api.mpv_set_property_string(handle, "volume", (field * 100).toString()) >= 0)
+            val updated = value.coerceIn(0f, 1f)
+            if (released || field == updated) return
+            check(Mpv.api.mpv_set_property_string(handle, "volume", (updated * 100).toString()) >= 0)
+            field = updated
+            if (updated > 0f) volumeBeforeMute = updated
+            volumeTasks.removeCallbacks(persistVolume)
+            volumeTasks.postDelayed(persistVolume, 300)
             emit()
         }
+    override fun toggleMute() { volume = if (volume > 0f) 0f else volumeBeforeMute }
 
     private fun emit(vararg changed: Int) {
         val playing = isPlaying
@@ -419,6 +437,8 @@ class MpvPlayer(private val app: SpotygramApp) : Player {
     override fun removeListener(listener: Player.Listener) { listeners -= listener }
     override fun release() {
         if (released) return
+        volumeTasks.removeCallbacks(persistVolume)
+        persistVolume.run()
         released = true
         streams.values.forEach { it.reader.cancel() }
         Mpv.api.mpv_wakeup(handle)

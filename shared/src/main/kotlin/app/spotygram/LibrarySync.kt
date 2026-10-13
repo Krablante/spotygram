@@ -37,6 +37,8 @@ class LibrarySync(
 
     companion object {
         const val FORMAT = 2
+        private val localPlaybackSettings =
+            setOf("setting/speed", "setting/order", "setting/repeat")
         val settings =
             setOf(
                 "theme",
@@ -46,9 +48,6 @@ class LibrarySync(
                 "resume_minutes",
                 "wifi_only",
                 "discard_listened",
-                "speed",
-                "order",
-                "repeat",
             )
         private val uuid = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
         private val trackId = Regex("(?:-?[0-9]{1,16}:[0-9]{1,16}|local:[a-f0-9-]{36})")
@@ -85,7 +84,11 @@ class LibrarySync(
                     val writer = row.getString(2)
                     val value = row.get(3)
                     require(clock in 1..Long.MAX_VALUE / 4 && uuid.matches(writer) && seen.add(key))
-                    if (legacy && (key == "queue" || key.startsWith("progress/"))) continue
+                    if (
+                        key in localPlaybackSettings ||
+                            legacy && (key == "queue" || key.startsWith("progress/"))
+                    )
+                        continue
                     validate(key, value)
                     add(Record(key, clock, writer, wrapped(value)))
                 }
@@ -149,13 +152,6 @@ class LibrarySync(
                     when (parts[1]) {
                         "theme" -> require(value in listOf("system", "light", "dark"))
                         "language" -> require(value in listOf("system", "en", "ru"))
-                        "order" -> require(value in PlaybackOrder.entries.map { it.name })
-                        "speed" ->
-                            require(
-                                value is Number &&
-                                    value.toFloat() in MIN_PLAYBACK_SPEED..MAX_PLAYBACK_SPEED
-                            )
-                        "repeat" -> require(value is Number && value.toInt() in 0..2)
                         "resume_minutes" -> require(value is Number && value.toInt() > 0)
                         else -> require(value is Boolean)
                     }
@@ -211,7 +207,7 @@ class LibrarySync(
             }
         }
         val prefs = platform.preferences("settings")
-        for (key in settings - setOf("speed", "order", "repeat")) if (prefs.contains(key))
+        for (key in settings) if (prefs.contains(key))
             seed["setting/$key"] =
                 when (key) {
                     "theme",
@@ -219,22 +215,14 @@ class LibrarySync(
                     "resume_minutes" -> prefs.getInt(key, 30)
                     else -> prefs.getBoolean(key, false)
                 }
-        val position = platform.preferences("playback_position")
-        if (position.contains("speed")) seed["setting/speed"] = position.getFloat("speed", 1f)
-        val queue = platform.preferences("playback_queue")
-        if (queue.contains("ids")) {
-            val current =
-                if (position.getString("version", "") == queue.getString("version", "?")) position
-                else queue
-            val order =
-                current.getString("order", PlaybackOrder.ORDERED.name) ?: PlaybackOrder.ORDERED.name
-            seed["setting/order"] = order
-            seed["setting/repeat"] = current.getInt("repeat", 0)
-        }
         edit(db, seed)
     }
 
     fun opened(db: SqlDatabase) {
+        // Old clients may still send these fields. They never control this device's playback.
+        db.execSQL(
+            "DELETE FROM sync_values WHERE key IN('setting/speed','setting/order','setting/repeat')"
+        )
         account = meta(db, "account").toLongOrNull() ?: 0L
     }
 

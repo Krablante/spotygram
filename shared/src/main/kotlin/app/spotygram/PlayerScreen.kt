@@ -37,11 +37,12 @@ fun PlayerScreen(
     onDownload: () -> Unit,
     onQueue: () -> Unit,
     onSpeed: () -> Unit,
-    onShuffle: () -> Unit,
+    onOrder: (PlaybackOrder) -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
     val progress = observePlayer(player, positionUpdates = true)
     val largeText = LocalConfiguration.current.fontScale > 1.2f
+    val volumeInset = if (player?.supportsVolumeControl == true) 48.dp else 0.dp
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val wide = maxWidth >= 600.dp && maxWidth > maxHeight
         val cover =
@@ -51,7 +52,8 @@ fun PlayerScreen(
                 else
                     minOf(
                         maxHeight * 0.42f,
-                        (maxHeight - if (largeText) 414.dp else 390.dp).coerceAtLeast(96.dp),
+                        (maxHeight - (if (largeText) 414.dp else 390.dp) - volumeInset)
+                            .coerceAtLeast(96.dp),
                     ),
                 340.dp,
             )
@@ -125,7 +127,7 @@ fun PlayerScreen(
                             { onDownload() },
                             { onQueue() },
                             onSpeed,
-                            { onShuffle() },
+                            onOrder,
                             onRepeat,
                         )
                     }
@@ -141,7 +143,7 @@ fun PlayerScreen(
                     { onDownload() },
                     { onQueue() },
                     onSpeed,
-                    { onShuffle() },
+                    onOrder,
                     onRepeat,
                 )
             }
@@ -194,7 +196,7 @@ private fun PlayerTransport(
     onDownload: () -> Unit,
     onQueue: () -> Unit,
     onSpeed: () -> Unit,
-    onShuffle: () -> Unit,
+    onOrder: (PlaybackOrder) -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
     var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
@@ -255,15 +257,7 @@ private fun PlayerTransport(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onShuffle) {
-                Icon(
-                    if (state.random) Icons.Rounded.Casino else Icons.Rounded.Shuffle,
-                    tr(R.string.change_playback_order, playbackOrderLabel(state)),
-                    tint =
-                        if (state.shuffle) MaterialTheme.colorScheme.secondary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            PlaybackOrderControl(state.order, onOrder)
             IconButton(
                 onClick = {
                     if (progress.position > 3000) player?.seekTo(0)
@@ -400,6 +394,12 @@ private fun PlayerTransport(
                 }
             }
         }
+        if (player?.supportsVolumeControl == true)
+            PlaybackVolumeControl(
+                player,
+                state,
+                Modifier.align(Alignment.CenterHorizontally).widthIn(max = 280.dp).fillMaxWidth(),
+            )
     }
 }
 
@@ -417,7 +417,10 @@ fun QueueSheet(library: LibraryState, state: Playing, app: SpotygramApp) {
         )
         Text(
             if (state.random) tr(R.string.random_pool_help, trackCount(queue.ids.size))
-            else if (state.shuffle) tr(R.string.shuffled_queue) else trackCount(queue.ids.size),
+            else if (state.shuffle) tr(R.string.shuffled_queue)
+            else if (state.order == PlaybackOrder.REVERSED)
+                tr(R.string.reversed_queue, trackCount(queue.ids.size))
+            else trackCount(queue.ids.size),
             Modifier.padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -470,7 +473,7 @@ fun QueueSheet(library: LibraryState, state: Playing, app: SpotygramApp) {
                         if (!state.shuffle)
                             IconButton(
                                 onClick = { app.playback?.moveUp(index) },
-                                enabled = index > 0,
+                                enabled = position > 0,
                             ) {
                                 Icon(Icons.Rounded.ArrowUpward, tr(R.string.move_up))
                             }
@@ -483,12 +486,3 @@ fun QueueSheet(library: LibraryState, state: Playing, app: SpotygramApp) {
         Spacer(Modifier.height(20.dp))
     }
 }
-
-private fun playbackOrderLabel(state: Playing): String =
-    tr(
-        when {
-            state.random -> R.string.random_mode
-            state.shuffle -> R.string.shuffle_no_repeats
-            else -> R.string.ordered_mode
-        }
-    )

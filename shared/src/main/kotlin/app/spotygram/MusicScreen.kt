@@ -39,8 +39,7 @@ fun MusicScreen(
     hideDuplicates: Boolean,
     library: LibraryState,
     playingId: String,
-    shuffle: Boolean,
-    random: Boolean,
+    order: PlaybackOrder,
     download: DownloadState,
     busy: Boolean,
     favorites: Boolean,
@@ -57,7 +56,7 @@ fun MusicScreen(
     onImport: () -> Unit,
     onChats: () -> Unit,
     onRefresh: () -> Unit,
-    onShuffle: (List<Track>) -> Unit,
+    onOrder: (PlaybackOrder) -> Unit,
     onDownload: (List<String>) -> Unit,
     onAddToPlaylist: (List<String>) -> Unit,
     onSearchChats: (String) -> Unit,
@@ -71,7 +70,6 @@ fun MusicScreen(
     var selected by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
     var lastReset by rememberSaveable { mutableIntStateOf(selectionReset) }
     val configuration = LocalConfiguration.current
-    val compactActions = configuration.screenWidthDp < 480 || configuration.fontScale > 1.2f
     val compactPlaylist =
         playlist != null && (configuration.screenWidthDp < 400 || configuration.fontScale > 1.2f)
     var removeSelected by remember { mutableStateOf(false) }
@@ -267,11 +265,14 @@ fun MusicScreen(
                     modifier = Modifier.weight(1f),
                     tint = spectrumAccent(0),
                     onClick = {
-                        if (shuffle) onShuffle(tracks)
-                        else
-                            tracks
-                                .firstOrNull { it.local || it.available }
-                                ?.let { onPlay(it, tracks) }
+                        val first =
+                            when {
+                                order.shuffled -> randomTrack(tracks)
+                                order == PlaybackOrder.REVERSED ->
+                                    tracks.lastOrNull { it.local || it.available }
+                                else -> tracks.firstOrNull { it.local || it.available }
+                            }
+                        first?.let { onPlay(it, tracks) }
                     },
                     enabled = playable,
                 ) {
@@ -285,31 +286,7 @@ fun MusicScreen(
                         Text(tr(R.string.play_all), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                if (compactActions || playlist != null)
-                    GlassIconButton(onClick = { onShuffle(tracks) }, enabled = playable) {
-                        Icon(
-                            if (random) Icons.Rounded.Casino else Icons.Rounded.Shuffle,
-                            tr(if (random) R.string.random_play else R.string.shuffle_play),
-                        )
-                    }
-                else
-                    GlassButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onShuffle(tracks) },
-                        enabled = playable,
-                    ) {
-                        Icon(
-                            if (random) Icons.Rounded.Casino else Icons.Rounded.Shuffle,
-                            null,
-                            Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            tr(if (random) R.string.random_play else R.string.shuffle_play),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                PlaybackOrderControl(order, onOrder, enabled = playable, glass = true)
                 if (playlist != null)
                     IconButton(onClick = onAddTracks) {
                         Icon(Icons.Rounded.PlaylistAdd, tr(R.string.add_tracks))
@@ -459,6 +436,7 @@ private fun MusicFilters(
     onSort: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    BackHandler(enabled = expanded) { expanded = false }
     val sourceLabel = source?.displayTitle ?: tr(R.string.all_sources)
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),

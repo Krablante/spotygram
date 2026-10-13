@@ -17,10 +17,12 @@ fun Track.mediaItem(): MediaItem = MediaItem(id, title, subtitle, art)
 
 enum class PlaybackOrder {
     ORDERED,
+    REVERSED,
     SHUFFLE,
     RANDOM;
 
-    fun next() = entries[(ordinal + 1) % entries.size]
+    val shuffled
+        get() = this == SHUFFLE || this == RANDOM
 }
 
 data class PlaybackMode(
@@ -28,7 +30,7 @@ data class PlaybackMode(
     val repeat: Int = Player.REPEAT_MODE_OFF,
 ) {
     val shuffle
-        get() = order != PlaybackOrder.ORDERED
+        get() = order.shuffled
 
     val random
         get() = order == PlaybackOrder.RANDOM
@@ -59,7 +61,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
     private var pendingStart: Job? = null
     private val progress = mutableMapOf<String, PlaybackProgress>()
     private val progressUpdates = mutableMapOf<String, PlaybackProgress?>()
-    private var speedSaving: Job? = null
     private var observedDuration = 0L
     private lateinit var writer: Job
     private val mode
@@ -85,7 +86,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         val speed = exo.playbackParameters.speed
         if (app.getSharedPreferences("playback_position").getFloat("speed", 1f) == speed)
             return@Runnable
-        speedSaving = app.changeSetting("speed", speed)
         app.getSharedPreferences("playback_position").edit().putFloat("speed", speed).apply()
     }
     private val slide = Runnable {
@@ -245,7 +245,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                     ids = restored.ids
                     path = restored.path
                     cursor = restored.cursor
-                    app.playbackMode.value = restored.mode
+                    if (restored.mode.order != mode.order) resetOrder(current)
                     if (app.musicCache.state.value.clearing) cleanupPosition = restored.position
                     else window(position = restored.position)
                 }
@@ -278,11 +278,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         restoring = false
         ids = tracks.map { it.id }
         val updatedMode = mode.copy(order = order, repeat = normalizedRepeat(order, mode.repeat))
-        if (updatedMode != mode)
-            app.changeSettings(
-                mapOf("order" to updatedMode.order.name, "repeat" to updatedMode.repeat)
-            )
-        app.playbackMode.value = updatedMode
+        if (updatedMode != mode) app.persistPlaybackMode(updatedMode)
         resetOrder(index)
         window()
         exo.prepare()
@@ -291,6 +287,7 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
     }
 
     private fun permutation(): List<Int> {
+        if (mode.order == PlaybackOrder.REVERSED) return ids.indices.reversed().toList()
         val result = ids.indices.toMutableList()
         if (mode.shuffle)
             for (i in result.lastIndex downTo 1) {
@@ -391,19 +388,16 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
     fun setMode(
         order: PlaybackOrder = mode.order,
         repeat: Int = mode.repeat,
-        publish: Boolean = true,
     ) {
         if (blockedByCleanup()) return
         val updated = PlaybackMode(order, normalizedRepeat(order, repeat))
         if (updated == mode) return
         val selected = current
         val reshuffle = mode.order != order
-        app.playbackMode.value = updated
+        app.persistPlaybackMode(updated)
         if (reshuffle) resetOrder(selected)
         window(preserve = true)
         changed()
-        if (publish)
-            app.changeSettings(mapOf("order" to updated.order.name, "repeat" to updated.repeat))
     }
 
     fun snapshot(): QueueSnapshot {
@@ -442,8 +436,9 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         }
         val selected = current
         if (!mode.shuffle) {
-            ids = ids.toMutableList().apply { add(selected + 1, track.id) }
-            resetOrder(selected)
+            val reverse = mode.order == PlaybackOrder.REVERSED
+            ids = ids.toMutableList().apply { add(selected + if (reverse) 0 else 1, track.id) }
+            resetOrder(selected + if (reverse) 1 else 0)
             window(preserve = true)
             changed()
             return
@@ -489,16 +484,19 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
 
     fun moveUp(index: Int) {
         if (blockedByCleanup()) return
-        if (mode.shuffle || index !in 1 until ids.size) return
+        if (mode.shuffle || index !in ids.indices) return
+        val neighbor = index + if (mode.order == PlaybackOrder.REVERSED) 1 else -1
+        if (neighbor !in ids.indices) return
         val selected = current
         val updated = ids.toMutableList()
-        val item = updated.removeAt(index)
-        updated.add(index - 1, item)
+        val item = updated[index]
+        updated[index] = updated[neighbor]
+        updated[neighbor] = item
         ids = updated
         resetOrder(
             when (selected) {
-                index -> index - 1
-                index - 1 -> index
+                index -> neighbor
+                neighbor -> index
                 else -> selected
             }
         )
@@ -683,7 +681,9 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
                 restoredPath.size % n != 0 ||
                 restoredPath.chunked(n).any { it.toSet().size != n }
         )
-            restoredPath = restoredIds.indices.toList()
+            restoredPath =
+                if (restoredOrder == PlaybackOrder.REVERSED) restoredIds.indices.reversed().toList()
+                else restoredIds.indices.toList()
         val oldCursor =
             if (legacy) {
                 restoredPath.indexOf(remap[source.getInt("queue_index", 0)]).coerceAtLeast(0)
@@ -738,7 +738,6 @@ class PlaybackQueue(private val app: SpotygramApp, private val exo: Player) {
         cancelPendingStart()
         val finished = scope.launch {
             writer.join()
-            speedSaving?.join()
             scope.cancel()
         }
         app.player = null

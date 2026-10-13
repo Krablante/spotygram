@@ -39,6 +39,13 @@
         <item quantity="other">%d файла в кэше</item>
     </plurals>
     <string name="ordered_mode">По порядку</string>
+    <string name="reversed_mode">В обратном порядке</string>
+    <string name="reversed_queue">Обратный порядок · %1$s</string>
+    <string name="playback_order">Порядок воспроизведения</string>
+    <string name="selected_mode">Выбранный режим</string>
+    <string name="volume">Громкость</string>
+    <string name="mute">Выключить звук</string>
+    <string name="unmute">Включить звук</string>
     <string name="shuffle_no_repeats">Перемешивание · без повторов</string>
     <string name="random_mode">Абсолютный рандом · возможны повторы</string>
     <string name="random_play">Рандом</string>

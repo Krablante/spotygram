@@ -154,9 +154,11 @@ Unknown formats and invalid documents retain the catalog and pending edits.
 Documents are bounded to 8 MiB compressed and 32 MiB expanded; downloaded sync
 documents and upload staging files are discarded after use.
 
-Settings apply through the same shared app controls. Speed, order and repeat publish
-only on preference changes; received modes also update the active queue without
-republishing them. The queue, last track and all listening positions stay local.
+Library settings apply through the same shared app controls. Speed, order, repeat,
+volume and mute stay local, together with the queue, last track and listening
+positions. Startup removes old speed/order/repeat records from local sync storage;
+incoming legacy settings are ignored without rejecting other library records.
+The format remains 2, so existing library-sync clients remain compatible.
 Five-second checkpoints, pause, seek, track change and orderly exit write only local
 playback storage. Audio copies, downloads, indexing
 checkpoints, native sessions and installation state belong to each device.
@@ -171,6 +173,11 @@ intentional repeats. Shuffle uses Fisher–Yates and retains at most two passes.
 Repeat-all avoids a shuffled boundary repeat. Absolute random draws independently
 and keeps 32 previous choices, the current choice and one prepared next choice.
 
+Reverse order traverses source indices downward while preserving the selected song
+and position on mode changes. Queue insertion and upward moves follow the displayed
+playback order; library and playlist lists keep their own ordering. Mode preferences
+are local and independent of the saved queue, including an empty queue.
+
 One conflated IO writer saves immutable queue snapshots. Structural changes write
 the full list; position, mode and cursor use separate version-linked preferences.
 Five-second playback checkpoints and pause/seek/selection/lifecycle events save
@@ -180,6 +187,11 @@ resume. Restoration is paused and waits for catalog reconciliation and progress 
 
 Speed is 0.3×–4× with pitch correction. A 300 ms deferred preference write coalesces
 slider movement; closing the queue flushes it. Speed changes do not rebuild the queue.
+
+Desktop libmpv applies software volume in the 0–100% range. The full player and
+mini-player popup observe the same engine events. Mute retains the last nonzero
+level. One 300 ms deferred preference write coalesces volume changes; engine release
+flushes it. These preferences live only in the desktop profile.
 
 `TrackReader` reads available on-disk TDLib ranges through both engines. Missing
 ranges wait for native file events, with a 60-second read timeout. Replacement or

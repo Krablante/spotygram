@@ -100,20 +100,29 @@ the message asks you to tap a song to retry; restarting the app is not required.
 Leaving the app cancels a waiting start, but does not stop music already playing.
 
 The full player has seeking, a queue and repeat controls. The order button to
-the left of Previous cycles through three modes:
+the left of Previous opens four choices and marks the active one. The same choice
+is available beside Play all above a collection and through **Playback order**
+in a song's menu; choosing a mode there does not start that song.
 
 | Mode | How the next song is chosen |
 | --- | --- |
 | In order | The next entry in the collection |
+| In reverse order | The entry above the current song in the selected list |
 | Shuffle | A random order with no repeats within a pass |
 | Absolute random, the dice icon | An independent draw every time; even consecutive repeats are possible |
+
+For a list of 1, 2, 3, 4, selecting song 3 in reverse plays 3 → 2 → 1.
+**Play all** begins with the last available song. Changing mode preserves the
+current song and position. The library and saved playlist order stay unchanged;
+the queue shows the actual playback order. **Play next** still inserts immediately
+after the current song, and the queue's up arrow moves a song up in its displayed order.
 
 Random mode continues until stopped. Previous retraces recent listening
 history. The queue shows the selection pool and the next prepared song, not
 a promise to play the whole collection in order. **Play next** in a song's menu
 takes priority over the random choice.
 
-Repeat one works in all modes. Repeat all works in ordered and shuffled modes;
+Repeat one works in all modes. Repeat all works in ordered, reversed and shuffled modes;
 random is already endless. Reopening the app restores the queue and position
 without starting playback automatically.
 
@@ -127,6 +136,15 @@ including after an app restart. **1×** restores normal speed. The button gains
 a subtle accent and the mini-player shows the value whenever speed differs from 1×.
 
 <img src="screenshots/speed-light.png" width="300" alt="Playback speed panel with slider and quick choices">
+
+On desktop, the full player has a **0–100% volume slider** below Download, speed
+and Queue. The speaker button after Next in the mini-player opens the same slider
+in a small panel. Click its speaker to mute or restore the previous level. Drag
+the slider, use arrow keys while it is focused, or scroll the mouse wheel over it;
+changes apply immediately. This adjusts Spotygram's own audio volume.
+
+Volume and mute survive restart on this computer. Order, repeat and speed also
+stay on each device; changing them does not send library-sync documents.
 
 ## Continue long recordings
 
@@ -182,7 +200,7 @@ creates or finds a private channel named `spotygram-` followed by random charact
 mutes it and moves it to Telegram's archive. It stays out of the music-source picker.
 You do not need to choose files or start a sync manually.
 
-Playlists, their song order, favorites, selected chats, playback preferences,
+Playlists, their song order, favorites, selected chats, library preferences,
 appearance and language sync automatically. Each device keeps its own queue,
 last track and listening positions. Playback itself does not send sync documents.
 Referenced songs appear before their source finishes indexing. Imported songs

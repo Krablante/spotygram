@@ -23,11 +23,17 @@ data class Playing(
     val loading: Boolean = false,
     val position: Long = 0,
     val duration: Long = 0,
-    val shuffle: Boolean = false,
-    val random: Boolean = false,
+    val order: PlaybackOrder = PlaybackOrder.ORDERED,
     val repeat: Int = 0,
     val speed: Float = 1f,
-)
+    val volume: Float = 1f,
+) {
+    val shuffle
+        get() = order.shuffled
+
+    val random
+        get() = order == PlaybackOrder.RANDOM
+}
 
 @Composable
 fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
@@ -46,10 +52,10 @@ fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
                     player.playbackState == Player.STATE_BUFFERING,
                     player.currentPosition.coerceAtLeast(0),
                     player.duration.coerceAtLeast(0),
-                    player.shuffleModeEnabled,
-                    false,
+                    if (player.shuffleModeEnabled) PlaybackOrder.SHUFFLE else PlaybackOrder.ORDERED,
                     player.repeatMode,
                     player.playbackParameters.speed,
+                    player.volume,
                 )
         }
         val listener =

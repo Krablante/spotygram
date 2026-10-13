@@ -238,12 +238,12 @@ fun SettingsSheet(
                 Modifier.padding(12.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
-        ActionRow(Icons.Rounded.Download, tr(R.string.resume_downloads), onResume)
+        ActionRow(Icons.Rounded.Download, tr(R.string.resume_downloads), onClick = onResume)
         if (download.queued > 0)
             ActionRow(Icons.Rounded.Close, tr(R.string.stop_downloads)) {
                 app.platform.stopDownloads(app)
             }
-        ActionRow(Icons.Rounded.Add, tr(R.string.import_files), onImport)
+        ActionRow(Icons.Rounded.Add, tr(R.string.import_files), onClick = onImport)
         HorizontalDivider(
             Modifier.padding(vertical = 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -251,7 +251,7 @@ fun SettingsSheet(
         ActionRow(
             Icons.Rounded.Forum,
             if (connected) tr(R.string.logout_telegram) else tr(R.string.connect_telegram),
-            if (connected) onLogout else onConnect,
+            onClick = if (connected) onLogout else onConnect,
         )
         if (connected) {
             ListItem(

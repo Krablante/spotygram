@@ -33,6 +33,8 @@ interface Player {
     val shuffleModeEnabled: Boolean get() = false
     var repeatMode: Int
     var volume: Float
+    val supportsVolumeControl: Boolean get() = false
+    fun toggleMute() { volume = if (volume > 0f) 0f else 1f }
 
     fun prepare()
     fun play()

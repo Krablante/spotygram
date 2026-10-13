@@ -61,7 +61,34 @@ class SpotygramApp(val platform: Platform) {
     val updates by lazy { AppUpdates(this) }
     val cloudSync by lazy { CloudSync(this) }
     var suppressCloudWrites = false
-    val playbackMode = MutableStateFlow(PlaybackMode())
+    val playbackMode =
+        MutableStateFlow(
+            run {
+                val local = getSharedPreferences("playback_mode")
+                val queue = getSharedPreferences("playback_queue")
+                val position = getSharedPreferences("playback_position")
+                val previous =
+                    if (!queue.contains("ids")) prefs
+                    else if (position.getString("version", "") == queue.getString("version", "?"))
+                        position
+                    else queue
+                val source = if (local.contains("order")) local else previous
+                PlaybackMode(
+                    runCatching { PlaybackOrder.valueOf(source.getString("order", "")!!) }
+                        .getOrElse {
+                            if (
+                                source.getBoolean(
+                                    if (source === prefs) "queue_shuffle" else "shuffle",
+                                    false,
+                                )
+                            )
+                                PlaybackOrder.SHUFFLE
+                            else PlaybackOrder.ORDERED
+                        },
+                    source.getInt("repeat", Player.REPEAT_MODE_OFF).coerceIn(0, 2),
+                )
+            }
+        )
     val queueRevision = MutableStateFlow(0L)
 
     fun start() {
@@ -186,6 +213,25 @@ class SpotygramApp(val platform: Platform) {
 
     fun changeSetting(key: String, value: Any) = changeSettings(mapOf(key to value))
 
+    fun changePlaybackOrder(order: PlaybackOrder) {
+        val queue = playback
+        if (queue != null) queue.setMode(order = order)
+        else persistPlaybackMode(playbackMode.value.copy(order = order))
+    }
+
+    fun persistPlaybackMode(value: PlaybackMode) {
+        val mode =
+            if (value.random && value.repeat == Player.REPEAT_MODE_ALL)
+                value.copy(repeat = Player.REPEAT_MODE_OFF)
+            else value
+        playbackMode.value = mode
+        getSharedPreferences("playback_mode")
+            .edit()
+            .putString("order", mode.order.name)
+            .putInt("repeat", mode.repeat)
+            .apply()
+    }
+
     fun changeSettings(values: Map<String, Any>) = action {
         preferencesChanging.withLock {
             awaitLibrary()
@@ -198,7 +244,7 @@ class SpotygramApp(val platform: Platform) {
     fun applyCloudPreferences(values: Map<String, Any>) {
         val edit = prefs.edit()
         for ((key, value) in values) {
-            if (key !in LibrarySync.settings || key in setOf("speed", "order", "repeat")) continue
+            if (key !in LibrarySync.settings) continue
             when (value) {
                 is Boolean -> edit.putBoolean(key, value)
                 is Number -> edit.putInt(key, value.toInt())
@@ -217,22 +263,6 @@ class SpotygramApp(val platform: Platform) {
         }
         values["discard_listened"]?.let {
             listeningCache.setEnabled(it as Boolean, publish = false)
-        }
-        val position = getSharedPreferences("playback_position").edit()
-        values["speed"]?.let {
-            val speed = (it as Number).toFloat()
-            position.putFloat("speed", speed)
-            if (player?.playbackParameters?.speed != speed) player?.setPlaybackSpeed(speed)
-        }
-        values["order"]?.let { position.putString("order", it as String) }
-        values["repeat"]?.let { position.putInt("repeat", (it as Number).toInt()) }
-        position.apply()
-        if ("order" in values || "repeat" in values) {
-            val current = playbackMode.value
-            val order = (values["order"] as? String)?.let(PlaybackOrder::valueOf) ?: current.order
-            val repeat = (values["repeat"] as? Number)?.toInt() ?: current.repeat
-            if (playback != null) playback?.setMode(order, repeat, publish = false)
-            else playbackMode.value = PlaybackMode(order, repeat)
         }
     }
 
