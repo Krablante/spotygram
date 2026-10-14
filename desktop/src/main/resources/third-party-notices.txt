@@ -5,6 +5,10 @@ with their pinned distributions, under the application's resources/licenses.
 Java dependencies retain their notices inside their individual JAR files.
 Dependency versions and source links: https://github.com/Krablante/spotygram/blob/main/docs/third-party.md
 
+Fluent Emoji 3D artwork, Copyright (c) Microsoft Corporation, MIT License.
+https://github.com/microsoft/fluentui-emoji
+Full notice: resources/licenses/Fluent-Emoji-MIT.txt
+
 Nucleus media-control and core-runtime 2.5.0
 https://github.com/NucleusFramework/Nucleus/tree/v2.5.0
 

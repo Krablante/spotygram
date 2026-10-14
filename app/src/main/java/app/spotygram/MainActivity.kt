@@ -75,11 +75,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        app.headerSticker.visibility(true)
         playerConnection.start()
         app.updates.check()
     }
 
     override fun onStop() {
+        app.headerSticker.visibility(false)
         app.playback?.cancelPendingStart()
         app.playback?.savePosition()
         playerConnection.stop()

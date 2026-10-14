@@ -358,6 +358,12 @@ Song and chat names are not translated.
 Choose light or dark appearance in Settings. Until then, the app follows your
 system. Switching appearance does not interrupt playback.
 
+The small sticker beside `spotygram` is chosen from 40 yellow hand gestures and
+faces. A fresh app launch or returning after 30 minutes away chooses another,
+without repeating the previous sticker. Short returns, changing tabs, theme or
+language and rotating the phone keep it. The faces are random decoration, not
+connection or playback status. Stickers work offline and stay local to each device.
+
 ## Updates and keeping your data
 
 Automatic checks are enabled by default. They happen only when opening or

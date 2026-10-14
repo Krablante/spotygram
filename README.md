@@ -64,8 +64,10 @@ keeps its library documents in a private, muted channel in your Telegram archive
   <img src="docs/screenshots/playlists-light.png" width="30%" alt="Playlists">
 </p>
 
-The library screenshot shows 0.22.0 with its honey-glass mark. The player and
-playlist screenshots were captured in 0.18.0; the fourth tab is now Sources.
+The library screenshot shows 0.23.0 with its changing emoji sticker. The header
+chooses from 40 yellow gestures and faces at a fresh launch or after 30 minutes
+away, and keeps one sticker while you use the app. The player and playlist
+screenshots were captured in 0.18.0; the fourth tab is now Sources.
 
 ## Put it on your phone
 

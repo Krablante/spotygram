@@ -313,9 +313,23 @@ facilities are not advertised.
 
 ## Visual system and idle work
 
-English/Russian strings are shared XML resources. The honey-glass mark with rounded
-ears and a curled antenna is one transparent PNG in `shared/`; Android and desktop
-load the same artwork. The interface displays the name as `spotygram`. System
+English/Russian strings are shared XML resources. The library header pairs the
+lowercase `spotygram` name with one of 40 bundled Fluent Emoji stickers: 18 yellow
+hand gestures and 22 faces. Every transparent PNG shares a 112-pixel canvas and
+balanced insets inside the existing 28 dp slot. The sticker is decorative, with
+no glass effect, animation or separate accessibility announcement.
+
+`HeaderSticker` belongs to `SpotygramApp`, so navigation, theme/language changes
+and Android activity recreation keep the same choice. A new application process
+selects a new sticker; returning after at least 30 minutes hidden or minimized
+selects another. Consecutive selections never repeat. Android activity and desktop
+window visibility events drive the same logic. A timestamp of hiding includes
+device sleep, with no background timer. Only the previous sticker's stable name
+is saved in separate local preferences; it creates no library, playback or
+cloud-sync records.
+
+The honey-glass mark with rounded ears and a curled antenna remains on welcome
+and sign-in screens. Android and desktop load that same transparent PNG. System
 icons place the mark on a pale liquid-glass surface. Desktop packaging derives
 PNG, multi-size ICO and ICNS from the shared `spotygram_launcher.png`; the window
 and tray use that tile too. Android keeps the standalone mark in the adaptive

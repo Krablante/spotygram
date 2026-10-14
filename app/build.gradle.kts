@@ -20,6 +20,7 @@ fun credential(name: String) =
 val licenseAssets =
     tasks.register<Copy>("prepareLicenseAssets") {
         from(rootProject.file("LICENSE")) { rename { "Spotygram-MIT.txt" } }
+        from(rootProject.file("shared/licenses/Fluent-Emoji-MIT.txt"))
         from(file("$buildState/tdlib-src/LICENSE_1_0.txt")) { rename { "Boost-1.0.txt" } }
         from(file("$buildState/native/openssl/LICENSE.txt")) { rename { "Apache-2.0.txt" } }
         into(layout.buildDirectory.dir("generated/licenseAssets"))
@@ -33,7 +34,7 @@ android {
         applicationId = "app.spotygram"
         minSdk = 26
         targetSdk = 36
-        versionCode = 43
+        versionCode = 44
         versionName = rootProject.version.toString()
         buildConfigField("int", "TELEGRAM_API_ID", credential("TELEGRAM_API_ID").ifBlank { "0" })
         buildConfigField("String", "TELEGRAM_API_HASH", "\"${credential("TELEGRAM_API_HASH")}\"")

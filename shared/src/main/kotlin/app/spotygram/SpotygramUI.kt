@@ -61,6 +61,7 @@ fun SpotygramUI(
     val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
     val cache by app.musicCache.state.collectAsStateWithLifecycle()
     val startupError by app.startupError.collectAsStateWithLifecycle()
+    val headerSticker by app.headerSticker.drawable.collectAsStateWithLifecycle()
     val playing = observePlayer(player).copy(order = mode.order, repeat = mode.repeat)
     var localMode by rememberSaveable { mutableStateOf(app.prefs.getBoolean("local_mode", false)) }
     var connect by rememberSaveable { mutableStateOf(false) }
@@ -528,7 +529,7 @@ fun SpotygramUI(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Image(
-                                            painterResource(R.drawable.spotygram_mark),
+                                            painterResource(headerSticker),
                                             null,
                                             Modifier.size(28.dp),
                                         )

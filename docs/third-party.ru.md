@@ -10,6 +10,7 @@
 | Compose Multiplatform / Skiko | Версии закреплены в Gradle | Apache 2.0 |
 | AndroidX / Media3 | Версии в `app/build.gradle.kts` | Apache 2.0 |
 | Coil / Haze / Haze Glass | 3.3.0 / 2.0.1 / 2.0.1 | Apache 2.0 |
+| Изображения Fluent Emoji | 40 обрезанных и уменьшенных PNG 3D из [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji/tree/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets); стандартные жёлтые варианты рук | MIT, copyright Microsoft Corporation |
 | SQLite внутри TDLib | Версия поставки TDLib | Public domain |
 | Готовый TDLib desktop | `prebuilt-tdlib` 0.1008067.0 | Boost 1.0; компоненты сохраняют свои лицензии |
 | libmpv / FFmpeg desktop | [mpv-prebuilt](https://github.com/jason-yau/mpv-prebuilt/releases/tag/20260906162952), LGPL-сборки libmpv 0.41.0 | LGPL 2.1+ и лицензии компонентов |
@@ -39,5 +40,7 @@ mpv-prebuilt; исходники jaudiotagger — в
 
 Иконки UI — Material Icons, работу со шрифтами предоставляет Compose.
 Логотипов Spotify и Telegram, встроенной музыки и сгенерированных обложек нет.
+Лицензия Fluent Emoji сохранена в `shared/licenses/Fluent-Emoji-MIT.txt`
+и включена в assets APK Android и `resources/licenses/` desktop.
 Демонстрационная запись [The Entertainer Скотта Джоплина](https://commons.wikimedia.org/wiki/File:%22The_Entertainer%22,_by_Scott_Joplin_(1902,_Ragtime_piano).opus)
 помечена public domain на Wikimedia Commons; она не входит в репозиторий или приложение.

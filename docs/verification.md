@@ -7,6 +7,40 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.23.0 — session emoji stickers
+
+The signed APK updated the retained Android 15 emulator over 0.22.1. The installed
+APK matched the final release build byte-for-byte. The complete SQLite dump was
+identical before installation and before the first launch. The existing recording,
+favorite, playlist and 8,910 ms paused player position remained available. After
+appearance/language checks, only their expected sync preference edits differed;
+another cold launch changed the sticker with an identical database dump.
+
+Real Android screens covered English/light and English/Russian dark appearances,
+360 dp and 320 dp with font scale 1.3, and rotation. The header stayed aligned and
+retained its sticker through theme/language changes, activity recreation and a
+short Home/return cycle. Two cold restarts changed eyebrow → peace → palms up.
+The crash buffer was empty. These checks used the retained emulator with the
+Lavapipe backend; they do not establish physical-device responsiveness or sound.
+
+The packaged Linux application displayed the same resources at 390 and 1090
+pixels wide, in both appearances, Music/Favorites/Playlists/Sources and during
+local playback. Theme, navigation and a short minimize/restore retained the
+sticker. Cold launches changed pensive → finger heart → pensive without consecutive
+repeats. A local WAV import, favorite and native libmpv playback with null output
+worked; ordinary Quit closed the app and reopening retained the local library.
+After 32 minutes minimized, the persisted sticker was still pensive. Restoring
+the actual window changed it to sob; the selection happened on return, with no
+timer-driven change while hidden.
+
+Both Android debug/release assemblies and Lint checks passed. The release APKs
+retain the original signer/application ID, versionCode 44 and 16 KB alignment.
+The release APK and packaged desktop JAR both contain all 40 stickers. The Fluent
+Emoji MIT notice is included in Android assets and desktop resource licenses.
+
+Physical Android devices, physical audio output, authenticated Telegram actions
+and interactive Windows/macOS operation were not exercised in this cycle.
+
 ## 0.22.1 — liquid-glass application icon
 
 The signed Android build updated the retained Android 15 emulator over 0.22.0.

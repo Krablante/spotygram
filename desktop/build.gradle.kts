@@ -14,7 +14,9 @@ val buildState = rootProject.extra["spotygramState"] as String
 val definitions = layout.buildDirectory.dir("generated/definitions")
 val generateDefinitions = tasks.register("generateDesktopDefinitions") {
     val strings = rootProject.file("shared/src/main/res/values/strings.xml")
+    val drawables = rootProject.fileTree("shared/src/main/res/drawable-nodpi") { include("*.png") }
     inputs.file(strings)
+    inputs.files(drawables)
     inputs.property("version", rootProject.version.toString())
     inputs.files(listOfNotNull(file("$buildState/telegram.env").takeIf { it.isFile }))
     inputs.property("telegramConfiguration", MessageDigest.getInstance("SHA-256")
@@ -46,7 +48,15 @@ val generateDefinitions = tasks.register("generateDesktopDefinitions") {
                 }
                 appendLine("    }")
             }
-            appendLine("    object drawable { const val spotygram_mark = 10000; const val spotygram_launcher = 10001 }")
+            appendLine("    object drawable {")
+            val drawableNames = drawables.files.sortedBy { it.name }.map { it.nameWithoutExtension }
+            drawableNames.forEachIndexed { index, name ->
+                appendLine("        const val $name = ${10000 + index}")
+            }
+            appendLine("        val names = mapOf(")
+            drawableNames.forEach { name -> appendLine("            $name to \"$name\",") }
+            appendLine("        )")
+            appendLine("    }")
             appendLine("    val names = mapOf(")
             names.forEach { (number, name) -> appendLine("        $number to \"$name\",") }
             appendLine("    )")
@@ -93,6 +103,8 @@ val prepareNative = tasks.register<Exec>("prepareNativeLibraries") {
         rootProject.file("LICENSE").copyTo(nativeDirectory.resolve("licenses/Spotygram.txt"), overwrite = true)
         file("src/main/resources/third-party-notices.txt").copyTo(
             nativeDirectory.resolve("licenses/Spotygram-dependencies.txt"), overwrite = true)
+        rootProject.file("shared/licenses/Fluent-Emoji-MIT.txt").copyTo(
+            nativeDirectory.resolve("licenses/Fluent-Emoji-MIT.txt"), overwrite = true)
     }
 }
 val icons = layout.buildDirectory.dir("icons")

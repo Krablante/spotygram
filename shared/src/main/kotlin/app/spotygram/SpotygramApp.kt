@@ -59,6 +59,7 @@ class SpotygramApp(val platform: Platform) {
     val musicCache by lazy { MusicCache(this) }
     val listeningCache by lazy { ListeningCache(this) }
     val updates by lazy { AppUpdates(this) }
+    val headerSticker by lazy { HeaderSticker(platform.preferences("header_sticker")) }
     val cloudSync by lazy { CloudSync(this) }
     val profiles by lazy { Profiles(this) }
     var suppressCloudWrites = false

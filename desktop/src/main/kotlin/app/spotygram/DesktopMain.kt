@@ -139,6 +139,7 @@ fun main(arguments: Array<String>) {
             }
             LaunchedEffect(active) {
                 if (closing) return@LaunchedEffect
+                app.headerSticker.visibility(active)
                 owner.lifecycle.currentState = if (active) Lifecycle.State.STARTED else Lifecycle.State.CREATED
                 if (active) app.updates.check()
                 else { queue.cancelPendingStart(); queue.savePosition() }

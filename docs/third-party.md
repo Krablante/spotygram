@@ -12,6 +12,7 @@
 | AndroidX / Media3 | Exact versions in `app/build.gradle.kts` | Apache 2.0 |
 | Coil | 3.3.0 | Apache 2.0 |
 | Haze / Haze Glass | 2.0.1, [chrisbanes/haze](https://github.com/chrisbanes/haze) | Apache 2.0 |
+| Fluent Emoji artwork | 40 cropped/resized 3D PNGs from [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji/tree/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets); default yellow hand variants | MIT, copyright Microsoft Corporation |
 | SQLite (TDLib) | Upstream bundled version | Public domain |
 | Desktop TDLib prebuilts | `prebuilt-tdlib` 0.1008067.0 | Boost 1.0 for TDLib; bundled components retain their licenses |
 | libmpv / FFmpeg desktop runtime | [mpv-prebuilt](https://github.com/jason-yau/mpv-prebuilt/releases/tag/20260906162952), libmpv 0.41.0 LGPL assets | LGPL 2.1+ and component licenses |
@@ -42,5 +43,7 @@ the linked mpv-prebuilt release; jaudiotagger sources are available through
 
 UI icons use Material Icons. Compose supplies platform font handling. There are
 no Spotify logos, Telegram logos, bundled music files or AI-generated album covers.
+The Fluent Emoji notice is retained in `shared/licenses/Fluent-Emoji-MIT.txt`
+and included in Android APK assets and desktop `resources/licenses/`.
 
 The manually imported development recording is [The Entertainer by Scott Joplin](https://commons.wikimedia.org/wiki/File:%22The_Entertainer%22,_by_Scott_Joplin_(1902,_Ragtime_piano).opus), marked public domain on Wikimedia Commons. The audio is not part of the repository or APK.
