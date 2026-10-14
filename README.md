@@ -166,6 +166,13 @@ Downloaded songs are available under **On device**. The interface comes in
 English and Russian, with light and dark appearances. The initial appearance
 follows the system until you choose one in Settings.
 
+Send the current song to a person, group or channel without leaving the player.
+The chooser combines pinned and recent recipients with your Telegram folders
+and main chat order, and shows only destinations that accept the file. Select
+a recipient, then confirm. Audio is sent from your account without the original
+sender or caption by default; **Settings → Sharing audio** controls both options.
+Local imports can be uploaded too. See [sending audio](docs/usage.md#send-audio-to-a-chat).
+
 Glass controls reflect the artwork and the library scrolling beneath them.
 Light and dark share the same layout and material; wide screens use side
 navigation and a player with separate artwork and control columns. Full

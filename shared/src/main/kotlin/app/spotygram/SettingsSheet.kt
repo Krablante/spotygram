@@ -35,6 +35,7 @@ fun SettingsSheet(
     onLocal: () -> Unit,
     onResume: () -> Unit,
     onCache: () -> Unit,
+    onSharing: () -> Unit,
 ) {
     val theme by app.theme.collectAsStateWithLifecycle()
     val hideDuplicates by app.hideDuplicates.collectAsStateWithLifecycle()
@@ -97,6 +98,14 @@ fun SettingsSheet(
         HorizontalDivider(
             Modifier.padding(vertical = 16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        ListItem(
+            headlineContent = { Text(tr(R.string.share_settings)) },
+            supportingContent = { Text(tr(R.string.share_settings_help)) },
+            leadingContent = { Icon(Icons.Rounded.IosShare, null) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+            modifier = Modifier.clickable(onClick = onSharing),
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         Row(
             Modifier.fillMaxWidth()

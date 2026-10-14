@@ -207,9 +207,10 @@ class AndroidPlatform(val context: AndroidApplication) : Platform {
         ContextCompat.startForegroundService(context, Intent(context, DownloadService::class.java))
     }
 
-    override fun startProfileAudioUpload(app: SpotygramApp) {
+    override fun startAudioTransfer(app: SpotygramApp) {
         ContextCompat.startForegroundService(
-            context, Intent(context, DownloadService::class.java).setAction("profileUpload")
+            context,
+            Intent(context, DownloadService::class.java).setAction("audioTransfer"),
         )
     }
 

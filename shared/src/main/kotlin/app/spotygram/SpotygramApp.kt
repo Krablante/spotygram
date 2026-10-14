@@ -62,6 +62,7 @@ class SpotygramApp(val platform: Platform) {
     val headerSticker by lazy { HeaderSticker(platform.preferences("header_sticker")) }
     val cloudSync by lazy { CloudSync(this) }
     val profiles by lazy { Profiles(this) }
+    val sharing by lazy { Sharing(this) }
     var suppressCloudWrites = false
     val playbackMode =
         MutableStateFlow(
@@ -179,6 +180,7 @@ class SpotygramApp(val platform: Platform) {
     suspend fun close() {
         scanJob?.cancelAndJoin()
         profiles.stop()
+        sharing.stop()
         downloadService?.cancelForCacheCleanup()
         playback?.close()?.join()
         preferencesSaving?.join()
@@ -832,6 +834,7 @@ class SpotygramApp(val platform: Platform) {
                 playback?.clear()
                 playback?.forgetTelegramProgress()
                 profiles.stop()
+                sharing.stop()
                 platform.stopDownloads(this)
                 telegram.request(json("logOut"))
                 prefs.edit().putBoolean("telegram_connected", false).apply()

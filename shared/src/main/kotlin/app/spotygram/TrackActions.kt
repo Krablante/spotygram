@@ -38,10 +38,12 @@ fun TrackActions(
     onOrder: () -> Unit,
     onDownload: () -> Unit,
     onOpenTelegram: () -> Unit,
+    onShare: () -> Unit,
     onProfileChanged: (Boolean) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val auth by app.telegram.auth.collectAsStateWithLifecycle()
     val environment = remember { HazeSourceSelection.Behind.where { it.zIndex == 0f } }
     val compact = LocalConfiguration.current.screenWidthDp >= 600
     Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
@@ -64,6 +66,13 @@ fun TrackActions(
         CompositionLocalProvider(LocalGlassSourceSelection provides environment) {
             ProfileAudioButton(app, track, onProfileChanged)
         }
+        if (auth.type == "authorizationStateReady" && (track.available || track.local))
+            ActionRow(
+                Icons.Rounded.IosShare,
+                tr(R.string.share_audio),
+                compact = compact,
+                onClick = onShare,
+            )
         ActionRow(
             if (track.liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             tr(if (track.liked) R.string.unlike else R.string.like),

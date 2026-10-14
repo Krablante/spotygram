@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 
 class DownloadService : Service() {
     private val app get() = (application as AndroidApplication).model
@@ -23,9 +24,9 @@ class DownloadService : Service() {
         downloads = Downloads(app, { text, progress ->
             getSystemService(NotificationManager::class.java).notify(20, notification(text, progress))
         }, {
-            if (app.profiles.uploadingAudio.value)
+            if (app.profiles.uploadingAudio.value || app.sharing.sending.value)
                 getSystemService(NotificationManager::class.java).notify(20,
-                    notification(tr(R.string.profile_audio_uploading), upload = true))
+                    notification(transferTitle(), upload = true))
             else {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -34,11 +35,13 @@ class DownloadService : Service() {
     }
 
     private fun stopIfIdle() {
-        if (!downloads.running && !app.profiles.uploadingAudio.value) {
+        if (!downloads.running && !app.profiles.uploadingAudio.value && !app.sharing.sending.value) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
+
+    private fun transferTitle() = tr(if (app.sharing.sending.value) R.string.share_sending else R.string.profile_audio_uploading)
 
     private fun notification(text: String, progress: Int = -1, upload: Boolean = false): Notification {
         val cancel = PendingIntent.getService(this, 1,
@@ -46,7 +49,7 @@ class DownloadService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val builder = NotificationCompat.Builder(this, "downloads")
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(tr(if (upload) R.string.profile_audio_uploading else R.string.download_notification_title)).setContentText(text)
+            .setContentTitle(if (upload) transferTitle() else tr(R.string.download_notification_title)).setContentText(text)
             .setOnlyAlertOnce(true).setOngoing(true)
             .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE))
@@ -61,20 +64,20 @@ class DownloadService : Service() {
             stopIfIdle()
             return START_NOT_STICKY
         }
-        val upload = intent?.action == "profileUpload"
+        val upload = intent?.action == "audioTransfer"
         ServiceCompat.startForeground(this, 20,
-            notification(tr(if (upload) R.string.profile_audio_uploading else R.string.preparing_downloads), upload = upload),
+            notification(if (upload) transferTitle() else tr(R.string.preparing_downloads), upload = upload),
             if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0)
         if (!upload) {
             if (app.musicCache.state.value.clearing) stopIfIdle()
             else downloads.start()
         }
         if (uploadObserver == null) uploadObserver = scope.launch {
-            app.profiles.uploadingAudio.collect { active ->
+            combine(app.profiles.uploadingAudio, app.sharing.sending) { profile, sharing -> profile || sharing }.collect { active ->
                 if (!active) stopIfIdle()
                 else if (!downloads.running)
                     getSystemService(NotificationManager::class.java).notify(20,
-                        notification(tr(R.string.profile_audio_uploading), upload = true))
+                        notification(transferTitle(), upload = true))
             }
         }
         return START_NOT_STICKY

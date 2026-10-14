@@ -308,7 +308,7 @@ class Profiles(private val app: SpotygramApp) {
                 if (added && id == 0) {
                     check(validAudioCopy(current.path, current.size)) { tr(R.string.no_local_copy) }
                     uploadingAudio.value = true
-                    app.platform.startProfileAudioUpload(app)
+                    app.platform.startAudioTransfer(app)
                     // Register the upload so its stable remote reference can be retained for the
                     // original imported song. A later restart can then offer Remove on that song.
                     id =

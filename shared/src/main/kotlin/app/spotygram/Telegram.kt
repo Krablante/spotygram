@@ -27,6 +27,8 @@ class Telegram(
     internal val avatarSlots = Semaphore(2)
     val chatPhotos = ChatPhotos(this)
     val chatRevision = MutableStateFlow(0L)
+    val recipientRevision = MutableStateFlow(0L)
+    val chatFolders = MutableStateFlow<List<ShareFolder>>(emptyList())
     val fileRevision = MutableStateFlow(0L)
     val updates = Channel<JSONObject>(Channel.UNLIMITED)
     val cloudUpdates = Channel<Unit>(Channel.CONFLATED)
@@ -65,6 +67,19 @@ class Telegram(
                     val extra = obj.optString("@extra")
                     if (extra.isNotEmpty()) requests.remove(extra)?.complete(obj)
                     when (obj.kind()) {
+                        "updateChatFolders" -> {
+                            val folders = obj.getJSONArray("chat_folders")
+                            chatFolders.value =
+                                (0 until folders.length()).map { i ->
+                                    val folder = folders.getJSONObject(i)
+                                    val name =
+                                        folder
+                                            .optJSONObject("name")
+                                            ?.optJSONObject("text")
+                                            ?.optString("text") ?: folder.optString("title")
+                                    ShareFolder(folder.getInt("id"), name)
+                                }
+                        }
                         "updateAuthorizationState" ->
                             authorization(obj.getJSONObject("authorization_state"))
                         "updateConnectionState" ->
@@ -111,9 +126,12 @@ class Telegram(
                         "updateChatPhoto" ->
                             chatPhotos.changed(obj.getLong("chat_id"), obj.optJSONObject("photo"))
                         "updateNewMessage" -> {
-                            val content =
-                                obj.getJSONObject("message").optJSONObject("content")?.kind()
-                            if (content == "messageAudio" || content == "messageDocument")
+                            val message = obj.getJSONObject("message")
+                            val content = message.optJSONObject("content")?.kind()
+                            if (
+                                (content == "messageAudio" || content == "messageDocument") &&
+                                    message.optJSONObject("sending_state") == null
+                            )
                                 updates.send(obj)
                             if (obj.getJSONObject("message").optLong("chat_id") in storageChats)
                                 cloudUpdates.trySend(Unit)
@@ -124,6 +142,12 @@ class Telegram(
                                 sendResults.keys.take(32).forEach(sendResults::remove)
                             sendResults[obj.getLong("old_message_id")] = obj
                             sendRevision.update { it + 1 }
+                            if (obj.kind() == "updateMessageSendSucceeded") {
+                                val message = obj.getJSONObject("message")
+                                val content = message.optJSONObject("content")?.kind()
+                                if (content == "messageAudio" || content == "messageDocument")
+                                    updates.send(json("updateNewMessage", "message" to message))
+                            }
                             cloudUpdates.trySend(Unit)
                         }
                         "updateMessageContent",
@@ -144,6 +168,20 @@ class Telegram(
                         "updateChatDraftMessage",
                         "updateChatAddedToList",
                         "updateChatRemovedFromList" -> chatRevision.update { it + 1 }
+                    }
+                    when (obj.kind()) {
+                        "updateChatPermissions",
+                        "updateChatBlockList",
+                        "updateChatMessageSender",
+                        "updateBasicGroup",
+                        "updateSupergroup",
+                        "updateSupergroupFullInfo",
+                        "updateUser",
+                        "updateUserFullInfo",
+                        "updateForumTopicInfo",
+                        "updateChatHasProtectedContent",
+                        "updateMessageContent",
+                        "updateDeleteMessages" -> recipientRevision.update { it + 1 }
                     }
                 }
             }
@@ -179,7 +217,11 @@ class Telegram(
         return choice
     }
 
-    suspend fun sendConfirmed(query: JSONObject): JSONObject {
+    suspend fun sendConfirmed(
+        query: JSONObject,
+        timeout: Long = 120_000,
+        cancelPending: Boolean = false,
+    ): JSONObject {
         val message = request(query)
         val sending = message.optJSONObject("sending_state")
         if (sending == null || sending == JSONObject.NULL) return message
@@ -190,15 +232,45 @@ class Telegram(
         val temporary = message.getLong("id")
         try {
             val result =
-                withTimeout(120_000) {
+                withTimeout(timeout) {
                     sendRevision.first { sendResults.containsKey(temporary) }
                     sendResults.getValue(temporary)
                 }
             if (result.kind() == "updateMessageSendFailed") {
                 val error = result.getJSONObject("error")
+                if (cancelPending)
+                    withContext(NonCancellable) {
+                        runCatching {
+                            request(
+                                json(
+                                    "deleteMessages",
+                                    "chat_id" to message.getLong("chat_id"),
+                                    "message_ids" to org.json.JSONArray(listOf(temporary)),
+                                    "revoke" to true,
+                                ),
+                                timeout = 5_000,
+                            )
+                        }
+                    }
                 throw TelegramException(error.getInt("code"), error.getString("message"))
             }
             return result.getJSONObject("message")
+        } catch (e: CancellationException) {
+            if (cancelPending)
+                withContext(NonCancellable) {
+                    runCatching {
+                        request(
+                            json(
+                                "deleteMessages",
+                                "chat_id" to message.getLong("chat_id"),
+                                "message_ids" to listOf(temporary),
+                                "revoke" to true,
+                            ),
+                            timeout = 5_000,
+                        )
+                    }
+                }
+            throw e
         } finally {
             sendResults.remove(temporary)
         }
@@ -299,6 +371,8 @@ class Telegram(
                 sendResults.clear()
                 sendRevision.update { it + 1 }
                 chats.clear()
+                chatFolders.value = emptyList()
+                recipientRevision.update { it + 1 }
                 chatPhotos.reset()
                 channelChats.clear()
                 networkObserver?.close()

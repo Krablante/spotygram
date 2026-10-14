@@ -244,6 +244,42 @@ fun SpotygramUI(
                 }
         }
     }
+    val shareContent: @Composable (Modifier, androidx.compose.ui.unit.Dp?) -> Unit =
+        { modifier, height ->
+            selectedTrack?.let { track ->
+                SharingSheet(
+                    app,
+                    track,
+                    onClose = { sheet = "" },
+                    onSent = { recipient, message ->
+                        if (sheet == "share" && selectedTrackId == track.id) sheet = ""
+                        snackbar.currentSnackbarData?.dismiss()
+                        scope.launch {
+                            if (
+                                snackbar.showSnackbar(
+                                    tr(R.string.share_sent_to, recipient.displayTitle),
+                                    tr(R.string.share_open),
+                                    duration = SnackbarDuration.Short,
+                                ) == SnackbarResult.ActionPerformed
+                            )
+                                app.action {
+                                    app.platform.openUrl(
+                                        app.messageLink(
+                                            track.copy(
+                                                chatId = message.getLong("chat_id"),
+                                                messageId = message.getLong("id"),
+                                            )
+                                        )
+                                    )
+                                }
+                        }
+                    },
+                    onFailed = { message -> if (sheet != "share") app.notices.tryEmit(message) },
+                    modifier = modifier,
+                    maxHeight = height,
+                )
+            }
+        }
     val trackActions: @Composable (Modifier) -> Unit = { modifier ->
         selectedTrack?.let { track ->
             TrackActions(
@@ -255,6 +291,7 @@ fun SpotygramUI(
                 onPlaylist = { addToPlaylist(listOf(track.id)) },
                 onOrder = { sheet = "playbackOrder" },
                 onDownload = { onDownload(listOf(track.id)) },
+                onShare = { sheet = "share" },
                 onOpenTelegram = {
                     snackbar.currentSnackbarData?.dismiss()
                     app.action {
@@ -372,6 +409,14 @@ fun SpotygramUI(
                                 trackAnchor = anchor
                                 sheet = "track"
                             },
+                            onShare =
+                                if (auth.type == "authorizationStateReady")
+                                    { anchor ->
+                                        selectedTrackId = current.id
+                                        trackAnchor = anchor
+                                        sheet = "share"
+                                    }
+                                else null,
                             onLike = { like(current) },
                             onDownload = { onDownload(listOf(current.id)) },
                             onQueue = { sheet = "queue" },
@@ -760,7 +805,7 @@ fun SpotygramUI(
                     ) {
                         GlassSnackbarHost(snackbar)
                     }
-                if (sheet == "track" && trackPopup) {
+                if (sheet in listOf("track", "share") && trackPopup) {
                     val density = LocalDensity.current
                     val margin = with(density) { 8.dp.roundToPx() }
                     Popup(
@@ -775,17 +820,22 @@ fun SpotygramUI(
                             Modifier.width(
                                     (LocalConfiguration.current.screenWidthDp - 32)
                                         .dp
-                                        .coerceAtMost(380.dp)
+                                        .coerceAtMost(if (sheet == "share") 420.dp else 380.dp)
                                 )
                                 .heightIn(max = (LocalConfiguration.current.screenHeightDp - 32).dp)
                                 .liquidGlass(24.dp, strong = true)
                                 .padding(vertical = 8.dp)
                         ) {
-                            trackActions(Modifier.weight(1f, fill = false))
+                            if (sheet == "share")
+                                shareContent(
+                                    Modifier,
+                                    (LocalConfiguration.current.screenHeightDp - 64).dp,
+                                )
+                            else trackActions(Modifier.weight(1f, fill = false))
                         }
                     }
                 }
-                if (sheet.isNotEmpty() && !(sheet == "track" && trackPopup))
+                if (sheet.isNotEmpty() && !(sheet in listOf("track", "share") && trackPopup))
                     ModalBottomSheet(
                         onDismissRequest = { sheet = "" },
                         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -854,7 +904,11 @@ fun SpotygramUI(
                                                 }
                                             },
                                             onCache = { sheet = "cache" },
+                                            onSharing = { sheet = "sharingSettings" },
                                         )
+                                    "sharingSettings" ->
+                                        SharingSettings(app, onBack = { sheet = "settings" })
+                                    "share" -> shareContent(Modifier, null)
                                     "cache" ->
                                         CacheScreen(
                                             app,

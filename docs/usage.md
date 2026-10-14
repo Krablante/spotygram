@@ -135,6 +135,52 @@ Profile selections, favorites and playlists use library-sync format 3. Clients
 through 0.18.0 need an update to continue synchronizing once format 3 is received;
 their local library is preserved. New clients also read the previous library formats.
 
+## Send audio to a chat
+
+Use the send button beside the full player's menu, or **Send audio** in a song's
+menu. Choose a recipient, then confirm with the button that names the destination.
+Selecting a card does not send anything, and playback continues.
+
+Quick access shows your pinned recipients, recent sends and Telegram's main-list
+pins. Select a chat and use the pin button to keep it nearby. You can pin up to
+eight recipients; swipe the cards to reach more. The main list, your Telegram
+folders and archive retain their Telegram order. Search finds chats, channels
+and people. Opening this chooser does not connect a music source to your library.
+
+Only destinations that allow this type of file are shown, including in search
+and quick access. Audio and document permissions are checked separately; channel
+publishing rights and personal group restrictions also apply. For a group with
+topics, choose an open topic. Secret chats, destinations requiring payment and
+closed topics are excluded. Rights are checked again before sending.
+
+By default the recording is sent from your account without the original sender
+or caption. **Settings → Sharing audio**, also available from the chooser's gear,
+has two switches: **Keep original sender** and **Keep original caption**. Both
+start off. Track title and artist are retained, and the audio file is unchanged.
+Telegram cannot remove an existing caption while preserving the original sender;
+the chooser explains this combination before sending. Channel posts follow
+Telegram's channel identity rules. Groups that cannot use your personal identity
+are excluded.
+
+Telegram recordings reuse the existing file. Local imports are uploaded, with an
+explanation before you confirm; their original local entry and file remain.
+The upload reference is retained for later sends. Telegram's protection against
+copying and forwarding is respected even when a listening copy is on the device.
+
+The success message appears after Telegram confirms the send and offers **Open**.
+A send failure keeps the recipient available for retry; losing permission clears
+the selection. Closing the chooser leaves an
+active send running; Android keeps a quiet transfer notification, and desktop
+keeps its process alive. Sharing settings, pins and recent recipients stay on
+this device, with recipient history kept separately for each Telegram account.
+
+<img src="screenshots/sharing-light.png" width="300" alt="Selected recipient in quick access and Telegram's main chat list">
+
+<img src="screenshots/desktop-sharing-light.png" width="800" alt="Sharing panel beside the full player's send button on desktop">
+
+The shared interface in narrow and wide Linux windows, with demonstration
+recordings and recipients.
+
 ## Listen
 
 **Settings → Hide duplicates** is on by default. Music, Favorites and On device
@@ -158,7 +204,7 @@ bottom player opens the full player. Android lock-screen and desktop system medi
 controls work too. Wide windows move navigation to the side.
 
 Desktop **Esc** closes the current panel or player. Closing the window while
-playing, downloading or changing profile music hides it in the tray, or minimizes it when a tray is
+playing, downloading, sending audio or changing profile music hides it in the tray, or minimizes it when a tray is
 unavailable. **Ctrl/⌘+Q** quits and saves state; playback never starts automatically
 after the next launch.
 

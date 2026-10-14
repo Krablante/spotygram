@@ -7,6 +7,41 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.24.0 — audio sharing
+
+Native TDLib through a separate owned Spotygram production session confirmed local
+audio upload, copying an existing recording without its sender or caption,
+keeping only the caption, forwarding with sender and caption, and sending an
+audio document. The imported entry retained its original file and reusable upload
+reference; another process reused that reference. Confirmed messages entered the
+catalog with permanent Telegram IDs. Protected content and the conflicting
+sender/removed-caption combination were rejected before sending. Sending to an
+open forum topic succeeded; a closed topic was hidden and rejected. Temporary
+messages and single-member verification groups/channels were removed afterward.
+
+The compiled shared interface used controlled Telegram responses and native Linux
+libmpv with local recordings. Actual screenshots covered both appearances,
+the player and song-menu entries, quick recipients, folders, topics, selection,
+settings, confirmation, retry and rights revocation. Revocation removed the chat
+from cards and rows, cleared selection and disabled sending. A double click
+created one send. The anchored panel at 1100 pixels and a 320-pixel window with
+font scale 1.3 remained usable; wider cards corrected an orphaned final letter.
+These directory/error checks do not establish production group membership rules.
+
+The signed x86-64 APK updated the retained Android 15 emulator over 0.23.0.
+Before first launch, the database and queue preferences matched byte-for-byte.
+The recording, favorite, playlist and 8,910 ms paused position remained available.
+Actual settings screens covered light/dark appearances and 320 dp with font scale
+1.3. A changed sharing switch survived process restart; both switches were restored
+to off. Only expected appearance-sync clocks differed in the final catalog dump;
+SQLite integrity was `ok` and the crash buffer was empty. The emulator had a
+System UI ANR at cold boot before the successful application checks.
+
+Physical Android devices, physical sound, authenticated Android sending, long
+foreground uploads and interactive Windows/macOS operation were not exercised.
+Profile-file sharing was reviewed against the existing resolver, without a new
+production profile-send check.
+
 ## 0.23.0 — session emoji stickers
 
 The signed APK updated the retained Android 15 emulator over 0.22.1. The installed

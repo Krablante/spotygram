@@ -36,6 +36,7 @@ fun PlayerScreen(
     player: Player?,
     onBack: () -> Unit,
     onMore: (IntRect) -> Unit,
+    onShare: ((IntRect) -> Unit)? = null,
     onLike: () -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
@@ -47,6 +48,7 @@ fun PlayerScreen(
     val largeText = LocalConfiguration.current.fontScale > 1.2f
     val volumeInset = if (player?.supportsVolumeControl == true) 48.dp else 0.dp
     var menuAnchor by remember { mutableStateOf(IntRect.Zero) }
+    var shareAnchor by remember { mutableStateOf(IntRect.Zero) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val wide = maxWidth >= 600.dp && maxWidth > maxHeight
         val cover =
@@ -101,6 +103,25 @@ fun PlayerScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (onShare != null) {
+                    GlassIconButton(
+                        onClick = { onShare(shareAnchor) },
+                        modifier =
+                            Modifier.onGloballyPositioned {
+                                val b = it.boundsInWindow()
+                                shareAnchor =
+                                    IntRect(
+                                        b.left.toInt(),
+                                        b.top.toInt(),
+                                        b.right.toInt(),
+                                        b.bottom.toInt(),
+                                    )
+                            },
+                    ) {
+                        Icon(Icons.Rounded.IosShare, tr(R.string.share_audio))
+                    }
+                    Spacer(Modifier.width(8.dp))
                 }
                 GlassIconButton(
                     onClick = { onMore(menuAnchor) },

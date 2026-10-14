@@ -147,7 +147,7 @@ fun main(arguments: Array<String>) {
             LaunchedEffect(applyUpdate) { if (applyUpdate) quit() }
             Window(
                 onCloseRequest = {
-                    if (engine.playWhenReady && engine.playbackState != Player.STATE_ENDED || app.downloadService?.running == true || app.profiles.editingAudio.value ||
+                    if (engine.playWhenReady && engine.playbackState != Player.STATE_ENDED || app.downloadService?.running == true || app.profiles.editingAudio.value || app.sharing.sending.value ||
                         app.updates.installer.state.value.phase in setOf(InstallPhase.DOWNLOADING, InstallPhase.VERIFYING)) {
                         if (traySupported) visible = false else windowState.isMinimized = true
                     } else quit()

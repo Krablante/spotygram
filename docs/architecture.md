@@ -56,6 +56,30 @@ marks it for refresh; draining triggers the final empty check. It does not copy
 the whole pending list before every file. Its active task, including initial
 resolution, keeps desktop alive when the window closes.
 
+## Sending audio
+
+`Sharing` owns recipient eligibility, account-scoped pinned/recent recipients and
+one explicit send. `SharingSheet` combines quick cards with paged TDLib chat lists,
+folders, search and a fixed confirmation area. Directory order changes reuse
+cached permission results; permission events invalidate them. Visible picker work
+stops with its lifecycle, and avatars use the existing two shared slots.
+
+Audio and document permissions, personal restrictions, publishing rights and
+available personal senders are checked before display and again before sending.
+Source message properties distinguish copying from ordinary forwarding. Default
+sends copy audio without original sender or caption; keeping the sender with an
+existing caption requires keeping that caption. Profile files use the existing
+resolver; imports keep their local entry and store a reusable upload reference.
+Only a confirmed file-reference failure can retry an import with its local file.
+Sharing preferences stay local and recipient history is namespaced by account,
+without a schema migration or library-sync document.
+
+The send belongs to the application rather than the chooser. Android reuses its
+data-transfer foreground service; desktop retains the process while sending.
+TDLib's temporary outgoing messages do not enter the music catalog. The final
+send update publishes the permanent message reference, and the interface reports
+success only after confirmation.
+
 ## Catalog and data
 
 SQLite schema 8 stores tracks, chat and profile sources, playlists, playlist membership, pending
