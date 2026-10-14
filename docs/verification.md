@@ -42,9 +42,28 @@ the app. The app's render thread waited on the emulator's OpenGL program linking
 Changing the software backend did not yield a reliable interactive session, so
 authenticated Android profile actions and foreground-upload survival were not verified.
 
+The final production Linux launcher opened its retained Spotygram account and
+catalog. Its real track-menu button added an existing Telegram song in one click,
+then showed Remove on reopening. Removal and a second addition followed by Undo
+also succeeded through the UI; My profile returned to its original empty state.
+No intermediate menu or confirmation appeared. The application then closed through
+its ordinary Quit action.
+
 Physical-device behavior, physical sound and interactive Windows/macOS operation
-were not exercised. Production profile mutations were checked on Linux; the wider
-menu and failure scenarios used controlled responses.
+were not exercised. Production profile mutations were checked on Linux;
+the additional appearance, narrow-layout and failure scenarios used controlled responses.
+
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38509295498)
+built from `0cc2927` on native runners. The four installer signatures and four
+archive manifests verified with the existing key, as did every archive payload
+hash. Each compiled app reported 0.21.0 with DEBUG false, included `TrackActions`
+and embedded the original trusted update key. The signed Linux release archive
+reopened the retained catalog, displayed the working profile action and exited
+through the ordinary Quit action. All fifteen draft asset names, sizes and GitHub
+SHA-256 digests matched the local files before publication; the published ordinary
+[v0.21.0 release](https://github.com/Krablante/spotygram/releases/tag/v0.21.0) was
+confirmed as Latest with the same assets. The signed ARM64 APK was delivered to the
+owner through Telegram artifacts.
 
 ## 0.20.0 — grouped glass sources and chat photos
 
