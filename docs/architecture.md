@@ -332,8 +332,10 @@ Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with
 secondary touch targets. Sheet glass travels inside its native placement transform;
 keyboard layout changes preserve text-field identity and focus.
 
-Track actions share one header and list. The profile button has direct Add/Remove
-actions, a 48 dp minimum touch target and wrapping text. Widths from 600 dp use a
+Track actions share one header and list. The profile button is centered beneath
+the artwork/title row with short To profile/Remove labels and a 48 dp minimum touch
+target. Its width fits the longer label at the current font size and stays equal
+in both states; screen readers retain the full action descriptions. Widths from 600 dp use a
 menu anchored to the chosen track's three-dot button; narrower windows use the
 native bottom sheet. Both surfaces bound their height and scroll longer content.
 

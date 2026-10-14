@@ -7,6 +7,32 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.21.1 — centered compact profile button
+
+The compiled shared interface showed To profile/Remove centered beneath the
+artwork/title row, with matching button widths and centered icon/text groups.
+Screenshots covered 380 dp, 320 dp with font scale 1.3, English/Russian and both
+appearances. Short labels stayed on one line. A controlled request failure kept the
+button available with a readable explanation beneath it; retry succeeded.
+
+The production Linux launcher reopened its retained account and catalog. Real
+addition, removal and Undo succeeded through the new button; the separate owned
+profile returned to its original empty state. The wide menu's two button states
+kept the same placement and width. Quit closed the packaged application.
+
+Android debug/release assemblies and both Lint checks passed. The signed APKs use
+0.21.1, versionCode 41, the original application ID/certificate and 16 KB alignment.
+The retained Android 15 emulator updated from 0.21.0; its installed APK matched the
+release file byte-for-byte. All eleven catalog tables, preferences and queue fields
+were preserved, including the 8,910 ms position. Restart renewed only the normal
+queue-instance UUID, with matching queue/position versions. SQLite integrity was
+`ok`. System UI again stalled in the software emulator, so authenticated Android
+profile actions were not verified.
+
+Physical devices, physical sound, screen-reader speech and interactive Windows/macOS
+operation were not exercised. Narrow-layout and error checks used controlled TDLib
+responses in the compiled desktop interface.
+
 ## 0.21.0 — direct profile-music actions
 
 Native TDLib through the retained, separate Spotygram production session uploaded

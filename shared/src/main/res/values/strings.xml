@@ -388,6 +388,8 @@
     <string name="sync_storage_missing">The private storage channel is unavailable. Restore access to it to continue syncing.</string>
     <string name="add_profile_audio">Add to Telegram profile</string>
     <string name="remove_profile_audio">Remove from Telegram profile</string>
+    <string name="profile_audio_add_short">To profile</string>
+    <string name="profile_audio_remove_short">Remove</string>
     <string name="profile_audio_added">Added to Telegram profile</string>
     <string name="profile_audio_removed">Removed from Telegram profile</string>
     <string name="profile_audio_upload">Uploads this file to your Telegram profile</string>

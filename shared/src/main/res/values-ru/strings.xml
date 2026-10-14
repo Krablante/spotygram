@@ -392,6 +392,8 @@
     <string name="sync_storage_missing">Служебный канал недоступен. Восстановите доступ к нему, чтобы продолжить синхронизацию.</string>
     <string name="add_profile_audio">Добавить в профиль Telegram</string>
     <string name="remove_profile_audio">Убрать из профиля Telegram</string>
+    <string name="profile_audio_add_short">В профиль</string>
+    <string name="profile_audio_remove_short">Убрать</string>
     <string name="profile_audio_added">Добавлено в профиль Telegram</string>
     <string name="profile_audio_removed">Убрано из профиля Telegram</string>
     <string name="profile_audio_upload">Загрузит файл в ваш профиль Telegram</string>

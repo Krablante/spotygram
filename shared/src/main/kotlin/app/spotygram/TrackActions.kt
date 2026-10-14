@@ -10,6 +10,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -53,10 +59,10 @@ fun TrackActions(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp),
                 )
-                CompositionLocalProvider(LocalGlassSourceSelection provides environment) {
-                    ProfileAudioButton(app, track, onProfileChanged)
-                }
             }
+        }
+        CompositionLocalProvider(LocalGlassSourceSelection provides environment) {
+            ProfileAudioButton(app, track, onProfileChanged)
         }
         ActionRow(
             if (track.liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
@@ -156,67 +162,89 @@ private fun ProfileAudioButton(app: SpotygramApp, track: Track, onChanged: (Bool
     if (auth.type != "authorizationStateReady") return
     if (!track.available && !track.local && track.remoteId.isEmpty()) return
     val remove = present == true
-    GlassButton(
-        onClick = {
-            val added = !remove
-            changing = true
-            error = ""
-            app.action {
-                try {
-                    app.profiles.changeAudio(track, added)
-                    present = added
-                    onChanged(added)
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    error = friendly(e)
-                    // Reinspect after a timeout rather than advertising an unconfirmed state.
-                    try {
-                        present = app.profiles.containsAudio(track)
-                    } catch (inspection: Exception) {
-                        if (inspection is CancellationException) throw inspection
-                        present = null
-                    }
-                } finally {
-                    changing = false
-                }
+    val addLabel = tr(R.string.profile_audio_add_short)
+    val removeLabel = tr(R.string.profile_audio_remove_short)
+    val labelStyle = MaterialTheme.typography.labelMedium
+    val textMeasurer = rememberTextMeasurer()
+    val buttonWidth =
+        with(LocalDensity.current) {
+                maxOf(
+                        textMeasurer.measure(addLabel, labelStyle).size.width,
+                        textMeasurer.measure(removeLabel, labelStyle).size.width,
+                    )
+                    .toDp() + 56.dp
             }
-        },
-        enabled = connected && present != null && !inspecting && !changing && !editing,
-        modifier = Modifier.padding(top = 8.dp),
-        tint = if (remove) spectrumAccent(0) else Color.Transparent,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            .coerceAtLeast(128.dp)
+    val description = tr(if (remove) R.string.remove_profile_audio else R.string.add_profile_audio)
+    Column(
+        Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (inspecting || changing)
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        else
-            Icon(
-                if (remove) Icons.Rounded.PersonRemove else Icons.Rounded.PersonAdd,
-                null,
-                Modifier.size(18.dp),
+        GlassButton(
+            onClick = {
+                val added = !remove
+                changing = true
+                error = ""
+                app.action {
+                    try {
+                        app.profiles.changeAudio(track, added)
+                        present = added
+                        onChanged(added)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        error = friendly(e)
+                        // Reinspect after a timeout rather than advertising an unconfirmed state.
+                        try {
+                            present = app.profiles.containsAudio(track)
+                        } catch (inspection: Exception) {
+                            if (inspection is CancellationException) throw inspection
+                            present = null
+                        }
+                    } finally {
+                        changing = false
+                    }
+                }
+            },
+            enabled = connected && present != null && !inspecting && !changing && !editing,
+            modifier = Modifier.width(buttonWidth).semantics { contentDescription = description },
+            tint = if (remove) spectrumAccent(0) else Color.Transparent,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            if (inspecting || changing)
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            else
+                Icon(
+                    if (remove) Icons.Rounded.PersonRemove else Icons.Rounded.PersonAdd,
+                    null,
+                    Modifier.size(18.dp),
+                )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (remove) removeLabel else addLabel,
+                modifier = Modifier.clearAndSetSemantics {},
+                style = labelStyle,
+                textAlign = TextAlign.Center,
             )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            tr(if (remove) R.string.remove_profile_audio else R.string.add_profile_audio),
-            style = MaterialTheme.typography.labelMedium,
-        )
+        }
+        val detail =
+            when {
+                !connected -> tr(R.string.profile_offline)
+                error.isNotEmpty() -> error
+                track.imported && track.remoteId.isEmpty() && !remove ->
+                    tr(R.string.profile_audio_upload)
+                else -> ""
+            }
+        if (detail.isNotEmpty())
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        if (error.isNotEmpty() && present == null && connected && !changing && !inspecting)
+            TextButton(onClick = { retry++ }, contentPadding = PaddingValues(0.dp)) {
+                Text(tr(R.string.retry_chat_loading))
+            }
     }
-    val detail =
-        when {
-            !connected -> tr(R.string.profile_offline)
-            error.isNotEmpty() -> error
-            track.imported && track.remoteId.isEmpty() && !remove ->
-                tr(R.string.profile_audio_upload)
-            else -> ""
-        }
-    if (detail.isNotEmpty())
-        Text(
-            detail,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-    if (error.isNotEmpty() && present == null && connected && !changing && !inspecting)
-        TextButton(onClick = { retry++ }, contentPadding = PaddingValues(0.dp)) {
-            Text(tr(R.string.retry_chat_loading))
-        }
 }

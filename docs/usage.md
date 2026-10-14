@@ -86,7 +86,9 @@ It stays at the top even when you have not connected it to the library.
 This music is separate from files in Saved Messages or a conversation.
 
 Open a song's three-dot menu in a list or the player. The glass button beneath
-the title offers **Add to Telegram profile** or **Remove from Telegram profile**.
+the artwork and song information is centered in the header. **To profile** adds the
+song to your Telegram profile; **Remove** takes it out. The button keeps the same
+width in both states.
 Each click applies the action directly, without another menu or confirmation.
 The menu closes after Telegram confirms it.
 New songs go to the beginning of your profile's music. The resulting message
