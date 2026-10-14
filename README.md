@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/banner.svg" alt="Spotygram — Telegram music player" width="100%">
+  <img src="docs/banner.png" alt="spotygram — Telegram music player with a honey-glass curled-antenna mark" width="100%">
 </p>
 
 <p align="center">
@@ -48,7 +48,8 @@ recordings can be uploaded there too; the button explains the upload before you 
   <img src="docs/screenshots/profile-dark.png" width="30%" alt="Listening to a profile before adding it to the library">
 </p>
 
-These screens show demonstration sources and recordings in the shared desktop interface.
+These screens show demonstration sources and recordings in the shared desktop interface,
+before the honey-glass mark introduced in 0.22.0.
 
 Sign in to the same Telegram account on another device to restore your playlists,
 favorites, selected chats and profiles, and library settings automatically. Each device keeps its own
@@ -63,8 +64,8 @@ keeps its library documents in a private, muted channel in your Telegram archive
   <img src="docs/screenshots/playlists-light.png" width="30%" alt="Playlists">
 </p>
 
-The library, player and playlist screenshots above were captured in 0.18.0;
-the fourth tab is now Sources.
+The library screenshot shows 0.22.0 with its honey-glass mark. The player and
+playlist screenshots were captured in 0.18.0; the fourth tab is now Sources.
 
 ## Put it on your phone
 

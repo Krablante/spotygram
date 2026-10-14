@@ -23,7 +23,7 @@ fun BackHandler(enabled: Boolean = true, onBack: () -> Unit) {
 @Composable
 fun painterResource(id: Int): Painter {
     require(id == R.drawable.spotygram_mark)
-    return androidx.compose.ui.res.painterResource("drawable/spotygram_mark.xml")
+    return androidx.compose.ui.res.painterResource("drawable-nodpi/spotygram_mark.png")
 }
 
 @Composable

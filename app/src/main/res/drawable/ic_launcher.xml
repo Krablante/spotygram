@@ -1,3 +1,9 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/spotygram_mark" />
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/launcher_background" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_launcher_foreground" />
 </layer-list>

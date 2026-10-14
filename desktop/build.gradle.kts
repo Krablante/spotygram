@@ -102,7 +102,7 @@ val prepareIcons = tasks.register<JavaExec>("prepareDesktopIcons") {
     mainClass.set("app.spotygram.DesktopMainKt")
     args("--write-icons", icons.get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "-Xmx128m")
-    inputs.file(rootProject.file("shared/src/main/res/drawable/spotygram_mark.xml"))
+    inputs.file(rootProject.file("shared/src/main/res/drawable-nodpi/spotygram_mark.png"))
     outputs.dir(icons)
 }
 

@@ -38,16 +38,16 @@ fun main(arguments: Array<String>) {
         return
     }
     System.setProperty("nucleus.app.id", "app.spotygram")
-    System.setProperty("nucleus.app.name", "Spotygram")
+    System.setProperty("nucleus.app.name", "spotygram")
     System.setProperty("nucleus.app.version", BuildConfig.VERSION_NAME)
     System.setProperty("nucleus.app.aumid", "app.spotygram")
     val platform = try { DesktopPlatform() } catch (error: Exception) {
-        JOptionPane.showMessageDialog(null, error.message, "Spotygram", JOptionPane.ERROR_MESSAGE)
+        JOptionPane.showMessageDialog(null, error.message, "spotygram", JOptionPane.ERROR_MESSAGE)
         return
     }
     val instance = try { DesktopInstance(platform.filesDir) } catch (error: Exception) {
         platform.close()
-        JOptionPane.showMessageDialog(null, error.message, "Spotygram", JOptionPane.ERROR_MESSAGE)
+        JOptionPane.showMessageDialog(null, error.message, "spotygram", JOptionPane.ERROR_MESSAGE)
         return
     }
     if (!instance.primary) {
@@ -151,7 +151,7 @@ fun main(arguments: Array<String>) {
                         if (traySupported) visible = false else windowState.isMinimized = true
                     } else quit()
                 },
-                title = "Spotygram",
+                title = "spotygram",
                 state = windowState,
                 visible = visible,
                 icon = painterResource(R.drawable.spotygram_mark),
@@ -193,7 +193,7 @@ fun main(arguments: Array<String>) {
                     }
                 }
             }
-            if (traySupported) Tray(icon = painterResource(R.drawable.spotygram_mark), tooltip = "Spotygram",
+            if (traySupported) Tray(icon = painterResource(R.drawable.spotygram_mark), tooltip = "spotygram",
                 onAction = ::show, menu = {
                     Item(tr(R.string.show_window), onClick = ::show)
                     Separator()
@@ -204,7 +204,7 @@ fun main(arguments: Array<String>) {
         kotlinx.coroutines.runBlocking { started?.close() }
         instance.close()
         platform.close()
-        JOptionPane.showMessageDialog(null, error.message ?: "Spotygram could not start", "Spotygram", JOptionPane.ERROR_MESSAGE)
+        JOptionPane.showMessageDialog(null, error.message ?: "spotygram could not start", "spotygram", JOptionPane.ERROR_MESSAGE)
         error.printStackTrace()
         kotlin.system.exitProcess(1)
     }

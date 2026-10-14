@@ -77,12 +77,12 @@ fun AuthScreen(app: SpotygramApp, auth: AuthState, onLocal: () -> Unit, onBack: 
             if (!phone && auth.canChangePhone) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Image(painterResource(R.drawable.spotygram_mark), null, Modifier.size(40.dp))
-                    Text("Spotygram", style = MaterialTheme.typography.headlineSmall)
+                    Text("spotygram", style = MaterialTheme.typography.headlineSmall)
                 }
             } else {
                 Image(painterResource(R.drawable.spotygram_mark), null, Modifier.size(64.dp))
                 Spacer(Modifier.height(16.dp))
-                Text("Spotygram", style = MaterialTheme.typography.headlineLarge)
+                Text("spotygram", style = MaterialTheme.typography.headlineLarge)
             }
             Spacer(Modifier.height(12.dp))
         }

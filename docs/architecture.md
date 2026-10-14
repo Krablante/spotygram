@@ -313,9 +313,15 @@ facilities are not advertised.
 
 ## Visual system and idle work
 
-English/Russian strings and the RGB brand vector are shared XML resources. Android
-uses native resources; desktop reads those same XML files. `Design.kt` feeds explicit
-background/content captures to Haze Glass 2.0.1. Controls are outside their own capture;
+English/Russian strings are shared XML resources. The honey-glass mark with rounded
+ears and a curled antenna is one transparent PNG in `shared/`; Android and desktop
+load the same artwork. The interface displays the name as `spotygram`. Desktop
+packaging derives PNG, multi-size ICO and ICNS icons from that artwork. Android
+keeps the mark inside the adaptive-icon safe area and uses its matching white
+silhouette for themed icons and notifications. These static assets need no live
+glass effect or animation.
+
+`Design.kt` feeds explicit background/content captures to Haze Glass 2.0.1. Controls are outside their own capture;
 dense glass diffuses text underneath. Primary edge refraction, dispersion and lighting
 remain, while the secondary detail pass is disabled. There is no row effect or animated
 wallpaper. Desktop and Android 13+ use full optics; older Android uses denser tint,

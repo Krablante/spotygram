@@ -9,6 +9,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.SessionResult
 import androidx.media3.common.Player as NativePlayer
 
@@ -20,6 +21,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        setMediaNotificationProvider(DefaultMediaNotificationProvider(this).apply {
+            setSmallIcon(R.drawable.ic_notification)
+        })
         val player = ExoPlayer.Builder(this)
             .setLoadControl(DefaultLoadControl.Builder()
                 .setBufferDurationsMs(15000, 30000, 1000, 2000).build())

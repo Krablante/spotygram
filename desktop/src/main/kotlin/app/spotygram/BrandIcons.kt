@@ -1,49 +1,50 @@
 package app.spotygram
 
 import java.io.File
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import javax.xml.parsers.DocumentBuilderFactory
-import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Paint
-import org.jetbrains.skia.Path
-import org.jetbrains.skia.Surface
-import org.w3c.dom.Element
+import javax.imageio.ImageIO
 
-/** Launcher icons are generated from the same vector used by the shared interface. */
+/** Launcher icons preserve the same glass artwork used by the shared interface. */
 object BrandIcons {
     fun write(directory: File) {
         directory.mkdirs()
-        val document = checkNotNull(javaClass.classLoader.getResourceAsStream("drawable/spotygram_mark.xml"))
-            .use { DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(it) }
-        val nodes = document.getElementsByTagName("path")
+        val original = checkNotNull(javaClass.classLoader.getResourceAsStream("drawable-nodpi/spotygram_mark.png"))
+            .use { checkNotNull(ImageIO.read(it)) }
         fun png(size: Int): ByteArray {
-            Surface.makeRasterN32Premul(size, size).use { surface ->
-                surface.canvas.scale(size / 108f, size / 108f)
-                Paint().use { paint ->
-                    paint.isAntiAlias = true
-                    for (i in 0 until nodes.length) {
-                        val element = nodes.item(i) as Element
-                        val color = element.getAttributeNS("http://schemas.android.com/apk/res/android", "fillColor").removePrefix("#").toLong(16)
-                        paint.color = (color or 0xff000000L).toInt()
-                        Path.makeFromSVGString(element.getAttributeNS("http://schemas.android.com/apk/res/android", "pathData")).use { path ->
-                            surface.canvas.drawPath(path, paint)
-                        }
-                    }
-                }
-                return surface.makeImageSnapshot().use { image ->
-                    checkNotNull(image.encodeToData(EncodedImageFormat.PNG)).use { it.bytes }
-                }
+            val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+            val graphics = image.createGraphics()
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                graphics.drawImage(original, 0, 0, size, size, null)
+            } finally {
+                graphics.dispose()
+            }
+            return ByteArrayOutputStream().use { output ->
+                check(ImageIO.write(image, "png", output))
+                output.toByteArray()
             }
         }
-        val icon = png(256)
         File(directory, "spotygram.png").writeBytes(png(512))
-        val header = ByteBuffer.allocate(22).order(ByteOrder.LITTLE_ENDIAN)
-        header.putShort(0).putShort(1).putShort(1)
-        header.put(0).put(0).put(0).put(0).putShort(1).putShort(32)
-        header.putInt(icon.size).putInt(22)
-        File(directory, "spotygram.ico").writeBytes(header.array() + icon)
-        val chunks = listOf("ic07" to 128, "ic08" to 256, "ic09" to 512, "ic10" to 1024).map { (kind, size) ->
+        val sizes = listOf(16, 24, 32, 48, 64, 128, 256)
+        val images = sizes.map(::png)
+        val header = ByteBuffer.allocate(6 + sizes.size * 16).order(ByteOrder.LITTLE_ENDIAN)
+        header.putShort(0).putShort(1).putShort(sizes.size.toShort())
+        var offset = header.capacity()
+        sizes.zip(images).forEach { (size, image) ->
+            header.put((size % 256).toByte()).put((size % 256).toByte()).put(0).put(0).putShort(1).putShort(32)
+            header.putInt(image.size).putInt(offset)
+            offset += image.size
+        }
+        File(directory, "spotygram.ico").outputStream().use { output ->
+            output.write(header.array())
+            images.forEach(output::write)
+        }
+        val chunks = listOf("icp4" to 16, "icp5" to 32, "icp6" to 64, "ic07" to 128,
+            "ic08" to 256, "ic09" to 512, "ic10" to 1024).map { (kind, size) ->
             val data = png(size)
             kind.toByteArray(Charsets.US_ASCII) + ByteBuffer.allocate(4).putInt(data.size + 8).array() + data
         }.fold(ByteArray(0)) { result, chunk -> result + chunk }

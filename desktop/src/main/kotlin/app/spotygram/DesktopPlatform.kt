@@ -52,7 +52,7 @@ class DesktopPlatform : Platform, AutoCloseable {
 
     init {
         listOf(filesDir, cacheDir).forEach { directory ->
-            check(directory.isDirectory || directory.mkdirs()) { "Spotygram storage could not be created" }
+            check(directory.isDirectory || directory.mkdirs()) { "spotygram storage could not be created" }
             if (DesktopTarget.os != "windows") Files.setPosixFilePermissions(directory.toPath(),
                 setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE))
         }
@@ -67,7 +67,7 @@ class DesktopPlatform : Platform, AutoCloseable {
         val db = DesktopDatabase(File(filesDir, name))
         try {
             val old = db.rawQuery("PRAGMA user_version", null).use { it.moveToFirst(); it.getInt(0) }
-            check(old <= version) { "This library needs a newer Spotygram version" }
+            check(old <= version) { "This library needs a newer spotygram version" }
             if (old < version) db.transaction {
                 if (old == 0) create(this) else upgrade(this, old, version)
                 execSQL("PRAGMA user_version=$version")

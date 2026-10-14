@@ -101,7 +101,7 @@ class UpdateInstaller(private val app: AndroidApplication) : UpdateInstallation 
                         check(prefs.edit().putString("asset", asset.toJson()).commit())
                         val request =
                             DownloadManager.Request(Uri.parse(asset.url))
-                                .setTitle("Spotygram ${asset.version}")
+                                .setTitle("spotygram ${asset.version}")
                                 .setDescription(tr(R.string.update_downloading))
                                 .setMimeType("application/vnd.android.package-archive")
                                 .setNotificationVisibility(

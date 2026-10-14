@@ -292,7 +292,7 @@ fun SettingsSheet(
         }
         UpdateSettings(app)
         Text(
-            "Spotygram ${BuildConfig.VERSION_NAME}",
+            "spotygram ${BuildConfig.VERSION_NAME}",
             Modifier.padding(top = 20.dp),
             style = MaterialTheme.typography.titleMedium,
         )

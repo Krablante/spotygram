@@ -7,6 +7,32 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.22.0 — honey-glass identity
+
+The packaged Linux application displayed the selected yellow glass mark with its
+curled antenna and lowercase `spotygram` name. Actual screenshots covered welcome,
+library and player screens, both appearances, English/Russian and 390/1100-pixel
+windows. Pale reflections stayed opaque and the background stayed transparent.
+Two local WAV recordings imported; native libmpv playback with null audio output,
+pause and a favorite worked. Ordinary Quit closed the application. The README
+banner and library image now show the selected artwork; older images are identified.
+
+Android debug/release assemblies and both Lint checks passed. The signed APKs use
+0.22.0, versionCode 42, the original application ID/certificate and 16 KB alignment.
+The retained Android 15 emulator updated from 0.21.1; the installed APK matched the
+release file byte-for-byte. Immediately after upgrade, all eleven catalog tables
+and local queue/position fields matched the baseline, including 8,910 ms; SQLite
+integrity was `ok`. Real screenshots showed the launcher icon, English/light and
+Russian/dark library, and the complete brand row at 320 dp with font scale 1.3.
+Keyboard navigation changed language and appearance. Touch injection was unreliable
+in this emulator, so these checks do not establish physical touch responsiveness.
+
+Physical devices, physical sound, screen-reader speech, authenticated Telegram
+actions and interactive Windows/macOS operation were not exercised in this cycle.
+The notification and themed-icon resources use the matching white silhouette;
+the themed launcher mode and an active Android media notification were not visually
+exercised.
+
 ## 0.21.1 — centered compact profile button
 
 The compiled shared interface showed To profile/Remove centered beneath the
