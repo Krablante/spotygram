@@ -33,6 +33,17 @@ Physical devices, physical sound, screen-reader speech and interactive Windows/m
 operation were not exercised. Narrow-layout and error checks used controlled TDLib
 responses in the compiled desktop interface.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38540377303)
+built from `8ecaa5b`. Installer signatures, archive manifests and all payload hashes
+verified with the original key. Every compiled app reported 0.21.1 with DEBUG false,
+contained the new short-label resources and embedded the trusted update key.
+The signed Linux release archive reopened the retained catalog and displayed the
+centered compact button; ordinary Quit closed it. All fifteen draft asset names,
+sizes and GitHub SHA-256 digests matched the local files before publication.
+The ordinary [v0.21.1 release](https://github.com/Krablante/spotygram/releases/tag/v0.21.1)
+was confirmed as Latest with the same assets. The signed ARM64 APK was delivered
+to the owner through Telegram artifacts.
+
 ## 0.21.0 — direct profile-music actions
 
 Native TDLib through the retained, separate Spotygram production session uploaded
