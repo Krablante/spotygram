@@ -37,6 +37,26 @@ to off. Only expected appearance-sync clocks differed in the final catalog dump;
 SQLite integrity was `ok` and the crash buffer was empty. The emulator had a
 System UI ANR at cold boot before the successful application checks.
 
+Final Android debug/release assemblies and both Lint checks passed. The two release
+APKs retain the original signer/application ID, versionCode 45 and 16 KB alignment.
+The final installed x86-64 APK matched the release file byte-for-byte. Its catalog
+dump matched the pre-installation baseline after launch, and the paused position
+remained 8,910 ms. Both sharing switches remained off.
+
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38632282559)
+built from `78562e4`. Archive manifests, all payload hashes and four installer
+signatures verified with the existing key. Every compiled app reports 0.24.0 with
+DEBUG false, includes the sharing classes and embeds the original update key.
+The signed Linux release reopened its 537-record catalog and owned Telegram session,
+displayed live eligible recipients, and selected, pinned and unpinned a recipient.
+Ordinary Quit closed it; catalog counts matched and SQLite integrity was `ok`.
+
+All fifteen draft and published asset names, sizes and GitHub SHA-256 digests
+matched the local files. [v0.24.0](https://github.com/Krablante/spotygram/releases/tag/v0.24.0)
+was confirmed as Latest with `78562e4` as its tag target. The signed ARM64 APK and
+actual shared-interface/Android-settings screenshots were delivered to the owner
+through Telegram artifacts. Public screenshots use demonstration recipients.
+
 Physical Android devices, physical sound, authenticated Android sending, long
 foreground uploads and interactive Windows/macOS operation were not exercised.
 Profile-file sharing was reviewed against the existing resolver, without a new
