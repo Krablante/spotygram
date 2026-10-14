@@ -63,7 +63,7 @@ fun MusicScreen(
     onBack: () -> Unit,
     onPlay: (Track, List<Track>) -> Unit,
     onLike: (Track) -> Unit,
-    onMore: (Track) -> Unit,
+    onMore: (Track, IntRect) -> Unit,
     onImport: () -> Unit,
     onChats: () -> Unit,
     onRefresh: () -> Unit,
@@ -514,7 +514,7 @@ fun MusicScreen(
                             toggle(track)
                         },
                         onLike = { onLike(track) },
-                        onMore = { onMore(track) },
+                        onMore = { anchor -> onMore(track, anchor) },
                     )
                 }
                 if (library.sources.any { !it.fullyIndexed } && !favorites && playlist == null)
@@ -788,9 +788,10 @@ fun TrackRow(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     onLike: (() -> Unit)? = null,
-    onMore: (() -> Unit)? = null,
+    onMore: ((IntRect) -> Unit)? = null,
 ) {
     val narrow = LocalConfiguration.current.screenWidthDp < 360
+    var menuAnchor by remember { mutableStateOf(IntRect.Zero) }
     Row(
         Modifier.fillMaxWidth()
             .background(
@@ -893,7 +894,20 @@ fun TrackRow(
                 )
             }
         if (selected == null && onMore != null)
-            IconButton(onClick = onMore) {
+            IconButton(
+                onClick = { onMore(menuAnchor) },
+                modifier =
+                    Modifier.onGloballyPositioned {
+                        val b = it.boundsInWindow()
+                        menuAnchor =
+                            IntRect(
+                                b.left.toInt(),
+                                b.top.toInt(),
+                                b.right.toInt(),
+                                b.bottom.toInt(),
+                            )
+                    },
+            ) {
                 Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions_named, track.title))
             }
         if (selected != null) Spacer(Modifier.width(12.dp))

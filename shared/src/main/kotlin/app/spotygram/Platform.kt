@@ -39,6 +39,7 @@ interface Platform {
     fun languageSettings(app: SpotygramApp)
     fun startDownloads(app: SpotygramApp)
     fun stopDownloads(app: SpotygramApp)
+    fun startProfileAudioUpload(app: SpotygramApp) {}
     fun installer(app: SpotygramApp): UpdateInstallation
     fun assetName(version: String, abi: String = releaseAbi): String
     fun logPlaybackError(code: String)

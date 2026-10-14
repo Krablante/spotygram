@@ -35,6 +35,10 @@ source menu in Music. Open a profile to listen to its pinned music, then choose 
 if you want all its songs in your collection. A heart or playlist saves an individual
 song without connecting the profile. Other people’s music follows Telegram’s privacy settings.
 
+Open a song's menu to **Add to Telegram profile** or **Remove from Telegram profile**
+with the glass button beneath its title. Both actions apply in one click. Local
+recordings can be uploaded there too; the button explains the upload before you choose it.
+
 <p align="center">
   <img src="docs/screenshots/sources-dark.png" width="30%" alt="Glass source groups with chat avatars and My profile pinned at the top">
   &nbsp;

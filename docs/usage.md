@@ -85,6 +85,27 @@ from the music library.
 It stays at the top even when you have not connected it to the library.
 This music is separate from files in Saved Messages or a conversation.
 
+Open a song's three-dot menu in a list or the player. The glass button beneath
+the title offers **Add to Telegram profile** or **Remove from Telegram profile**.
+Each click applies the action directly, without another menu or confirmation.
+The menu closes after Telegram confirms it.
+New songs go to the beginning of your profile's music. The resulting message
+offers **Undo**. Removing profile music leaves favorites, playlists and local copies intact.
+
+These actions require a Telegram connection. An imported recording is uploaded
+when you choose Add; the explanation under the button makes this visible beforehand.
+Android shows a quiet notification while it uploads. Its original local entry
+remembers the uploaded file, so Remove is also available there after restart.
+Telegram's restrictions on saving recordings still apply. An error keeps the
+action available for retry rather than reporting success.
+
+Telegram profile music accepts audio tracks. Songs sent as ordinary documents
+do not show this button; local imports can be uploaded as audio.
+
+Narrow windows use the bottom sheet. Wide windows show the same header and actions
+in a compact menu beside the three-dot button. The profile button stays within
+this menu, leaving the listening screen's controls unchanged.
+
 To find another person, open **Sources → Add → Profiles** and enter a name,
 `@username` or a `t.me/username` link. The search includes contacts, known private
 chats and public username matches; channels and bots are excluded. Recent profiles
@@ -135,7 +156,7 @@ bottom player opens the full player. Android lock-screen and desktop system medi
 controls work too. Wide windows move navigation to the side.
 
 Desktop **Esc** closes the current panel or player. Closing the window while
-playing or downloading hides it in the tray, or minimizes it when a tray is
+playing, downloading or changing profile music hides it in the tray, or minimizes it when a tray is
 unavailable. **Ctrl/⌘+Q** quits and saves state; playback never starts automatically
 after the next launch.
 

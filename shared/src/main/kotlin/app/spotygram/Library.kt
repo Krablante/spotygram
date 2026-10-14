@@ -456,6 +456,21 @@ class Library(private val platform: Platform) : AutoCloseable {
             reload()
         }
 
+    suspend fun importedAudioReference(id: String, key: String, remote: String) =
+        withContext(Dispatchers.IO) {
+            require(key.isNotEmpty() && remote.isNotEmpty())
+            writableDatabase.update(
+                "tracks",
+                Values().apply {
+                    put("file_key", key)
+                    put("remote_id", remote)
+                },
+                "id=? AND chat=0 AND profile_user=0",
+                arrayOf(id),
+            )
+            reload()
+        }
+
     suspend fun pruneProfilePreviews(protectedUsers: Set<Long>): Set<String> =
         withContext(Dispatchers.IO) {
             val removed = mutableSetOf<String>()

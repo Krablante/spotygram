@@ -12,6 +12,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
@@ -37,6 +38,11 @@ class Profiles(private val app: SpotygramApp) {
     val loading = MutableStateFlow(emptySet<Long>())
     val errors = MutableStateFlow(emptyMap<Long, String>())
     val photos = MutableStateFlow(emptyMap<Long, String>())
+    val audioRevision = MutableStateFlow(0L)
+    val editingAudio = MutableStateFlow(false)
+    val uploadingAudio = MutableStateFlow(false)
+    private val audioEdits = Mutex()
+    private var editedProfileRefresh: Job? = null
     private val locks = ConcurrentHashMap<Long, Mutex>()
     private val photoLoads = ConcurrentHashMap.newKeySet<Long>()
     private val jobs = ConcurrentHashMap.newKeySet<Job>()
@@ -199,14 +205,16 @@ class Profiles(private val app: SpotygramApp) {
                     } while (offset < total)
                     check(tracks.size == expectedCount) { tr(R.string.profile_incomplete) }
                     library.profileAudios(id, tracks.values.toList())
-                    val savedQueue = runCatching {
-                        val ids =
-                            JSONArray(
-                                app.getSharedPreferences("playback_queue").getString("ids", "[]")
-                            )
-                        List(ids.length()) { ids.getString(it) }
-                    }
-                        .getOrDefault(emptyList())
+                    val savedQueue =
+                        runCatching {
+                                val ids =
+                                    JSONArray(
+                                        app.getSharedPreferences("playback_queue")
+                                            .getString("ids", "[]")
+                                    )
+                                List(ids.length()) { ids.getString(it) }
+                            }
+                            .getOrDefault(emptyList())
                     val protected =
                         (savedQueue + app.playback?.snapshot()?.ids.orEmpty())
                             .mapNotNull {
@@ -236,6 +244,140 @@ class Profiles(private val app: SpotygramApp) {
         if (current?.available != true || current.fileId == 0)
             error(tr(R.string.profile_audio_unavailable))
         return current.fileId
+    }
+
+    private fun requireConnection() {
+        check(telegram.auth.value.type == "authorizationStateReady") {
+            tr(R.string.telegram_required)
+        }
+        check(telegram.connection.value.isEmpty()) { tr(R.string.profile_offline) }
+    }
+
+    private suspend fun audioFile(track: Track): Int {
+        if (!track.imported && track.available) return app.resolve(track)
+        if (track.remoteId.isEmpty()) return 0
+        return telegram
+            .request(
+                json(
+                    "getRemoteFile",
+                    "remote_file_id" to track.remoteId,
+                    "file_type" to json("fileTypeAudio"),
+                )
+            )
+            .getInt("id")
+    }
+
+    /** Inspect only the selected recording; TDLib owns the account's saved-file index. */
+    suspend fun containsAudio(track: Track): Boolean = active {
+        app.awaitLibrary()
+        requireConnection()
+        val id = audioFile(app.track(track.id) ?: track)
+        if (id == 0) return@active false
+        try {
+            telegram.request(json("isProfileAudio", "file_id" to id))
+            true
+        } catch (e: TelegramException) {
+            if (e.code != 404) throw e
+            false
+        }
+    }
+
+    /** A click sets one final state. Profile membership is owned by Telegram, not LibrarySync. */
+    suspend fun changeAudio(track: Track, added: Boolean) = active {
+        audioEdits.withLock {
+            app.awaitLibrary()
+            requireConnection()
+            editingAudio.value = true
+            var preliminary = 0
+            try {
+                val current = app.track(track.id) ?: track
+                if (added && current.chatId != 0L) {
+                    val properties =
+                        telegram.request(
+                            json(
+                                "getMessageProperties",
+                                "chat_id" to current.chatId,
+                                "message_id" to current.messageId,
+                            )
+                        )
+                    check(properties.getBoolean("can_be_saved")) {
+                        tr(R.string.profile_audio_protected)
+                    }
+                }
+                var id = audioFile(current)
+                if (added && id == 0) {
+                    check(validAudioCopy(current.path, current.size)) { tr(R.string.no_local_copy) }
+                    uploadingAudio.value = true
+                    app.platform.startProfileAudioUpload(app)
+                    // Register the upload so its stable remote reference can be retained for the
+                    // original imported song. A later restart can then offer Remove on that song.
+                    id =
+                        telegram
+                            .request(
+                                json(
+                                    "preliminaryUploadFile",
+                                    "file" to json("inputFileLocal", "path" to current.path),
+                                    "file_type" to json("fileTypeAudio"),
+                                    "priority" to 2,
+                                )
+                            )
+                            .getInt("id")
+                    preliminary = id
+                }
+                check(id != 0) { tr(R.string.profile_audio_unavailable) }
+                if (added)
+                    telegram.request(
+                        json(
+                            "addProfileAudio",
+                            "audio" to
+                                json(
+                                    "inputAudio",
+                                    "audio" to json("inputFileId", "id" to id),
+                                    "duration" to current.duration,
+                                    "title" to current.title,
+                                    "performer" to current.artist,
+                                ),
+                        ),
+                        timeout = if (preliminary != 0) 86_400_000 else 30_000,
+                    )
+                else telegram.request(json("removeProfileAudio", "file_id" to id))
+                if (current.imported && added) {
+                    val file = telegram.request(json("getFile", "file_id" to id))
+                    val remote = file.getJSONObject("remote")
+                    library.importedAudioReference(
+                        current.id,
+                        remote.getString("unique_id"),
+                        remote.getString("id"),
+                    )
+                }
+                audioRevision.update { it + 1 }
+                // Refresh a previously opened/connected collection without delaying the button.
+                // Bursts replace this one job; unrelated menus never read the whole profile.
+                editedProfileRefresh?.cancel()
+                editedProfileRefresh =
+                    app.scope.launch {
+                        try {
+                            val own = if (selfId.value == 0L) currentUser().id else selfId.value
+                            if (cached(own)?.let { it.loadedAt != 0L || it.selected } == true)
+                                load(own, force = true)
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                        }
+                    }
+            } finally {
+                if (preliminary != 0)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        runCatching {
+                            telegram.request(
+                                json("cancelPreliminaryUploadFile", "file_id" to preliminary),
+                                timeout = 5_000,
+                            )
+                        }
+                    }
+                editingAudio.value = false
+                uploadingAudio.value = false
+            }
+        }
     }
 
     suspend fun search(query: String, server: Boolean): List<UserProfile> {
@@ -367,6 +509,8 @@ class Profiles(private val app: SpotygramApp) {
     }
 
     suspend fun stop() {
+        editedProfileRefresh?.cancelAndJoin()
+        editedProfileRefresh = null
         val caller = currentCoroutineContext().job
         val active =
             synchronized(jobs) {
@@ -384,6 +528,7 @@ class Profiles(private val app: SpotygramApp) {
         selfId.value = 0
         errors.value = emptyMap()
         photos.value = emptyMap()
+        audioRevision.update { it + 1 }
         app.prefs.edit().remove("profile_self").apply()
     }
 }

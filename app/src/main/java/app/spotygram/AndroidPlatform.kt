@@ -207,6 +207,12 @@ class AndroidPlatform(val context: AndroidApplication) : Platform {
         ContextCompat.startForegroundService(context, Intent(context, DownloadService::class.java))
     }
 
+    override fun startProfileAudioUpload(app: SpotygramApp) {
+        ContextCompat.startForegroundService(
+            context, Intent(context, DownloadService::class.java).setAction("profileUpload")
+        )
+    }
+
     override fun stopDownloads(app: SpotygramApp) {
         if (app.downloadService != null)
             context.startService(Intent(context, DownloadService::class.java).setAction("cancel"))

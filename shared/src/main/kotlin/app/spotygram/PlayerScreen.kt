@@ -16,11 +16,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,7 +35,7 @@ fun PlayerScreen(
     state: Playing,
     player: Player?,
     onBack: () -> Unit,
-    onMore: () -> Unit,
+    onMore: (IntRect) -> Unit,
     onLike: () -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
@@ -43,6 +46,7 @@ fun PlayerScreen(
     val progress = observePlayer(player, positionUpdates = true)
     val largeText = LocalConfiguration.current.fontScale > 1.2f
     val volumeInset = if (player?.supportsVolumeControl == true) 48.dp else 0.dp
+    var menuAnchor by remember { mutableStateOf(IntRect.Zero) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val wide = maxWidth >= 600.dp && maxWidth > maxHeight
         val cover =
@@ -92,14 +96,26 @@ fun PlayerScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        if (track.imported) tr(R.string.from_device)
-                        else track.sourceTitle,
+                        if (track.imported) tr(R.string.from_device) else track.sourceTitle,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                GlassIconButton(onClick = onMore) {
+                GlassIconButton(
+                    onClick = { onMore(menuAnchor) },
+                    modifier =
+                        Modifier.onGloballyPositioned {
+                            val b = it.boundsInWindow()
+                            menuAnchor =
+                                IntRect(
+                                    b.left.toInt(),
+                                    b.top.toInt(),
+                                    b.right.toInt(),
+                                    b.bottom.toInt(),
+                                )
+                        },
+                ) {
                     Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions))
                 }
             }

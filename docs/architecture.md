@@ -86,6 +86,18 @@ TDLib's native file-reference refresh source. Portable descriptors include the u
 ID and username; a fresh client can resolve that username while checking the ID,
 or load its account contact directory when needed.
 
+The track-menu header checks `isProfileAudio` for that recording. `Profiles`
+serializes explicit `addProfileAudio`/`removeProfileAudio` requests and changes the
+button after Telegram confirms them. A replaceable refresh job updates an already
+opened or selected own profile; it does not delay the button or poll an idle account.
+Chat recordings retain Telegram's saving restrictions; ordinary Document files
+are excluded because profile music requires Audio files. Imported uploads reuse the
+native uploader and store the returned stable file key and remote reference in the
+existing track columns, preserving the original local file and entry. Membership
+belongs to Telegram and creates no library-sync record or schema migration. Android's
+existing data-transfer foreground service also keeps explicit profile uploads alive;
+desktop window closing retains the process while a profile edit is active.
+
 Browsing stores metadata independently of library membership. Only selected profiles,
 favorite songs and playlist members enter Music and the playlist editor; retained
 playback copies remain available in On device. Preview metadata keeps twelve recent
@@ -319,6 +331,11 @@ At 840 dp, navigation becomes a side rail; wide players separate artwork and con
 Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with 48 dp
 secondary touch targets. Sheet glass travels inside its native placement transform;
 keyboard layout changes preserve text-field identity and focus.
+
+Track actions share one header and list. The profile button has direct Add/Remove
+actions, a 48 dp minimum touch target and wrapping text. Widths from 600 dp use a
+menu anchored to the chosen track's three-dot button; narrower windows use the
+native bottom sheet. Both surfaces bound their height and scroll longer content.
 
 Sources uses lazy rows inside common glass panels. Each visible group draws one
 surface bounded to the viewport, including groups taller than the screen. The

@@ -21,13 +21,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.chrisbanes.haze.rememberHazeState
@@ -67,6 +75,7 @@ fun SpotygramUI(
     var fullPlayer by rememberSaveable { mutableStateOf(false) }
     var sheet by remember { mutableStateOf("") }
     var selectedTrackId by remember { mutableStateOf<String?>(null) }
+    var trackAnchor by remember { mutableStateOf(IntRect.Zero) }
     var playlistId by rememberSaveable { mutableStateOf<Long?>(null) }
     var sourceId by rememberSaveable { mutableStateOf<String?>(null) }
     var profileId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -90,6 +99,7 @@ fun SpotygramUI(
     val focus = LocalFocusManager.current
     val keyboardVisible = imeVisible()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
+    val trackPopup = LocalConfiguration.current.screenWidthDp >= 600
     val pages = rememberSaveableStateHolder()
     val glassState = rememberHazeState()
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
@@ -110,6 +120,11 @@ fun SpotygramUI(
     val groupedFavorites = hideDuplicates && (groupedView || profile != null)
     val current =
         library.byId[playing.id]?.let {
+            if (groupedFavorites) library.duplicates.display(it)
+            else if (offlineView && it.local) library.localDisplay(it) else it
+        }
+    val selectedTrack =
+        library.byId[selectedTrackId]?.let {
             if (groupedFavorites) library.duplicates.display(it)
             else if (offlineView && it.local) library.localDisplay(it) else it
         }
@@ -207,6 +222,58 @@ fun SpotygramUI(
         profileHint = value
         app.action { app.profiles.open(value) }
     }
+    fun profileChanged(track: Track, added: Boolean) {
+        snackbar.currentSnackbarData?.dismiss()
+        scope.launch {
+            if (
+                snackbar.showSnackbar(
+                    tr(if (added) R.string.profile_audio_added else R.string.profile_audio_removed),
+                    tr(R.string.undo),
+                    duration = SnackbarDuration.Short,
+                ) == SnackbarResult.ActionPerformed
+            )
+                app.action {
+                    app.profiles.changeAudio(track, !added)
+                    app.notices.emit(
+                        tr(
+                            if (added) R.string.profile_audio_removed
+                            else R.string.profile_audio_added
+                        )
+                    )
+                }
+        }
+    }
+    val trackActions: @Composable (Modifier) -> Unit = { modifier ->
+        selectedTrack?.let { track ->
+            TrackActions(
+                app,
+                track,
+                mode.order,
+                playlistId,
+                onLike = { like(track) },
+                onPlaylist = { addToPlaylist(listOf(track.id)) },
+                onOrder = { sheet = "playbackOrder" },
+                onDownload = { onDownload(listOf(track.id)) },
+                onOpenTelegram = {
+                    snackbar.currentSnackbarData?.dismiss()
+                    app.action {
+                        try {
+                            app.platform.openUrl(app.messageLink(track))
+                        } catch (_: Exception) {
+                            error(tr(R.string.telegram_app_missing))
+                        }
+                    }
+                    sheet = ""
+                },
+                onProfileChanged = {
+                    profileChanged(track, it)
+                    sheet = ""
+                },
+                onClose = { sheet = "" },
+                modifier = modifier,
+            )
+        }
+    }
     BackHandler(
         enabled =
             sheet.isEmpty() &&
@@ -299,8 +366,9 @@ fun SpotygramUI(
                             playing,
                             player,
                             onBack = { fullPlayer = false },
-                            onMore = {
+                            onMore = { anchor ->
                                 selectedTrackId = current.id
+                                trackAnchor = anchor
                                 sheet = "track"
                             },
                             onLike = { like(current) },
@@ -527,8 +595,9 @@ fun SpotygramUI(
                                                         play(track, tracks)
                                                     },
                                                     onLike = { like(it) },
-                                                    onMore = {
-                                                        selectedTrackId = it.id
+                                                    onMore = { track, anchor ->
+                                                        selectedTrackId = track.id
+                                                        trackAnchor = anchor
                                                         sheet = "track"
                                                     },
                                                     onImport = onImport,
@@ -690,7 +759,32 @@ fun SpotygramUI(
                     ) {
                         GlassSnackbarHost(snackbar)
                     }
-                if (sheet.isNotEmpty())
+                if (sheet == "track" && trackPopup) {
+                    val density = LocalDensity.current
+                    val margin = with(density) { 8.dp.roundToPx() }
+                    Popup(
+                        popupPositionProvider =
+                            remember(trackAnchor, margin) {
+                                TrackMenuPosition(trackAnchor, margin)
+                            },
+                        onDismissRequest = { sheet = "" },
+                        properties = PopupProperties(focusable = true),
+                    ) {
+                        Column(
+                            Modifier.width(
+                                    (LocalConfiguration.current.screenWidthDp - 32)
+                                        .dp
+                                        .coerceAtMost(380.dp)
+                                )
+                                .heightIn(max = (LocalConfiguration.current.screenHeightDp - 32).dp)
+                                .liquidGlass(24.dp, strong = true)
+                                .padding(vertical = 8.dp)
+                        ) {
+                            trackActions(Modifier.weight(1f, fill = false))
+                        }
+                    }
+                }
+                if (sheet.isNotEmpty() && !(sheet == "track" && trackPopup))
                     ModalBottomSheet(
                         onDismissRequest = { sheet = "" },
                         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -878,126 +972,7 @@ fun SpotygramUI(
                                                 Spacer(Modifier.height(12.dp))
                                             }
                                         }
-                                    "track" ->
-                                        library.byId[selectedTrackId]
-                                            ?.let {
-                                                if (groupedFavorites) library.duplicates.display(it)
-                                                else if (offlineView && it.local)
-                                                    library.localDisplay(it)
-                                                else it
-                                            }
-                                            ?.let { track ->
-                                                Column(
-                                                    Modifier.navigationBarsPadding()
-                                                        .padding(horizontal = 12.dp)
-                                                        .verticalScroll(rememberScrollState())
-                                                ) {
-                                                    ListItem(
-                                                        colors =
-                                                            ListItemDefaults.colors(
-                                                                containerColor = Color.Transparent
-                                                            ),
-                                                        headlineContent = {
-                                                            Text(track.title, maxLines = 2)
-                                                        },
-                                                        supportingContent = {
-                                                            Text(track.subtitle)
-                                                        },
-                                                        leadingContent = { Artwork(track, 48.dp) },
-                                                    )
-                                                    ActionRow(
-                                                        if (track.liked) Icons.Rounded.Favorite
-                                                        else Icons.Rounded.FavoriteBorder,
-                                                        if (track.liked) tr(R.string.unlike)
-                                                        else tr(R.string.like),
-                                                    ) {
-                                                        like(track)
-                                                        sheet = ""
-                                                    }
-                                                    ActionRow(
-                                                        Icons.Rounded.PlaylistAdd,
-                                                        tr(R.string.to_playlist),
-                                                    ) {
-                                                        addToPlaylist(listOf(track.id))
-                                                    }
-                                                    ActionRow(
-                                                        Icons.Rounded.QueuePlayNext,
-                                                        tr(R.string.play_next),
-                                                    ) {
-                                                        app.playback?.addNext(track)
-                                                        sheet = ""
-                                                    }
-                                                    ActionRow(
-                                                        playbackOrderIcon(mode.order),
-                                                        tr(R.string.playback_order),
-                                                        supportingText =
-                                                            playbackOrderLabel(mode.order),
-                                                    ) {
-                                                        sheet = "playbackOrder"
-                                                    }
-                                                    if (track.local && track.temporary)
-                                                        ActionRow(
-                                                            Icons.Rounded.Download,
-                                                            tr(R.string.keep_on_device),
-                                                        ) {
-                                                            onDownload(listOf(track.id))
-                                                            sheet = ""
-                                                        }
-                                                    if (track.local)
-                                                        ActionRow(
-                                                            Icons.Rounded.DeleteOutline,
-                                                            tr(R.string.remove_from_device),
-                                                        ) {
-                                                            app.action { app.removeLocal(track) }
-                                                            sheet = ""
-                                                        }
-                                                    else if (track.available)
-                                                        ActionRow(
-                                                            Icons.Rounded.Download,
-                                                            tr(R.string.download_to_device),
-                                                        ) {
-                                                            onDownload(listOf(track.id))
-                                                            sheet = ""
-                                                        }
-                                                    playlistId?.let { id ->
-                                                        ActionRow(
-                                                            Icons.Rounded.PlaylistRemove,
-                                                            tr(R.string.remove_from_playlist),
-                                                        ) {
-                                                            app.action {
-                                                                app.library.removeFromPlaylist(
-                                                                    id,
-                                                                    track.id,
-                                                                )
-                                                            }
-                                                            sheet = ""
-                                                        }
-                                                    }
-                                                    if (track.chatId != 0L && track.available)
-                                                        ActionRow(
-                                                            Icons.Rounded.OpenInNew,
-                                                            tr(R.string.open_in_telegram),
-                                                        ) {
-                                                            snackbar.currentSnackbarData?.dismiss()
-                                                            app.action {
-                                                                try {
-                                                                    app.platform.openUrl(
-                                                                        app.messageLink(track)
-                                                                    )
-                                                                } catch (_: Exception) {
-                                                                    error(
-                                                                        tr(
-                                                                            R.string
-                                                                                .telegram_app_missing
-                                                                        )
-                                                                    )
-                                                                }
-                                                            }
-                                                            sheet = ""
-                                                        }
-                                                    Spacer(Modifier.height(12.dp))
-                                                }
-                                            }
+                                    "track" -> trackActions(Modifier.navigationBarsPadding())
                                 }
                             }
                         }
@@ -1086,23 +1061,57 @@ fun SpotygramUI(
     }
 }
 
+private class TrackMenuPosition(private val anchor: IntRect, private val margin: Int) :
+    PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x =
+            if (layoutDirection == LayoutDirection.Ltr) anchor.right - popupContentSize.width
+            else anchor.left
+        val below = anchor.bottom + margin
+        val y =
+            if (below + popupContentSize.height <= windowSize.height - margin) below
+            else anchor.top - margin - popupContentSize.height
+        return IntOffset(
+            x.coerceIn(
+                margin,
+                (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin),
+            ),
+            y.coerceIn(
+                margin,
+                (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin),
+            ),
+        )
+    }
+}
+
 @Composable
 fun ActionRow(
     icon: ImageVector,
     text: String,
     supportingText: String? = null,
+    compact: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth()
             .clickable(onClick = onClick)
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .heightIn(min = if (compact) 48.dp else 56.dp)
+            .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, Modifier.size(24.dp))
+        Icon(icon, null, Modifier.size(if (compact) 20.dp else 24.dp))
         Column(Modifier.weight(1f).padding(start = 18.dp)) {
-            Text(text, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text,
+                style =
+                    if (compact) MaterialTheme.typography.bodyMedium
+                    else MaterialTheme.typography.bodyLarge,
+            )
             if (supportingText != null)
                 Text(
                     supportingText,

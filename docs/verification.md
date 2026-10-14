@@ -7,6 +7,45 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.21.0 — direct profile-music actions
+
+Native TDLib through the retained, separate Spotygram production session uploaded
+a six-second local WAV into its own profile. The imported entry retained its stable
+remote reference and original local file. A fresh application instance recognized
+that recording as profile music. Removing and adding the existing Telegram audio
+also succeeded; final removal and another restart confirmed that the temporary
+recording was absent and the original profile list was restored. These checks used
+an isolated local catalog and excluded library-sync transport.
+
+The compiled shared interface used controlled TDLib responses and real local audio.
+One click on the header button added or removed the recording. A failed addition
+kept Add available with an inline explanation. Screenshots covered the list and
+full-player menus, both appearances, the anchored wide menu and 320 dp with font
+scale 1.3. The complete action text remained readable. The local-upload explanation
+was visible before Add and disappeared after confirmation. Underlying list icons
+showing through the nested glass were corrected and rechecked.
+
+An imported song retained its favorite, one-song playlist and local file after
+profile removal. The local queue's three IDs, cursor and 60,868 ms paused position
+matched the baseline exactly; SQLite integrity was `ok`. The reopened shared player
+retained that paused queue with native libmpv and null audio output.
+
+Final Android debug/release assemblies and both Lint checks passed. Both signed
+release APKs use 0.21.0, versionCode 40 and the original application ID/certificate;
+16 KB alignment passed. The final production Linux application image also built.
+A signed x86-64 APK updated the retained Android 15 emulator from 0.20.0.
+All eleven catalog tables and all preferences, including the local queue, matched
+the pre-update copy; schema 8 and SQLite integrity were retained.
+The installed APK matched the final release file byte-for-byte. Its retained Music
+screen rendered, but software graphics again produced ANRs in both System UI and
+the app. The app's render thread waited on the emulator's OpenGL program linking.
+Changing the software backend did not yield a reliable interactive session, so
+authenticated Android profile actions and foreground-upload survival were not verified.
+
+Physical-device behavior, physical sound and interactive Windows/macOS operation
+were not exercised. Production profile mutations were checked on Linux; the wider
+menu and failure scenarios used controlled responses.
+
 ## 0.20.0 — grouped glass sources and chat photos
 
 The production Linux image's compiled shared screens used an isolated catalog,
