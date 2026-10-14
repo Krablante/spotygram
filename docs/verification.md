@@ -26,6 +26,19 @@ Android release assembly and Lint passed with zero Lint errors. Both APKs retain
 the original certificate/application ID, versionCode 43 and 16 KB alignment.
 The visual effect is static artwork, with no live blur or animation.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38566077431)
+built from `2727408`. Archive manifests, every payload hash and four installer
+signatures verified with the existing key. Each application contained the exact
+shared mark and launcher artwork. Native Linux PNG, both macOS ICNS sets and all
+seven Windows launcher/installer icon sizes matched the prepared glass imagery.
+The signed Linux archive also opened the welcome screen with the new window icon
+and closed through ordinary Quit.
+
+All fifteen draft and published asset names, sizes and GitHub SHA-256 digests
+matched the local files. [v0.22.1](https://github.com/Krablante/spotygram/releases/tag/v0.22.1)
+was confirmed as Latest with the built commit as its tag. The signed ARM64 APK
+and finished launcher PNG were delivered to the owner through Telegram artifacts.
+
 Physical Android devices, themed launcher mode and interactive Windows/macOS
 operation were not exercised in this cycle.
 
