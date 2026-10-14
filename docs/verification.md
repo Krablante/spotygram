@@ -38,6 +38,21 @@ retain the original signer/application ID, versionCode 44 and 16 KB alignment.
 The release APK and packaged desktop JAR both contain all 40 stickers. The Fluent
 Emoji MIT notice is included in Android assets and desktop resource licenses.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38582004779)
+built from `6d9364f`. Every archive manifest, payload hash and installer signature
+verified with the existing key. All four desktop applications contain the exact
+40 source PNGs and the Fluent Emoji notice. The signed Linux archive reopened the
+retained local recording/favorite, rendered the header and closed through Quit.
+Final APK metadata names that same source commit; only that metadata changed from
+the UI-checked build. Reinstalling the final x86-64 APK preserved the complete
+database, and the installed APK again matched the release file byte-for-byte.
+
+All fifteen draft and published asset names, sizes and GitHub SHA-256 digests
+matched the local files. [v0.23.0](https://github.com/Krablante/spotygram/releases/tag/v0.23.0)
+was confirmed as Latest, with `6d9364f` as its tag target.
+The signed ARM64 APK, all-sticker card and actual Android/Linux screenshots were
+delivered to the owner through Telegram artifacts.
+
 Physical Android devices, physical audio output, authenticated Telegram actions
 and interactive Windows/macOS operation were not exercised in this cycle.
 
