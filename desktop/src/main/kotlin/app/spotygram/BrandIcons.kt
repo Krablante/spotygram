@@ -8,11 +8,11 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.imageio.ImageIO
 
-/** Launcher icons preserve the same glass artwork used by the shared interface. */
+/** System icons use the glass tile; screens keep the standalone shared mark. */
 object BrandIcons {
     fun write(directory: File) {
         directory.mkdirs()
-        val original = checkNotNull(javaClass.classLoader.getResourceAsStream("drawable-nodpi/spotygram_mark.png"))
+        val original = checkNotNull(javaClass.classLoader.getResourceAsStream("drawable-nodpi/spotygram_launcher.png"))
             .use { checkNotNull(ImageIO.read(it)) }
         fun png(size: Int): ByteArray {
             val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)

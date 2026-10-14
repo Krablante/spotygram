@@ -7,6 +7,28 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.22.1 — liquid-glass application icon
+
+The signed Android build updated the retained Android 15 emulator over 0.22.0.
+The installed APK matched the release file byte-for-byte. Actual home-screen and
+application-info screenshots showed the honey-glass mark on a pale refracted glass
+surface. Proportional foreground insets kept the mark large and unclipped at both
+system sizes. The in-app header retained its standalone mark and lowercase name.
+All eleven catalog tables and preferences matched before the first launch; after
+launch, catalog rows and the 8,910 ms position still matched, with only the normal
+queue/position version identifiers renewed. The crash log was empty.
+
+The packaged Linux application ran at 390 pixels wide and supplied the glass tile
+to its actual window manager icon. That live icon, the packaged PNG and circular,
+rounded and 16–96-pixel previews were visually inspected on light/dark backgrounds.
+The welcome screen kept the selected in-app identity, and ordinary Quit closed it.
+Android release assembly and Lint passed with zero Lint errors. Both APKs retained
+the original certificate/application ID, versionCode 43 and 16 KB alignment.
+The visual effect is static artwork, with no live blur or animation.
+
+Physical Android devices, themed launcher mode and interactive Windows/macOS
+operation were not exercised in this cycle.
+
 ## 0.22.0 — honey-glass identity
 
 The packaged Linux application displayed the selected yellow glass mark with its

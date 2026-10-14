@@ -154,7 +154,7 @@ fun main(arguments: Array<String>) {
                 title = "spotygram",
                 state = windowState,
                 visible = visible,
-                icon = painterResource(R.drawable.spotygram_mark),
+                icon = painterResource(R.drawable.spotygram_launcher),
                 onPreviewKeyEvent = { event ->
                     if (event.type != KeyEventType.KeyDown) false
                     else when {
@@ -193,7 +193,7 @@ fun main(arguments: Array<String>) {
                     }
                 }
             }
-            if (traySupported) Tray(icon = painterResource(R.drawable.spotygram_mark), tooltip = "spotygram",
+            if (traySupported) Tray(icon = painterResource(R.drawable.spotygram_launcher), tooltip = "spotygram",
                 onAction = ::show, menu = {
                     Item(tr(R.string.show_window), onClick = ::show)
                     Separator()

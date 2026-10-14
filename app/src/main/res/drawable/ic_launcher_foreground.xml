@@ -1,4 +1,4 @@
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:inset="21dp">
+    android:inset="19.444444%">
     <bitmap android:src="@drawable/spotygram_mark" android:gravity="fill" />
 </inset>

@@ -46,7 +46,7 @@ val generateDefinitions = tasks.register("generateDesktopDefinitions") {
                 }
                 appendLine("    }")
             }
-            appendLine("    object drawable { const val spotygram_mark = 10000 }")
+            appendLine("    object drawable { const val spotygram_mark = 10000; const val spotygram_launcher = 10001 }")
             appendLine("    val names = mapOf(")
             names.forEach { (number, name) -> appendLine("        $number to \"$name\",") }
             appendLine("    )")
@@ -102,7 +102,7 @@ val prepareIcons = tasks.register<JavaExec>("prepareDesktopIcons") {
     mainClass.set("app.spotygram.DesktopMainKt")
     args("--write-icons", icons.get().asFile.absolutePath)
     jvmArgs("-Djava.awt.headless=true", "-Xmx128m")
-    inputs.file(rootProject.file("shared/src/main/res/drawable-nodpi/spotygram_mark.png"))
+    inputs.file(rootProject.file("shared/src/main/res/drawable-nodpi/spotygram_launcher.png"))
     outputs.dir(icons)
 }
 

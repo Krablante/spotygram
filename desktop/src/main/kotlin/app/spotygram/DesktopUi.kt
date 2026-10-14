@@ -22,8 +22,12 @@ fun BackHandler(enabled: Boolean = true, onBack: () -> Unit) {
 
 @Composable
 fun painterResource(id: Int): Painter {
-    require(id == R.drawable.spotygram_mark)
-    return androidx.compose.ui.res.painterResource("drawable-nodpi/spotygram_mark.png")
+    val name = when (id) {
+        R.drawable.spotygram_mark -> "spotygram_mark"
+        R.drawable.spotygram_launcher -> "spotygram_launcher"
+        else -> error("Unknown drawable: $id")
+    }
+    return androidx.compose.ui.res.painterResource("drawable-nodpi/$name.png")
 }
 
 @Composable

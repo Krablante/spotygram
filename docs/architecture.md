@@ -315,11 +315,14 @@ facilities are not advertised.
 
 English/Russian strings are shared XML resources. The honey-glass mark with rounded
 ears and a curled antenna is one transparent PNG in `shared/`; Android and desktop
-load the same artwork. The interface displays the name as `spotygram`. Desktop
-packaging derives PNG, multi-size ICO and ICNS icons from that artwork. Android
-keeps the mark inside the adaptive-icon safe area and uses its matching white
-silhouette for themed icons and notifications. These static assets need no live
-glass effect or animation.
+load the same artwork. The interface displays the name as `spotygram`. System
+icons place the mark on a pale liquid-glass surface. Desktop packaging derives
+PNG, multi-size ICO and ICNS from the shared `spotygram_launcher.png`; the window
+and tray use that tile too. Android keeps the standalone mark in the adaptive
+foreground with proportional safe-area insets, and extends the matching glass
+background beyond the launcher mask.
+Its white silhouette remains available for themed icons and notifications.
+Reflections are baked into the images; these assets need no live blur or animation.
 
 `Design.kt` feeds explicit background/content captures to Haze Glass 2.0.1. Controls are outside their own capture;
 dense glass diffuses text underneath. Primary edge refraction, dispersion and lighting
