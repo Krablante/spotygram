@@ -27,6 +27,19 @@ Russian/dark library, and the complete brand row at 320 dp with font scale 1.3.
 Keyboard navigation changed language and appearance. Touch injection was unreliable
 in this emulator, so these checks do not establish physical touch responsiveness.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38558439696)
+built from `eab4d37` on native runners. Four installer signatures, four archive
+manifests and every payload hash verified with the existing key. Each compiled
+application reported 0.22.0 with DEBUG false, embedded the original update key
+and contained the exact shared honey-glass PNG, with the old RGB vector absent.
+The signed Linux release archive reopened both local recordings, the favorite
+and paused queue, displayed the new mark and closed through ordinary Quit.
+All fifteen draft asset names, sizes and GitHub SHA-256 digests matched the local
+files. The ordinary [v0.22.0 release](https://github.com/Krablante/spotygram/releases/tag/v0.22.0)
+was confirmed as Latest with the same assets and the built commit as its tag.
+The signed ARM64 APK and actual application screenshots were delivered to the owner
+through Telegram artifacts.
+
 Physical devices, physical sound, screen-reader speech, authenticated Telegram
 actions and interactive Windows/macOS operation were not exercised in this cycle.
 The notification and themed-icon resources use the matching white silhouette;
