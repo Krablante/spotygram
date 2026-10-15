@@ -43,6 +43,21 @@ were inspected visually. Simplifying the traced contour removed its VectorPath
 warning without changing the color images. The README banner uses the photograph;
 older examples are cropped to their functional controls to remove obsolete brand rows.
 
+[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38662354303)
+built from `361190c`. Every archive manifest, payload hash and installer signature
+verified with the existing key. Compiled apps report 0.25.0 with DEBUG false and
+contain the exact photo/monochrome resources, all 40 emoji and the original update
+key. The signed Linux archive reopened the retained local recording/favorite,
+rendered the library and closed through ordinary Quit; SQLite integrity was `ok`.
+
+Final APK metadata names the same source commit. The installed x86-64 APK matched
+the release file byte-for-byte. Its catalog and settings matched before/after the
+final installation; the subsequent launch retained the catalog and 8,910 ms pause.
+All fifteen uploaded asset names, sizes and GitHub SHA-256 digests matched local
+files before and after publishing [v0.25.0](https://github.com/Krablante/spotygram/releases/tag/v0.25.0)
+as Latest, with the tag pointing to `361190c`. The signed ARM64 APK and actual app
+screenshots were delivered to the owner through Telegram artifacts.
+
 Physical Android devices, physical sound, authenticated sign-in, live tray menus,
 Android themed launcher mode/notification display and interactive Windows/macOS
 operation were not exercised in this cycle.
