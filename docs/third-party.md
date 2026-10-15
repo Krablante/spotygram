@@ -46,4 +46,9 @@ no Spotify logos, Telegram logos, bundled music files or AI-generated album cove
 The Fluent Emoji notice is retained in `shared/licenses/Fluent-Emoji-MIT.txt`
 and included in Android APK assets and desktop `resources/licenses/`.
 
+The Takopi plush identity uses a photograph supplied by the project owner, with
+its background removed and separate icon surfaces prepared for Spotygram. The
+software's MIT license does not grant rights to the character or source photo.
+`shared/licenses/Takopi-artwork-NOTICE.txt` is included in both platform packages.
+
 The manually imported development recording is [The Entertainer by Scott Joplin](https://commons.wikimedia.org/wiki/File:%22The_Entertainer%22,_by_Scott_Joplin_(1902,_Ragtime_piano).opus), marked public domain on Wikimedia Commons. The audio is not part of the repository or APK.

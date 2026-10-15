@@ -9,6 +9,10 @@ Fluent Emoji 3D artwork, Copyright (c) Microsoft Corporation, MIT License.
 https://github.com/microsoft/fluentui-emoji
 Full notice: resources/licenses/Fluent-Emoji-MIT.txt
 
+Takopi plush identity: owner-supplied photograph, cropped with its background removed.
+The software MIT license does not grant rights to the character or source photograph.
+Full notice: resources/licenses/Takopi-artwork-NOTICE.txt
+
 Nucleus media-control and core-runtime 2.5.0
 https://github.com/NucleusFramework/Nucleus/tree/v2.5.0
 

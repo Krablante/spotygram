@@ -105,6 +105,8 @@ val prepareNative = tasks.register<Exec>("prepareNativeLibraries") {
             nativeDirectory.resolve("licenses/Spotygram-dependencies.txt"), overwrite = true)
         rootProject.file("shared/licenses/Fluent-Emoji-MIT.txt").copyTo(
             nativeDirectory.resolve("licenses/Fluent-Emoji-MIT.txt"), overwrite = true)
+        rootProject.file("shared/licenses/Takopi-artwork-NOTICE.txt").copyTo(
+            nativeDirectory.resolve("licenses/Takopi-artwork-NOTICE.txt"), overwrite = true)
     }
 }
 val icons = layout.buildDirectory.dir("icons")

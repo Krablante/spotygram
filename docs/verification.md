@@ -7,6 +7,45 @@ review does not establish account access, audio quality or physical-device behav
 Checks use real packaged applications, UI interactions and runtime logs. Temporary
 inspection code, recordings, screenshots and account state stay outside the checkout.
 
+## 0.25.0 — photographed Takopi identity
+
+The packaged Linux app displayed the owner's original plush photograph on welcome
+and phone-entry screens at 390 and 1100 pixels, with light/dark artwork inspected.
+The actual X11 window icon contained the new pale tile at 96 pixels. Local import,
+favorite, native libmpv playback with null audio output, pause and ordinary Quit
+worked. The isolated catalog retained its recording/favorite and passed SQLite
+integrity. The headless display used Skiko's fallback after an unavailable GL context.
+
+The signed x86-64 APK updated the retained Android 15 emulator over 0.24.0. Before
+first launch, the catalog dump, queue, position, appearance and sharing preferences
+matched the baseline. After launch, the catalog was still identical and the paused
+position remained 8,910 ms. Actual screenshots covered the home-screen icon,
+application-info icon, library in both appearances and phone entry at 360 dp and
+320 dp with font scale 1.3. Opening the keyboard hid the decorative brand row and
+kept input/Continue available. After appearance/language checks, the recording,
+favorite, playlist and queue remained intact; only appearance sync clocks, local
+queue version identifiers and the newly initialized Telegram database key changed.
+Original Russian/dark preferences were restored and SQLite integrity was `ok`.
+
+The emulator's Lavapipe host process failed with a missing color buffer and exited
+139 after display/theme changes. A SwiftShader restart retained the same data;
+its cold boot had a System UI ANR, dismissed before the final app/data checks.
+Spotygram's crash buffer was empty. These observations do not measure physical
+device performance or touch responsiveness.
+
+Android debug/release assemblies and both Lint checks passed, with 57 warnings and
+zero errors each. Both release APKs retain the original signer/application ID,
+versionCode 46 and 16 KB alignment. Their decoded photo, launcher and adaptive
+background pixels match source, and both artwork notices are included. The 40
+emoji images, header layout and selection code are unchanged. Generated Windows
+ICO sizes 16–256, macOS ICNS sizes 16–1024 and the photo-derived monochrome vector
+were inspected visually. The README banner uses the photograph; older examples
+are cropped to their functional controls to remove obsolete brand rows.
+
+Physical Android devices, physical sound, authenticated sign-in, live tray menus,
+Android themed launcher mode/notification display and interactive Windows/macOS
+operation were not exercised in this cycle.
+
 ## 0.24.0 — audio sharing
 
 Native TDLib through a separate owned Spotygram production session confirmed local

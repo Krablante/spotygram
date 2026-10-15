@@ -352,15 +352,17 @@ device sleep, with no background timer. Only the previous sticker's stable name
 is saved in separate local preferences; it creates no library, playback or
 cloud-sync records.
 
-The honey-glass mark with rounded ears and a curled antenna remains on welcome
-and sign-in screens. Android and desktop load that same transparent PNG. System
-icons place the mark on a pale liquid-glass surface. Desktop packaging derives
-PNG, multi-size ICO and ICNS from the shared `spotygram_launcher.png`; the window
-and tray use that tile too. Android keeps the standalone mark in the adaptive
-foreground with proportional safe-area insets, and extends the matching glass
-background beyond the launcher mask.
-Its white silhouette remains available for themed icons and notifications.
-Reflections are baked into the images; these assets need no live blur or animation.
+Welcome and sign-in screens use the owner's photograph of a whole pink Takopi
+plush, with its white background removed. Android and desktop load the same
+transparent `spotygram_mark.png`; the fabric, seams and face come from the photo.
+System icons put the plush on a pale, lightly cyan/rose-tinted surface. Desktop
+packaging derives PNG, multi-size ICO and ICNS from the shared
+`spotygram_launcher.png`; the window and tray use that tile too. Android uses the
+standalone photo in the adaptive foreground, inset 24% on each side, and extends
+the matching background beyond the launcher mask. A white vector traced from the
+photo's contour and face supplies themed icons and notifications. The artwork is
+static and bundled; it needs no network processing, live blur or animation.
+The library keeps its independent session emoji and the existing glass palette.
 
 `Design.kt` feeds explicit background/content captures to Haze Glass 2.0.1. Controls are outside their own capture;
 dense glass diffuses text underneath. Primary edge refraction, dispersion and lighting

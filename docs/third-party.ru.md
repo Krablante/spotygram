@@ -42,5 +42,11 @@ mpv-prebuilt; исходники jaudiotagger — в
 Логотипов Spotify и Telegram, встроенной музыки и сгенерированных обложек нет.
 Лицензия Fluent Emoji сохранена в `shared/licenses/Fluent-Emoji-MIT.txt`
 и включена в assets APK Android и `resources/licenses/` desktop.
+
+Образ плюшевого Такопи использует предоставленную владельцем фотографию: для
+Spotygram удалён фон и подготовлены отдельные подложки иконки. MIT-лицензия
+программы не передаёт права на персонажа или исходное фото.
+`shared/licenses/Takopi-artwork-NOTICE.txt` включён в пакеты обеих платформ.
+
 Демонстрационная запись [The Entertainer Скотта Джоплина](https://commons.wikimedia.org/wiki/File:%22The_Entertainer%22,_by_Scott_Joplin_(1902,_Ragtime_piano).opus)
 помечена public domain на Wikimedia Commons; она не входит в репозиторий или приложение.

@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.imageio.ImageIO
 
-/** System icons use the glass tile; screens keep the standalone shared mark. */
+/** System icons use the pale photo tile; screens keep the transparent shared photo. */
 object BrandIcons {
     fun write(directory: File) {
         directory.mkdirs()

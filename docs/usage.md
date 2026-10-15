@@ -410,6 +410,10 @@ without repeating the previous sticker. Short returns, changing tabs, theme or
 language and rotating the phone keep it. The faces are random decoration, not
 connection or playback status. Stickers work offline and stay local to each device.
 
+The app icon and welcome/sign-in screens use a photograph of a pink Takopi plush.
+System icons place the whole toy on a pale tinted surface; sign-in shows the photo
+with a transparent background. This identity is separate from the library sticker.
+
 ## Updates and keeping your data
 
 Automatic checks are enabled by default. They happen only when opening or
