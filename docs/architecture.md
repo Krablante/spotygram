@@ -352,7 +352,7 @@ device sleep, with no background timer. Only the previous sticker's stable name
 is saved in separate local preferences; it creates no library, playback or
 cloud-sync records.
 
-Welcome and sign-in screens use the owner's photograph of a whole pink Takopi
+Welcome and sign-in screens use the owner-supplied photograph of a whole pink Takopi
 plush, with its white background removed. Android and desktop load the same
 transparent `spotygram_mark.png`; the fabric, seams and face come from the photo.
 System icons put the plush on a pale, lightly cyan/rose-tinted surface. Desktop

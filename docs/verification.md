@@ -9,7 +9,7 @@ inspection code, recordings, screenshots and account state stay outside the chec
 
 ## 0.25.0 — photographed Takopi identity
 
-The packaged Linux app displayed the owner's original plush photograph on welcome
+The packaged Linux app displayed the supplied plush photograph on welcome
 and phone-entry screens at 390 and 1100 pixels, with light/dark artwork inspected.
 The actual X11 window icon contained the new pale tile at 96 pixels. Local import,
 favorite, native libmpv playback with null audio output, pause and ordinary Quit
@@ -33,14 +33,15 @@ its cold boot had a System UI ANR, dismissed before the final app/data checks.
 Spotygram's crash buffer was empty. These observations do not measure physical
 device performance or touch responsiveness.
 
-Android debug/release assemblies and both Lint checks passed, with 57 warnings and
+Android debug/release assemblies and both Lint checks passed, with 56 warnings and
 zero errors each. Both release APKs retain the original signer/application ID,
 versionCode 46 and 16 KB alignment. Their decoded photo, launcher and adaptive
 background pixels match source, and both artwork notices are included. The 40
 emoji images, header layout and selection code are unchanged. Generated Windows
 ICO sizes 16–256, macOS ICNS sizes 16–1024 and the photo-derived monochrome vector
-were inspected visually. The README banner uses the photograph; older examples
-are cropped to their functional controls to remove obsolete brand rows.
+were inspected visually. Simplifying the traced contour removed its VectorPath
+warning without changing the color images. The README banner uses the photograph;
+older examples are cropped to their functional controls to remove obsolete brand rows.
 
 Physical Android devices, physical sound, authenticated sign-in, live tray menus,
 Android themed launcher mode/notification display and interactive Windows/macOS
