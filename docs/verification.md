@@ -120,6 +120,19 @@ local-file backups and the correct format-3 minimum version. README introduces
 the product and routes detailed controls to the user guide. Earlier verification
 history is linked instead of copied into the current record.
 
+### Published artifacts
+
+[0.26.0](https://github.com/Krablante/spotygram/releases/tag/v0.26.0) targets
+`83650bb`. The [native workflow](https://github.com/Krablante/spotygram/actions/runs/39835819489)
+completed all four platforms, including strict verification of the apps mounted
+from both DMGs. On Linux, the published 0.25.0 archive reader verified and extracted
+all four final archives and rejected a modified executable in each. All four
+installer signatures matched the existing trusted key. All 15 uploaded assets
+matched local sizes and SHA-256 digests before publication as the ordinary Latest release.
+The final downloaded Linux package required glibc 2.35 and ran local playback with
+null audio through its actual bundled launcher. Both APKs carry the release commit
+in their VCS metadata. Release signing identities and application IDs are unchanged.
+
 ## Earlier evidence
 
 The [complete record through 0.25.0](https://github.com/Krablante/spotygram/blob/8a9900e/docs/verification.md)
