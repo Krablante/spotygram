@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 import javax.xml.parsers.DocumentBuilderFactory
@@ -185,6 +186,18 @@ tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDi
                     destination.resolve(name).outputStream().use { source.copyTo(it) }
                 }
             }
+        }
+    }
+    if (targetOs != "windows") doLast {
+        val variant = if (name == "createReleaseDistributable") "release" else "main"
+        val resources = layout.buildDirectory.dir("distributions/$variant/app/" +
+            if (targetOs == "macos") "Spotygram.app/Contents/app/resources" else "Spotygram/lib/app/resources")
+            .get().asFile.toPath()
+        // Gradle's resource copy follows native aliases, duplicating large libraries.
+        nativeDirectory.listFiles().orEmpty().filter { Files.isSymbolicLink(it.toPath()) }.forEach { source ->
+            val destination = resources.resolve(source.name)
+            Files.deleteIfExists(destination)
+            Files.createSymbolicLink(destination, Files.readSymbolicLink(source.toPath()))
         }
     }
     if (targetOs == "macos") doLast {

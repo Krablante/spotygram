@@ -73,7 +73,8 @@ Build on the target operating system with **JDK 21**, **Python 3.12+** and the
 OpenSSL 3 CLI (on macOS, `brew install openssl@3`). Windows and Linux use x86-64;
 macOS has separate x86-64 and ARM64 builds.
 JDK's `jpackage` prepares the application image and Linux/macOS installers.
-Windows wraps that image with **Inno Setup 6.4.3**; Ubuntu needs **fakeroot** for DEB
+Windows wraps that image with **Inno Setup 6.4.3**; Ubuntu needs **fakeroot** and
+**binutils** (`readelf`) for DEB
 packaging. The workflow prepares these tools. For a local Windows build, install
 Inno Setup 6.4.3 or set `INNO_SETUP_COMPILER` to its `ISCC.exe`.
 There is no native source compilation or Node.js runtime. Keep `SPOTYGRAM_STATE`
@@ -97,6 +98,8 @@ owns the URLs and integrity values. Downloads, unpacking and native binaries sta
 under state. The platform image includes only its matching native dependencies.
 macOS bundles receive an ad hoc code signature and the shared public version;
 Apple notarization is not configured.
+Packaging mounts the finished DMG read-only and checks the contained app with
+`codesign --verify --deep --strict` before signing the installer for updates.
 
 For a new fork's desktop update channel, create an Ed25519 signing key once:
 
@@ -137,6 +140,19 @@ The **Desktop release assets** GitHub Actions workflow builds all four desktop
 targets on their native runners. Set repository secrets `TELEGRAM_API_ID`,
 `TELEGRAM_API_HASH` and `DESKTOP_RELEASE_KEY` (the private PEM), run the workflow,
 and download its four artifacts. It produces assets without publishing a release.
+
+Unix native-library aliases remain symbolic links in the application image and
+portable archive, avoiding duplicate copies after Gradle resource copying.
+JDK 21's DEB bundler dereferences them again when copying its installer image;
+the installed DEB therefore retains those duplicate files.
+DEB compression defaults to two threads via `DPKG_DEB_THREADS_MAX`; an explicit
+environment value overrides that default.
+
+The Linux DEB declares the highest glibc symbol version required by its bundled
+ELF binaries, with a minimum of 2.35. The JDK distribution can raise that floor:
+the published Temurin-based image uses 2.35; an Ubuntu-built JDK can require 2.38.
+Portable archives inherit the same actual requirements. Use the release workflow
+for the published platform set rather than assuming all JDK 21 images are equivalent.
 
 ## Publishing updates
 

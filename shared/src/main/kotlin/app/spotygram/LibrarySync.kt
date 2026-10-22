@@ -22,17 +22,18 @@ class LibrarySync(
         fun json() = JSONArray().put(key).put(clock).put(writer).put(JSONObject(value).get("v"))
 
         fun removesIdentity(): Boolean {
-            val v = JSONObject(value)
-            return key.endsWith("/deleted") && v.optBoolean("v") ||
-                key.startsWith("track/") && v.optJSONObject("v")?.optBoolean("deleted") == true
+            return when {
+                key.endsWith("/deleted") -> JSONObject(value).optBoolean("v")
+                key.startsWith("track/") ->
+                    JSONObject(value).optJSONObject("v")?.optBoolean("deleted") == true
+                else -> false
+            }
         }
 
         fun supersedes(old: Record?): Boolean =
-            old?.removesIdentity() != true &&
-                (removesIdentity() ||
-                    old == null ||
-                    clock > old.clock ||
-                    clock == old.clock && writer > old.writer)
+            old == null ||
+                if (removesIdentity() != old.removesIdentity()) removesIdentity()
+                else clock > old.clock || clock == old.clock && writer > old.writer
     }
 
     companion object {
@@ -423,42 +424,54 @@ class LibrarySync(
     suspend fun bind(user: Long) =
         withContext(Dispatchers.IO) {
             val db = database()
-            db.transaction {
-                if (account != user) {
-                    val unbound = records(this, false, user = 0)
-                    val existing = records(this, false, user = user).associateBy { it.key }
-                    compileStatement(
-                            "INSERT OR REPLACE INTO sync_values(account,key,clock,writer,value,pending) VALUES(?,?,?,?,?,1)"
-                        )
-                        .use { s ->
-                            for (r in unbound) {
-                                if (!r.supersedes(existing[r.key])) continue
-                                s.bindLong(1, user)
-                                s.bindString(2, r.key)
-                                s.bindLong(3, r.clock)
-                                s.bindString(4, r.writer)
-                                s.bindString(5, r.value)
-                                s.executeInsert()
+            val previousAccount = account
+            try {
+                db.transaction {
+                    if (account != user) {
+                        val unbound = records(this, false, user = 0)
+                        val existing = records(this, false, user = user).associateBy { it.key }
+                        compileStatement(
+                                "INSERT OR REPLACE INTO sync_values(account,key,clock,writer,value,pending) VALUES(?,?,?,?,?,1)"
+                            )
+                            .use { s ->
+                                for (r in unbound) {
+                                    if (!r.supersedes(existing[r.key])) continue
+                                    s.bindLong(1, user)
+                                    s.bindString(2, r.key)
+                                    s.bindLong(3, r.clock)
+                                    s.bindString(4, r.writer)
+                                    s.bindString(5, r.value)
+                                    s.executeInsert()
+                                }
                             }
-                        }
-                    execSQL("DELETE FROM sync_values WHERE account=0")
-                    execSQL("UPDATE playlists SET account=? WHERE account=0", arrayOf(user))
-                    putMeta(this, "account", user.toString())
-                    account = user
-                    execSQL("UPDATE tracks SET liked=0")
+                        execSQL("DELETE FROM sync_values WHERE account=0")
+                        execSQL("UPDATE playlists SET account=? WHERE account=0", arrayOf(user))
+                        putMeta(this, "account", user.toString())
+                        account = user
+                        execSQL("UPDATE tracks SET liked=0")
+                    }
+                    materialize(this, records(this, false).map { it.key }.toSet())
                 }
-                materialize(this, records(this, false).map { it.key }.toSet())
+            } catch (error: Throwable) {
+                account = previousAccount
+                throw error
             }
             reload()
         }
 
     suspend fun detach() =
         withContext(Dispatchers.IO) {
-            database().transaction {
-                putMeta(this, "account", "0")
-                account = 0L
-                execSQL("UPDATE tracks SET liked=0")
-                materialize(this, records(this, false).map { it.key }.toSet())
+            val previousAccount = account
+            try {
+                database().transaction {
+                    putMeta(this, "account", "0")
+                    account = 0L
+                    execSQL("UPDATE tracks SET liked=0")
+                    materialize(this, records(this, false).map { it.key }.toSet())
+                }
+            } catch (error: Throwable) {
+                account = previousAccount
+                throw error
             }
             reload()
         }
@@ -504,6 +517,7 @@ class LibrarySync(
 
     suspend fun merge(incoming: List<Record>): Set<String> =
         withContext(Dispatchers.IO) {
+            if (incoming.isEmpty()) return@withContext emptySet()
             val changed = linkedSetOf<String>()
             val db = database()
             db.transaction {
@@ -543,12 +557,17 @@ class LibrarySync(
     private fun materialize(db: SqlDatabase, changed: Set<String>) {
         if (changed.isEmpty()) return
         val rows = records(db, false).associateBy { it.key }
+        val deletedTracks =
+            rows.values
+                .filter { it.key.startsWith("track/") && it.removesIdentity() }
+                .mapTo(HashSet()) { it.key.removePrefix("track/") }
         fun value(key: String) = rows[key]?.let { JSONObject(it.value).get("v") }
         for (key in changed.filter { it.startsWith("track/") }) {
             val t = value(key) as? JSONObject ?: continue
             val id = t.getString("id")
             val chat = t.getLong("chat")
             if (t.optBoolean("deleted")) {
+                db.execSQL("UPDATE tracks SET liked=0 WHERE id=?", arrayOf(id))
                 db.execSQL(
                     "DELETE FROM playlist_tracks WHERE track=? AND playlist IN(SELECT id FROM playlists WHERE account=?)",
                     arrayOf<Any>(id, account),
@@ -591,7 +610,10 @@ class LibrarySync(
         }
         for (key in changed.filter { it.startsWith("favorite/") }) db.execSQL(
             "UPDATE tracks SET liked=? WHERE id=?",
-            arrayOf<Any>(if (value(key) == true) 1 else 0, key.removePrefix("favorite/")),
+            arrayOf<Any>(
+                if (value(key) == true && key.removePrefix("favorite/") !in deletedTracks) 1 else 0,
+                key.removePrefix("favorite/"),
+            ),
         )
         for (key in changed.filter { it.startsWith("source/") }) {
             val v = value(key) as? JSONObject ?: continue
@@ -654,7 +676,11 @@ class LibrarySync(
             val members =
                 playlistRows[uid]
                     .orEmpty()
-                    .filter { it.key.startsWith(prefix) && JSONObject(it.value).get("v") == true }
+                    .filter {
+                        it.key.startsWith(prefix) &&
+                            it.key.removePrefix(prefix) !in deletedTracks &&
+                            JSONObject(it.value).get("v") == true
+                    }
                     .sortedWith(
                         compareBy<Record> { it.clock }.thenBy { it.writer }.thenBy { it.key }
                     )
@@ -683,8 +709,18 @@ class LibrarySync(
 
     suspend fun preferences(): Map<String, Any> =
         withContext(Dispatchers.IO) {
-            records(database(), false)
-                .filter { it.key.startsWith("setting/") }
-                .associate { it.key.removePrefix("setting/") to JSONObject(it.value).get("v") }
+            database()
+                .rawQuery(
+                    "SELECT key,value FROM sync_values WHERE account=? AND key GLOB 'setting/*'",
+                    arrayOf(account.toString()),
+                )
+                .use { c ->
+                    buildMap {
+                        while (c.moveToNext()) put(
+                            c.getString(0).removePrefix("setting/"),
+                            JSONObject(c.getString(1)).get("v"),
+                        )
+                    }
+                }
         }
 }

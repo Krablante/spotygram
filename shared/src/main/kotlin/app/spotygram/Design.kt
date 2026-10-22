@@ -1,7 +1,6 @@
 package app.spotygram
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,12 +32,14 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeSourceSelection
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.glass.GlassStyle
@@ -221,6 +222,8 @@ fun Modifier.liquidGlass(
             Modifier.hazeGlass(
                 HazeInput.Sources(state, selection = selection),
                 style,
+                performanceMode =
+                    if (strong) HazePerformanceMode.Performance else HazePerformanceMode.Default,
                 interactionSource = interaction,
             )
         else Modifier.background(background.copy(alpha = 0.72f), shape)
@@ -404,7 +407,7 @@ fun GlassSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, enabled
                 )
         ) {
             Box(
-                Modifier.offset(x = thumb, y = 3.dp)
+                Modifier.offset { IntOffset(thumb.roundToPx(), 3.dp.roundToPx()) }
                     .size(24.dp)
                     .liquidGlass(12.dp, strong = true)
                     .background(

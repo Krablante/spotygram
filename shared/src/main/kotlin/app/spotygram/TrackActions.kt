@@ -37,6 +37,7 @@ fun TrackActions(
     onPlaylist: () -> Unit,
     onOrder: () -> Unit,
     onDownload: () -> Unit,
+    onRemoveLocal: () -> Unit,
     onOpenTelegram: () -> Unit,
     onShare: () -> Unit,
     onProfileChanged: (Boolean) -> Unit,
@@ -106,12 +107,13 @@ fun TrackActions(
         if (track.local)
             ActionRow(
                 Icons.Rounded.DeleteOutline,
-                tr(R.string.remove_from_device),
+                tr(
+                    if (track.imported) R.string.delete_imported_track
+                    else R.string.remove_from_device
+                ),
                 compact = compact,
-            ) {
-                app.action { app.removeLocal(track) }
-                onClose()
-            }
+                onClick = onRemoveLocal,
+            )
         else if (track.available)
             ActionRow(Icons.Rounded.Download, tr(R.string.download_to_device), compact = compact) {
                 onDownload()

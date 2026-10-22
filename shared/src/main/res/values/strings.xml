@@ -268,6 +268,8 @@
     <string name="remove_chat_help">"Stop collecting music from “%1$s”. Downloaded tracks stay in your library; Telegram messages are unchanged. You can add the chat again."</string>
     <string name="remove_chat_title">"Remove chat?"</string>
     <string name="remove_from_device">"Remove from device"</string>
+    <string name="delete_imported_track">"Delete imported track"</string>
+    <string name="delete_imported_track_help">"Delete this device’s imported copy of “%1$s” and remove the recording from Favorites and playlists on every synced device? The original file you imported and copies on other devices are kept."</string>
     <string name="remove_from_playlist">"Remove from playlist"</string>
     <string name="remove_from_queue">"Remove from queue"</string>
     <string name="remove_selected_playlist">"Remove selected from playlist"</string>

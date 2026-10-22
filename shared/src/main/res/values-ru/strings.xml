@@ -270,6 +270,8 @@
     <string name="remove_chat_help">"Перестанем собирать музыку из «%1$s». Скачанные треки останутся в медиатеке, сообщения в Telegram не изменятся. Чат можно добавить обратно."</string>
     <string name="remove_chat_title">"Убрать чат?"</string>
     <string name="remove_from_device">"Удалить с устройства"</string>
+    <string name="delete_imported_track">"Удалить импортированную запись"</string>
+    <string name="delete_imported_track_help">"Удалить местную копию «%1$s» и убрать запись из любимых и плейлистов на всех синхронизируемых устройствах? Исходный файл, который ты импортировал, и копии на других устройствах сохранятся."</string>
     <string name="remove_from_playlist">"Убрать из плейлиста"</string>
     <string name="remove_from_queue">"Убрать из очереди"</string>
     <string name="remove_selected_playlist">"Убрать выбранные из плейлиста"</string>

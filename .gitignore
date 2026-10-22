@@ -5,6 +5,8 @@
 local.properties
 *.jks
 *.keystore
+signing.properties
+release-private.pem
 *.env
 *.apk
 *.aab

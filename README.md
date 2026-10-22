@@ -115,8 +115,8 @@ Authenticode publisher certificate. macOS builds are ad hoc signed, without Appl
 notarization; if macOS blocks the first launch, use **System Settings → Privacy &
 Security → Open Anyway**.
 
-ZIP archives and the Linux TAR.GZ remain available for portable use; the Linux
-archive supports other distributions with glibc 2.35+. Extract the **whole archive**
+ZIP archives and the Linux TAR.GZ remain available for portable use; the published
+Linux archive supports other distributions with glibc 2.35+. Extract the **whole archive**
 and open its launcher. An existing portable library is also available to the
 installer version under the same OS user; quit the old copy before switching.
 
@@ -137,42 +137,21 @@ Your library and Telegram session are stored separately from the program.
 
 ## While you listen
 
-Playback continues in the background, with Android lock-screen controls and
-desktop system media controls.
-The small player opens the full player and queue. Long-press a song to select
-several tracks for a playlist or download; drag tracks to reorder a playlist.
+Playback continues in the background, with Android lock-screen controls and desktop
+media keys. The small player opens the full player and queue.
 
-Choose **in order**, **in reverse order**, **shuffle**, or **absolute random**
-from the order button in the player, above a song list, or in a song's menu.
-Reverse follows the list upward; Play all starts at its last available song.
-Changing order keeps the current song and position. Shuffle plays a pass without
-repeats. The dice mode draws each next song
-independently, so the same song can come up twice in a row. It keeps going
-until you stop it; Previous retraces your recent listening history.
+- Listen in order, in reverse, through a shuffled pass or with an independent random draw.
+- Adjust speed from **0.3× to 4×** without changing pitch; desktop also has volume and mute.
+- Resume recordings **30 minutes or longer** where you left them. The threshold is adjustable.
+- Select several songs for a playlist or download; drag playlist entries to reorder them.
+- Keep downloads under **On device**, or let temporary playback copies expire through
+  **Do not keep played tracks**. Imports and explicit downloads stay saved.
+- Send a song to a Telegram recipient after confirmation. Sender and caption are omitted
+  by default; [sharing settings](docs/usage.md#send-audio-to-a-chat) control both.
 
-Desktop has a **0–100% volume slider** beneath the full player's controls.
-The mini-player's speaker button opens a compact slider. Click the speaker inside
-the slider to mute or restore the previous level; the mouse wheel adjusts volume.
-Volume, mute, order, repeat and speed stay on each device.
-
-The round speed button below Play opens a **0.3×–4×** slider, fine adjustment
-and quick choices. Speed changes keep the original pitch and carry across songs
-and app restarts. Tap **1×** to return to normal; the mini-player shows altered speed.
-
-Recordings **30 minutes or longer** remember where you stopped, including after
-switching tracks or reopening the app. Change the duration threshold or turn this
-off in Settings. Finished recordings start over.
-
-Downloaded songs are available under **On device**. The interface comes in
-English and Russian, with light and dark appearances. The initial appearance
-follows the system until you choose one in Settings.
-
-Send the current song to a person, group or channel without leaving the player.
-The chooser combines pinned and recent recipients with your Telegram folders
-and main chat order, and shows only destinations that accept the file. Select
-a recipient, then confirm. Audio is sent from your account without the original
-sender or caption by default; **Settings → Sharing audio** controls both options.
-Local imports can be uploaded too. See [sending audio](docs/usage.md#send-audio-to-a-chat).
+Queue, listening positions and sound controls stay on each device. The
+[user guide](docs/usage.md) covers the controls, offline storage and sync conflicts.
+The interface supports English and Russian, with light and dark appearances.
 
 Glass controls reflect the artwork and the library scrolling beneath them.
 Light and dark share the same layout and material; wide screens use side

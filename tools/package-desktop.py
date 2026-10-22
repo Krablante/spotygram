@@ -7,10 +7,12 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import stat
 import subprocess
 import tarfile
+import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +55,20 @@ def checksum(file):
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             value.update(chunk)
     return value.hexdigest()
+
+
+def linux_glibc_requirement(image):
+    versions = {(2, 35)}
+    for file in image.rglob('*'):
+        if not file.is_file() or file.is_symlink():
+            continue
+        with file.open('rb') as source:
+            if source.read(4) != b'\x7fELF':
+                continue
+        details = subprocess.check_output(['readelf', '--version-info', str(file)], text=True)
+        versions.update(tuple(map(int, value.split('.'))) for value in
+                        re.findall(r'GLIBC_([0-9]+\.[0-9]+(?:\.[0-9]+)?)', details))
+    return '.'.join(map(str, max(versions)))
 
 
 def release_key(state, destination):
@@ -169,19 +185,32 @@ def installer(image, target, version, state, destination):
                     '--linux-menu-group', 'AudioVideo', '--linux-app-category', 'sound',
                     '--linux-deb-maintainer', 'gkrablante@gmail.com',
                     '--resource-dir', str(ROOT / 'desktop/packaging/linux'),
-                    '--linux-package-deps', 'libc6 (>= 2.35), libgl1, libegl1, libx11-6, xdg-utils']
+                    '--linux-package-deps',
+                    f'libc6 (>= {linux_glibc_requirement(image)}), libgl1, libegl1, libx11-6, xdg-utils']
     else:
         command += ['--mac-package-identifier', 'app.spotygram']
     marker.write_text(extension + '\n')
     try:
         if system == 'macos':
             subprocess.run(['codesign', '--force', '--deep', '--sign', '-', str(image)], check=True)
-        subprocess.run(command, check=True)
+        environment = dict(os.environ)
+        if system == 'linux':
+            environment.setdefault('DPKG_DEB_THREADS_MAX', '2')
+        subprocess.run(command, env=environment, check=True)
         packages = list(output.glob(f'*.{extension}'))
         if len(packages) != 1:
             raise RuntimeError(f'Expected one {extension} installer in {output}')
         destination.mkdir(parents=True, exist_ok=True)
         shutil.move(str(packages[0]), artifact)
+        if system == 'macos':
+            with tempfile.TemporaryDirectory(prefix='spotygram-dmg-') as mount:
+                subprocess.run(['hdiutil', 'attach', str(artifact), '-readonly', '-nobrowse',
+                                '-mountpoint', mount], check=True)
+                try:
+                    subprocess.run(['codesign', '--verify', '--deep', '--strict',
+                                    str(Path(mount) / 'Spotygram.app')], check=True)
+                finally:
+                    subprocess.run(['hdiutil', 'detach', '-force', mount], check=True)
     finally:
         marker.unlink()
         if system == 'macos':

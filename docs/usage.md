@@ -317,7 +317,7 @@ creates or finds a private channel named `spotygram-` followed by random charact
 mutes it and moves it to Telegram's archive. It stays out of the music-source picker.
 You do not need to choose files or start a sync manually.
 
-Playlists, their song order, favorites, selected chats, library preferences,
+Playlists, their song order, favorites, selected chats and profiles, library preferences,
 appearance and language sync automatically. Each device keeps its own queue,
 last track and listening positions. Playback itself does not send sync documents.
 Referenced songs appear before their source finishes indexing. Imported songs
@@ -327,14 +327,19 @@ it; a metadata entry alone cannot make such a song playable elsewhere.
 Edits save locally first and send in small batches. Offline edits survive closing
 the app and send after reconnection. Different song additions are kept together.
 Conflicting edits of the same field resolve consistently using their saved
-versions; a deleted playlist cannot return through an older device's edits.
+versions. The same name, setting or song membership has one winning value;
+simultaneous reordering keeps one order while retaining concurrent additions.
+A deleted playlist or imported recording cannot return through an older device's edits.
 Separate existing playlists keep their identities even when their names match.
+Sync keeps the current library, not a recoverable history of every edit. Keep a
+separate backup of imported audio and important local files.
 
 The storage channel keeps a current full snapshot and a short tail of recent edits.
 Connected clients consolidate that tail within about a minute or when it grows,
 then delete the replaced documents. Interrupted cleanup resumes after reconnection.
-Update every device to **0.17.0 or later**. Older versions pause sync when they encounter
-the new format; upgrading restores library sync while retaining local playback data.
+Update every device to **0.26.0 or later** for the send-confirmation and deletion fixes.
+Format 3 itself requires 0.19.0 or later; earlier clients pause when they encounter it.
+Upgrading retains local playback data.
 
 **Settings → Library sync** shows the current state and offers Retry after an
 error. Sync runs while Spotygram is running and Telegram is connected; a closed
@@ -380,6 +385,11 @@ remaining copies; it cannot restore those already deleted.
 
 **Remove from device** in a song's menu removes its local copy, not the Telegram
 message. Files still in the player's working window or being read cannot be removed.
+
+An import instead offers **Delete imported track** and asks for confirmation.
+It removes this device's app-owned copy and the recording's favorites/playlist
+references on every synced device. Your original import source and physical
+copies on other devices remain. Cancel keeps both the file and library entries.
 
 **Settings → Clear music cache** shows space occupied by downloaded Telegram
 audio. Imported files are excluded from that total.

@@ -34,7 +34,8 @@ class Telegram(
     val cloudUpdates = Channel<Unit>(Channel.CONFLATED)
     val storageChats: MutableSet<Long> = ConcurrentHashMap.newKeySet()
     val channelChats: MutableSet<Long> = ConcurrentHashMap.newKeySet()
-    private val sendResults = ConcurrentHashMap<Long, JSONObject>()
+    // TDLib message IDs, including temporary outgoing IDs, are scoped to their chat.
+    private val sendResults = ConcurrentHashMap<Pair<Long, Long>, JSONObject>()
     private val sendRevision = MutableStateFlow(0L)
     private val requests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
     private val sequence = AtomicLong()
@@ -140,10 +141,11 @@ class Telegram(
                         "updateMessageSendFailed" -> {
                             if (sendResults.size > 64)
                                 sendResults.keys.take(32).forEach(sendResults::remove)
-                            sendResults[obj.getLong("old_message_id")] = obj
+                            val message = obj.getJSONObject("message")
+                            sendResults[
+                                message.getLong("chat_id") to obj.getLong("old_message_id")] = obj
                             sendRevision.update { it + 1 }
                             if (obj.kind() == "updateMessageSendSucceeded") {
-                                val message = obj.getJSONObject("message")
                                 val content = message.optJSONObject("content")?.kind()
                                 if (content == "messageAudio" || content == "messageDocument")
                                     updates.send(json("updateNewMessage", "message" to message))
@@ -230,11 +232,12 @@ class Telegram(
             throw TelegramException(error.getInt("code"), error.getString("message"))
         }
         val temporary = message.getLong("id")
+        val identity = message.getLong("chat_id") to temporary
         try {
             val result =
                 withTimeout(timeout) {
-                    sendRevision.first { sendResults.containsKey(temporary) }
-                    sendResults.getValue(temporary)
+                    sendRevision.first { sendResults.containsKey(identity) }
+                    sendResults.getValue(identity)
                 }
             if (result.kind() == "updateMessageSendFailed") {
                 val error = result.getJSONObject("error")
@@ -272,7 +275,7 @@ class Telegram(
                 }
             throw e
         } finally {
-            sendResults.remove(temporary)
+            sendResults.remove(identity)
         }
     }
 

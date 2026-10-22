@@ -183,12 +183,18 @@ Imported audio remains local; peers receive an unavailable metadata entry.
 Each field has a logical clock and a device UUID. Receiving a version advances the
 local clock; ties use the writer UUID, so replay and duplicate sends converge.
 Playlist membership is versioned per song; ordering retains concurrent additions.
-Deletion tombstones survive snapshots and prevent old offline playlist edits from
-restoring a removed identity. The first migration seeds existing playlists,
+Deletion tombstones survive snapshots and prevent old offline edits from
+restoring a removed playlist or imported recording. Concurrent tombstones use
+the same clock/writer comparison, so their stored versions converge too. Materializing
+favorites or playlist members excludes deleted track identities even if a newer
+offline membership edit arrives. The first migration seeds existing playlists,
 favorites, sources, referenced tracks and preferences. Schema 7 retires cloud queue
 and progress records while preserving local queue preferences and bookmarks. JSON
 object fields are encoded in sorted order for equal values on Android and desktop.
 Signing out detaches that account's records without publishing catalog cleanup.
+Failed account binding or detachment restores the in-memory account when SQLite
+rolls back. Empty incoming batches skip the merge transaction, and preference reads
+select only settings rather than loading every portable record.
 
 `CloudSync` owns channel discovery and one coalesced IO worker. It loads both chat
 lists and checks owned channels for an account-bound description marker, including
@@ -212,6 +218,9 @@ messages already incorporated from that channel. Cleanup debt is durable and cle
 only after successful deletion; reconnection resumes it. Versions and tombstones
 remain in the snapshot. Confirmation waits for TDLib's final send
 result before clearing the exact sent versions; newer edits remain pending.
+Confirmation identities include the chat and temporary message ID; equal IDs in
+different chats cannot acknowledge each other's uploads. An incoming snapshot's
+`through` must precede its own message, and a delta must carry zero.
 Reads validate the complete incoming collection before one merge transaction.
 Unknown formats and invalid documents retain the catalog and pending edits.
 Documents are bounded to 8 MiB compressed and 32 MiB expanded; downloaded sync
@@ -370,6 +379,8 @@ remain, while the secondary detail pass is disabled. There is no row effect or a
 wallpaper. Desktop and Android 13+ use full optics; older Android uses denser tint,
 lighting and rim fallback. Compose/Haze follows the system reduced-motion policy.
 Static environment and rim gradients are cached until their size or theme changes.
+Dense, already diffused surfaces use Haze's Performance sampling profile; clear
+controls retain the default profile and the same optics.
 Windows uses Skiko's default Direct3D path, which performs drawing and presentation
 outside the UI event thread. A startup check selects ANGLE when no hardware
 DXGI adapter supports Direct3D 12; ANGLE was faster than software Direct3D in native
@@ -379,7 +390,10 @@ overrides remain available; both paths use the same glass material.
 At 840 dp, navigation becomes a side rail; wide players separate artwork and controls.
 Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with 48 dp
 secondary touch targets. Sheet glass travels inside its native placement transform;
-keyboard layout changes preserve text-field identity and focus.
+keyboard layout changes preserve text-field identity and focus. Settings
+compose visible groups through a lazy list rather than building the entire form
+before the first animation frame. Switch and tab-lens animation offsets are read
+during placement, avoiding recomposition for each animation frame.
 
 Track actions share one header and list. The profile button is centered beneath
 the artwork/title row with short To profile/Remove labels and a 48 dp minimum touch

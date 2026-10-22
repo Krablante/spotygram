@@ -94,6 +94,7 @@ fun SpotygramUI(
     var renameText by remember { mutableStateOf("") }
     var delete by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
+    var deletingImportId by remember { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -291,6 +292,11 @@ fun SpotygramUI(
                 onPlaylist = { addToPlaylist(listOf(track.id)) },
                 onOrder = { sheet = "playbackOrder" },
                 onDownload = { onDownload(listOf(track.id)) },
+                onRemoveLocal = {
+                    sheet = ""
+                    if (track.imported) deletingImportId = track.id
+                    else app.action { app.removeLocal(track) }
+                },
                 onShare = { sheet = "share" },
                 onOpenTelegram = {
                     snackbar.currentSnackbarData?.dismiss()
@@ -473,7 +479,12 @@ fun SpotygramUI(
                                                         label = "tab lens",
                                                     )
                                                 Box(
-                                                    Modifier.offset(x = offset, y = 5.dp)
+                                                    Modifier.offset {
+                                                            IntOffset(
+                                                                offset.roundToPx(),
+                                                                5.dp.roundToPx(),
+                                                            )
+                                                        }
                                                         .width(cellWidth)
                                                         .height(52.dp)
                                                         .liquidGlass(
@@ -835,14 +846,13 @@ fun SpotygramUI(
                         }
                     }
                 }
-                if (sheet.isNotEmpty() && !(sheet in listOf("track", "share") && trackPopup))
+                if (sheet.isNotEmpty() && !(sheet in listOf("track", "share") && trackPopup)) {
                     ModalBottomSheet(
                         onDismissRequest = { sheet = "" },
                         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                         containerColor = Color.Transparent,
                         dragHandle = null,
                     ) {
-                        // Material must travel inside the sheet's native placement/drag transform.
                         Column(Modifier.fillMaxWidth().liquidGlass(30.dp, strong = true)) {
                             if (sheet == "speed")
                                 Box(
@@ -1012,7 +1022,10 @@ fun SpotygramUI(
                                                 ) {
                                                     sheet = "order"
                                                 }
-                                                ActionRow(Icons.Rounded.Edit, tr(R.string.rename)) {
+                                                ActionRow(
+                                                    Icons.Rounded.Edit,
+                                                    tr(R.string.rename),
+                                                ) {
                                                     renameText = p.name
                                                     sheet = ""
                                                     rename = true
@@ -1032,6 +1045,29 @@ fun SpotygramUI(
                             }
                         }
                     }
+                }
+                library.byId[deletingImportId]?.let { track ->
+                    GlassDialog(
+                        onDismissRequest = { deletingImportId = null },
+                        title = { Text(tr(R.string.delete_imported_track)) },
+                        text = { Text(tr(R.string.delete_imported_track_help, track.title)) },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    deletingImportId = null
+                                    app.action { app.removeLocal(track) }
+                                }
+                            ) {
+                                Text(tr(R.string.delete))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { deletingImportId = null }) {
+                                Text(tr(R.string.cancel))
+                            }
+                        },
+                    )
+                }
                 if (rename)
                     GlassDialog(
                         onDismissRequest = { rename = false },

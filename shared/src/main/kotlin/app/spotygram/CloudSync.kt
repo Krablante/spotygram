@@ -459,6 +459,9 @@ class CloudSync(private val app: SpotygramApp) {
                 val (packet, records) =
                     try {
                         val packet = download(content, caption)
+                        val through = packet.getLong("through")
+                        require(through >= 0 && through < id)
+                        require(packet.getString("kind") == "snapshot" || through == 0L)
                         packet to
                             LibrarySync.decode(packet.getJSONArray("records"), legacy = format == 1)
                     } catch (e: Exception) {

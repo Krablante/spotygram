@@ -2,955 +2,133 @@
 
 [Documentation](README.md) · **English** · [Русский](verification.ru.md)
 
-This page records observed behavior and its limits. A successful build or source
-review does not establish account access, audio quality or physical-device behavior.
-Checks use real packaged applications, UI interactions and runtime logs. Temporary
-inspection code, recordings, screenshots and account state stay outside the checkout.
-
-## 0.25.0 — photographed Takopi identity
-
-The packaged Linux app displayed the supplied plush photograph on welcome
-and phone-entry screens at 390 and 1100 pixels, with light/dark artwork inspected.
-The actual X11 window icon contained the new pale tile at 96 pixels. Local import,
-favorite, native libmpv playback with null audio output, pause and ordinary Quit
-worked. The isolated catalog retained its recording/favorite and passed SQLite
-integrity. The headless display used Skiko's fallback after an unavailable GL context.
-
-The signed x86-64 APK updated the retained Android 15 emulator over 0.24.0. Before
-first launch, the catalog dump, queue, position, appearance and sharing preferences
-matched the baseline. After launch, the catalog was still identical and the paused
-position remained 8,910 ms. Actual screenshots covered the home-screen icon,
-application-info icon, library in both appearances and phone entry at 360 dp and
-320 dp with font scale 1.3. Opening the keyboard hid the decorative brand row and
-kept input/Continue available. After appearance/language checks, the recording,
-favorite, playlist and queue remained intact; only appearance sync clocks, local
-queue version identifiers and the newly initialized Telegram database key changed.
-Original Russian/dark preferences were restored and SQLite integrity was `ok`.
-
-The emulator's Lavapipe host process failed with a missing color buffer and exited
-139 after display/theme changes. A SwiftShader restart retained the same data;
-its cold boot had a System UI ANR, dismissed before the final app/data checks.
-Spotygram's crash buffer was empty. These observations do not measure physical
-device performance or touch responsiveness.
-
-Android debug/release assemblies and both Lint checks passed, with 56 warnings and
-zero errors each. Both release APKs retain the original signer/application ID,
-versionCode 46 and 16 KB alignment. Their decoded photo, launcher and adaptive
-background pixels match source, and both artwork notices are included. The 40
-emoji images, header layout and selection code are unchanged. Generated Windows
-ICO sizes 16–256, macOS ICNS sizes 16–1024 and the photo-derived monochrome vector
-were inspected visually. Simplifying the traced contour removed its VectorPath
-warning without changing the color images. The README banner uses the photograph;
-older examples are cropped to their functional controls to remove obsolete brand rows.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38662354303)
-built from `361190c`. Every archive manifest, payload hash and installer signature
-verified with the existing key. Compiled apps report 0.25.0 with DEBUG false and
-contain the exact photo/monochrome resources, all 40 emoji and the original update
-key. The signed Linux archive reopened the retained local recording/favorite,
-rendered the library and closed through ordinary Quit; SQLite integrity was `ok`.
-
-Final APK metadata names the same source commit. The installed x86-64 APK matched
-the release file byte-for-byte. Its catalog and settings matched before/after the
-final installation; the subsequent launch retained the catalog and 8,910 ms pause.
-All fifteen uploaded asset names, sizes and GitHub SHA-256 digests matched local
-files before and after publishing [v0.25.0](https://github.com/Krablante/spotygram/releases/tag/v0.25.0)
-as Latest, with the tag pointing to `361190c`. The signed ARM64 APK and actual app
-screenshots were delivered to the owner through Telegram artifacts.
-
-Physical Android devices, physical sound, authenticated sign-in, live tray menus,
-Android themed launcher mode/notification display and interactive Windows/macOS
-operation were not exercised in this cycle.
-
-## 0.24.0 — audio sharing
-
-Native TDLib through a separate owned Spotygram production session confirmed local
-audio upload, copying an existing recording without its sender or caption,
-keeping only the caption, forwarding with sender and caption, and sending an
-audio document. The imported entry retained its original file and reusable upload
-reference; another process reused that reference. Confirmed messages entered the
-catalog with permanent Telegram IDs. Protected content and the conflicting
-sender/removed-caption combination were rejected before sending. Sending to an
-open forum topic succeeded; a closed topic was hidden and rejected. Temporary
-messages and single-member verification groups/channels were removed afterward.
-
-The compiled shared interface used controlled Telegram responses and native Linux
-libmpv with local recordings. Actual screenshots covered both appearances,
-the player and song-menu entries, quick recipients, folders, topics, selection,
-settings, confirmation, retry and rights revocation. Revocation removed the chat
-from cards and rows, cleared selection and disabled sending. A double click
-created one send. The anchored panel at 1100 pixels and a 320-pixel window with
-font scale 1.3 remained usable; wider cards corrected an orphaned final letter.
-These directory/error checks do not establish production group membership rules.
-
-The signed x86-64 APK updated the retained Android 15 emulator over 0.23.0.
-Before first launch, the database and queue preferences matched byte-for-byte.
-The recording, favorite, playlist and 8,910 ms paused position remained available.
-Actual settings screens covered light/dark appearances and 320 dp with font scale
-1.3. A changed sharing switch survived process restart; both switches were restored
-to off. Only expected appearance-sync clocks differed in the final catalog dump;
-SQLite integrity was `ok` and the crash buffer was empty. The emulator had a
-System UI ANR at cold boot before the successful application checks.
-
-Final Android debug/release assemblies and both Lint checks passed. The two release
-APKs retain the original signer/application ID, versionCode 45 and 16 KB alignment.
-The final installed x86-64 APK matched the release file byte-for-byte. Its catalog
-dump matched the pre-installation baseline after launch, and the paused position
-remained 8,910 ms. Both sharing switches remained off.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38632282559)
-built from `78562e4`. Archive manifests, all payload hashes and four installer
-signatures verified with the existing key. Every compiled app reports 0.24.0 with
-DEBUG false, includes the sharing classes and embeds the original update key.
-The signed Linux release reopened its 537-record catalog and owned Telegram session,
-displayed live eligible recipients, and selected, pinned and unpinned a recipient.
-Ordinary Quit closed it; catalog counts matched and SQLite integrity was `ok`.
-
-All fifteen draft and published asset names, sizes and GitHub SHA-256 digests
-matched the local files. [v0.24.0](https://github.com/Krablante/spotygram/releases/tag/v0.24.0)
-was confirmed as Latest with `78562e4` as its tag target. The signed ARM64 APK and
-actual shared-interface/Android-settings screenshots were delivered to the owner
-through Telegram artifacts. Public screenshots use demonstration recipients.
-
-Physical Android devices, physical sound, authenticated Android sending, long
-foreground uploads and interactive Windows/macOS operation were not exercised.
-Profile-file sharing was reviewed against the existing resolver, without a new
-production profile-send check.
-
-## 0.23.0 — session emoji stickers
-
-The signed APK updated the retained Android 15 emulator over 0.22.1. The installed
-APK matched the final release build byte-for-byte. The complete SQLite dump was
-identical before installation and before the first launch. The existing recording,
-favorite, playlist and 8,910 ms paused player position remained available. After
-appearance/language checks, only their expected sync preference edits differed;
-another cold launch changed the sticker with an identical database dump.
-
-Real Android screens covered English/light and English/Russian dark appearances,
-360 dp and 320 dp with font scale 1.3, and rotation. The header stayed aligned and
-retained its sticker through theme/language changes, activity recreation and a
-short Home/return cycle. Two cold restarts changed eyebrow → peace → palms up.
-The crash buffer was empty. These checks used the retained emulator with the
-Lavapipe backend; they do not establish physical-device responsiveness or sound.
-
-The packaged Linux application displayed the same resources at 390 and 1090
-pixels wide, in both appearances, Music/Favorites/Playlists/Sources and during
-local playback. Theme, navigation and a short minimize/restore retained the
-sticker. Cold launches changed pensive → finger heart → pensive without consecutive
-repeats. A local WAV import, favorite and native libmpv playback with null output
-worked; ordinary Quit closed the app and reopening retained the local library.
-After 32 minutes minimized, the persisted sticker was still pensive. Restoring
-the actual window changed it to sob; the selection happened on return, with no
-timer-driven change while hidden.
-
-Both Android debug/release assemblies and Lint checks passed. The release APKs
-retain the original signer/application ID, versionCode 44 and 16 KB alignment.
-The release APK and packaged desktop JAR both contain all 40 stickers. The Fluent
-Emoji MIT notice is included in Android assets and desktop resource licenses.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38582004779)
-built from `6d9364f`. Every archive manifest, payload hash and installer signature
-verified with the existing key. All four desktop applications contain the exact
-40 source PNGs and the Fluent Emoji notice. The signed Linux archive reopened the
-retained local recording/favorite, rendered the header and closed through Quit.
-Final APK metadata names that same source commit; only that metadata changed from
-the UI-checked build. Reinstalling the final x86-64 APK preserved the complete
-database, and the installed APK again matched the release file byte-for-byte.
-
-All fifteen draft and published asset names, sizes and GitHub SHA-256 digests
-matched the local files. [v0.23.0](https://github.com/Krablante/spotygram/releases/tag/v0.23.0)
-was confirmed as Latest, with `6d9364f` as its tag target.
-The signed ARM64 APK, all-sticker card and actual Android/Linux screenshots were
-delivered to the owner through Telegram artifacts.
-
-Physical Android devices, physical audio output, authenticated Telegram actions
-and interactive Windows/macOS operation were not exercised in this cycle.
-
-## 0.22.1 — liquid-glass application icon
-
-The signed Android build updated the retained Android 15 emulator over 0.22.0.
-The installed APK matched the release file byte-for-byte. Actual home-screen and
-application-info screenshots showed the honey-glass mark on a pale refracted glass
-surface. Proportional foreground insets kept the mark large and unclipped at both
-system sizes. The in-app header retained its standalone mark and lowercase name.
-All eleven catalog tables and preferences matched before the first launch; after
-launch, catalog rows and the 8,910 ms position still matched, with only the normal
-queue/position version identifiers renewed. The crash log was empty.
-
-The packaged Linux application ran at 390 pixels wide and supplied the glass tile
-to its actual window manager icon. That live icon, the packaged PNG and circular,
-rounded and 16–96-pixel previews were visually inspected on light/dark backgrounds.
-The welcome screen kept the selected in-app identity, and ordinary Quit closed it.
-Android release assembly and Lint passed with zero Lint errors. Both APKs retained
-the original certificate/application ID, versionCode 43 and 16 KB alignment.
-The visual effect is static artwork, with no live blur or animation.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38566077431)
-built from `2727408`. Archive manifests, every payload hash and four installer
-signatures verified with the existing key. Each application contained the exact
-shared mark and launcher artwork. Native Linux PNG, both macOS ICNS sets and all
-seven Windows launcher/installer icon sizes matched the prepared glass imagery.
-The signed Linux archive also opened the welcome screen with the new window icon
-and closed through ordinary Quit.
-
-All fifteen draft and published asset names, sizes and GitHub SHA-256 digests
-matched the local files. [v0.22.1](https://github.com/Krablante/spotygram/releases/tag/v0.22.1)
-was confirmed as Latest with the built commit as its tag. The signed ARM64 APK
-and finished launcher PNG were delivered to the owner through Telegram artifacts.
-
-Physical Android devices, themed launcher mode and interactive Windows/macOS
-operation were not exercised in this cycle.
-
-## 0.22.0 — honey-glass identity
-
-The packaged Linux application displayed the selected yellow glass mark with its
-curled antenna and lowercase `spotygram` name. Actual screenshots covered welcome,
-library and player screens, both appearances, English/Russian and 390/1100-pixel
-windows. Pale reflections stayed opaque and the background stayed transparent.
-Two local WAV recordings imported; native libmpv playback with null audio output,
-pause and a favorite worked. Ordinary Quit closed the application. The README
-banner and library image now show the selected artwork; older images are identified.
-
-Android debug/release assemblies and both Lint checks passed. The signed APKs use
-0.22.0, versionCode 42, the original application ID/certificate and 16 KB alignment.
-The retained Android 15 emulator updated from 0.21.1; the installed APK matched the
-release file byte-for-byte. Immediately after upgrade, all eleven catalog tables
-and local queue/position fields matched the baseline, including 8,910 ms; SQLite
-integrity was `ok`. Real screenshots showed the launcher icon, English/light and
-Russian/dark library, and the complete brand row at 320 dp with font scale 1.3.
-Keyboard navigation changed language and appearance. Touch injection was unreliable
-in this emulator, so these checks do not establish physical touch responsiveness.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38558439696)
-built from `eab4d37` on native runners. Four installer signatures, four archive
-manifests and every payload hash verified with the existing key. Each compiled
-application reported 0.22.0 with DEBUG false, embedded the original update key
-and contained the exact shared honey-glass PNG, with the old RGB vector absent.
-The signed Linux release archive reopened both local recordings, the favorite
-and paused queue, displayed the new mark and closed through ordinary Quit.
-All fifteen draft asset names, sizes and GitHub SHA-256 digests matched the local
-files. The ordinary [v0.22.0 release](https://github.com/Krablante/spotygram/releases/tag/v0.22.0)
-was confirmed as Latest with the same assets and the built commit as its tag.
-The signed ARM64 APK and actual application screenshots were delivered to the owner
-through Telegram artifacts.
-
-Physical devices, physical sound, screen-reader speech, authenticated Telegram
-actions and interactive Windows/macOS operation were not exercised in this cycle.
-The notification and themed-icon resources use the matching white silhouette;
-the themed launcher mode and an active Android media notification were not visually
-exercised.
-
-## 0.21.1 — centered compact profile button
-
-The compiled shared interface showed To profile/Remove centered beneath the
-artwork/title row, with matching button widths and centered icon/text groups.
-Screenshots covered 380 dp, 320 dp with font scale 1.3, English/Russian and both
-appearances. Short labels stayed on one line. A controlled request failure kept the
-button available with a readable explanation beneath it; retry succeeded.
-
-The production Linux launcher reopened its retained account and catalog. Real
-addition, removal and Undo succeeded through the new button; the separate owned
-profile returned to its original empty state. The wide menu's two button states
-kept the same placement and width. Quit closed the packaged application.
-
-Android debug/release assemblies and both Lint checks passed. The signed APKs use
-0.21.1, versionCode 41, the original application ID/certificate and 16 KB alignment.
-The retained Android 15 emulator updated from 0.21.0; its installed APK matched the
-release file byte-for-byte. All eleven catalog tables, preferences and queue fields
-were preserved, including the 8,910 ms position. Restart renewed only the normal
-queue-instance UUID, with matching queue/position versions. SQLite integrity was
-`ok`. System UI again stalled in the software emulator, so authenticated Android
-profile actions were not verified.
-
-Physical devices, physical sound, screen-reader speech and interactive Windows/macOS
-operation were not exercised. Narrow-layout and error checks used controlled TDLib
-responses in the compiled desktop interface.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38540377303)
-built from `8ecaa5b`. Installer signatures, archive manifests and all payload hashes
-verified with the original key. Every compiled app reported 0.21.1 with DEBUG false,
-contained the new short-label resources and embedded the trusted update key.
-The signed Linux release archive reopened the retained catalog and displayed the
-centered compact button; ordinary Quit closed it. All fifteen draft asset names,
-sizes and GitHub SHA-256 digests matched the local files before publication.
-The ordinary [v0.21.1 release](https://github.com/Krablante/spotygram/releases/tag/v0.21.1)
-was confirmed as Latest with the same assets. The signed ARM64 APK was delivered
-to the owner through Telegram artifacts.
-
-## 0.21.0 — direct profile-music actions
-
-Native TDLib through the retained, separate Spotygram production session uploaded
-a six-second local WAV into its own profile. The imported entry retained its stable
-remote reference and original local file. A fresh application instance recognized
-that recording as profile music. Removing and adding the existing Telegram audio
-also succeeded; final removal and another restart confirmed that the temporary
-recording was absent and the original profile list was restored. These checks used
-an isolated local catalog and excluded library-sync transport.
-
-The compiled shared interface used controlled TDLib responses and real local audio.
-One click on the header button added or removed the recording. A failed addition
-kept Add available with an inline explanation. Screenshots covered the list and
-full-player menus, both appearances, the anchored wide menu and 320 dp with font
-scale 1.3. The complete action text remained readable. The local-upload explanation
-was visible before Add and disappeared after confirmation. Underlying list icons
-showing through the nested glass were corrected and rechecked.
-
-An imported song retained its favorite, one-song playlist and local file after
-profile removal. The local queue's three IDs, cursor and 60,868 ms paused position
-matched the baseline exactly; SQLite integrity was `ok`. The reopened shared player
-retained that paused queue with native libmpv and null audio output.
-
-Final Android debug/release assemblies and both Lint checks passed. Both signed
-release APKs use 0.21.0, versionCode 40 and the original application ID/certificate;
-16 KB alignment passed. The final production Linux application image also built.
-A signed x86-64 APK updated the retained Android 15 emulator from 0.20.0.
-All eleven catalog tables and all preferences, including the local queue, matched
-the pre-update copy; schema 8 and SQLite integrity were retained.
-The installed APK matched the final release file byte-for-byte. Its retained Music
-screen rendered, but software graphics again produced ANRs in both System UI and
-the app. The app's render thread waited on the emulator's OpenGL program linking.
-Changing the software backend did not yield a reliable interactive session, so
-authenticated Android profile actions and foreground-upload survival were not verified.
-
-The final production Linux launcher opened its retained Spotygram account and
-catalog. Its real track-menu button added an existing Telegram song in one click,
-then showed Remove on reopening. Removal and a second addition followed by Undo
-also succeeded through the UI; My profile returned to its original empty state.
-No intermediate menu or confirmation appeared. The application then closed through
-its ordinary Quit action.
-
-Physical-device behavior, physical sound and interactive Windows/macOS operation
-were not exercised. Production profile mutations were checked on Linux;
-the additional appearance, narrow-layout and failure scenarios used controlled responses.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38509295498)
-built from `0cc2927` on native runners. The four installer signatures and four
-archive manifests verified with the existing key, as did every archive payload
-hash. Each compiled app reported 0.21.0 with DEBUG false, included `TrackActions`
-and embedded the original trusted update key. The signed Linux release archive
-reopened the retained catalog, displayed the working profile action and exited
-through the ordinary Quit action. All fifteen draft asset names, sizes and GitHub
-SHA-256 digests matched the local files before publication; the published ordinary
-[v0.21.0 release](https://github.com/Krablante/spotygram/releases/tag/v0.21.0) was
-confirmed as Latest with the same assets. The signed ARM64 APK was delivered to the
-owner through Telegram artifacts.
-
-## 0.20.0 — grouped glass sources and chat photos
-
-The production Linux image's compiled shared screens used an isolated catalog,
-controlled TDLib responses and real JPEG files. Screenshots covered the continuous
-profile/chat panels, scrolling beyond the viewport, photo placeholders, selected
-source, search by name and @username, and the anchored desktop picker. Narrow
-screens used the bottom sheet. English/Russian, light/dark and a 320-pixel viewport
-with font scale 1.3 remained readable. The full-name dialog showed an otherwise
-truncated source title; Esc dismissed it while retaining the source. Switching
-language immediately updated counts in lazy rows. README images use this working
-shared interface with demonstration data.
-
-Photo replacement and removal events changed the visible avatar. Downloads used
-priority 1 and at most two shared chat/profile slots; restarting reused cached
-files. A native TDLib request through an owned Spotygram production session fetched
-and decoded a public chat's 160×160 JPEG. Its source remained unselected, and the
-536-track catalog was unchanged.
-
-The final packaged Linux launcher also reopened that owned catalog and displayed
-its connected Sources with real chat/profile photos and the Saved Messages bookmark.
-Android debug/release assemblies and both Lint checks passed. The two release APKs
-retained the original signer and application ID, used versionCode 39 and passed
-16 KB alignment. The production Linux image, signed archive and DEB built successfully.
-
-A signed x86-64 APK updated 0.19.0 on the retained Android 15 emulator. Its imported
-song, favorite, playlist, memberships, sources and profile rows matched the baseline
-exactly; schema 8 and SQLite integrity were retained.
-The installed APK matched the final release file byte-for-byte; Media3 retained
-the local queue's song and its 8,910 ms position after restart. The bottom sheet and
-its current-selection mark were inspected. With the keyboard open, search, the
-empty-result message and management footer remained within the available area.
-The emulator's software graphics repeatedly stalled in native shader compilation,
-also affecting System UI and keyboard startup. Mesa allowed the initial app and
-picker screens to render, but keyboard interaction still produced ANRs. This does
-not establish responsiveness or performance on Android; physical-device validation
-remains outstanding.
-
-Native Linux libmpv played a local WAV recording with null audio output. Removing
-and reconnecting its chat source retained the favorite, local file and queue;
-SQLite integrity remained `ok`. Shared panel clipping during scrolling and text
-bleed through picker cards were corrected and rechecked in the actual interface.
-
-Physical-device behavior, physical sound and interactive Windows/macOS operation
-were not exercised. Long source lists and photo-change/removal scenarios used
-controlled responses; production checks covered native photo requests, their cache
-and the retained catalog's Sources screen.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38486421547)
-built from `e37bece` on native runners. Four installer signatures, four archive
-manifests and every payload hash verified with the existing desktop key. Each
-compiled application reported 0.20.0 with DEBUG false and contained the chat-photo
-and grouped-source components. The verified Linux release archive reopened the
-retained Sources screen with real photos and closed through the ordinary Quit
-action. All fifteen GitHub draft asset names, sizes and SHA-256 digests matched
-the local files; SHA256SUMS covers both APKs and every desktop package, archive
-and detached signature. The complete ordinary release is published as Latest.
-
-## 0.19.0 — profile music and unified Sources
-
-An owned Spotygram production Telegram session exercised native TDLib `getMe`,
-`getUser`, `getUserFullInfo` and `getUserProfileAudios`. Its own profile and an
-accessible public user returned empty music lists. The actual UI handled these
-states; public channels were excluded from profile results, and an unused username
-became an ordinary empty search result. The retained schema 6 catalog upgraded to
-8 with all 536 tracks and unchanged playlist counts; SQLite integrity was `ok`.
-
-The compiled shared interface and native Linux libmpv player also used an isolated
-catalog with controlled TDLib responses and local recordings. My profile stayed
-at the top of Sources. Its five recordings played and advanced automatically;
-restart retained the paused local queue. Liking one song left the profile
-unselected and added only that song to Music. Retained listening copies remained
-in On device. A second profile loaded 230 songs in three pages, preserving profile
-order. Opening it did not add its songs to Music. Explicit connection added the
-collection, and removal returned Music to the individual favorite without deleting
-it or the retained local queue. A shared recording displayed its existing heart
-in both profiles. Real screenshots covered the profile list, source picker,
-connected Sources and removal confirmation in the shared glass interface.
-At 320 pixels with font scale 1.3, profile controls and the song menu remained
-usable. Adding one preview song to a new playlist kept both profiles unselected;
-Music showed exactly the favorite and that playlist song. SQLite integrity was `ok`.
-
-The compiled format 3 reader restored profile identity, username, a favorite,
-a one-song playlist and a selected profile on a fresh peer. Saving individual
-songs left their profile unselected. Native file IDs were reset to zero for
-resolution through TDLib on that device; legacy cloud playback fields were ignored.
-These were controlled metadata checks, without a new two-device Telegram exchange.
-
-A signed x86-64 APK updated 0.18.0 on a fresh Android 15 emulator, preserving an
-imported MP3, its favorite and paused queue. Media3 reported the retained track and
-position. Creating a playlist and restarting preserved its name. The new Sources
-connection screen was inspected at 320 dp with font scale 1.3; its text, Connect
-button and four navigation tabs remained usable. The normal-width library and
-playlist screens were also inspected after upgrade.
-
-Android debug/release assemblies and both Lint checks passed. A final release
-rebuild after the welcome-text update also passed Lint. Both release APKs retained
-the original signer and application ID, used versionCode 38 and passed 16 KB
-alignment. The production Linux image, signed archive and DEB built successfully;
-the packaged launcher reopened the 536-track catalog and My profile screen.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38430850916)
-built on their native runners from `da94a32`. Four installer signatures, four
-archive manifests and every payload hash verified with the existing desktop key.
-All compiled applications reported 0.19.0 with DEBUG false and contained the new
-profile and Sources implementation. The release Linux archive reopened the
-retained catalog and own-profile screen, then closed normally. The final installed
-Android APK matched the release file byte-for-byte; Media3 played the retained
-MP3 and the crash log was empty. SHA256SUMS covers both APKs and every desktop
-package, archive and detached signature. All fifteen GitHub draft asset names,
-sizes and SHA-256 digests matched the local files before publication.
-
-Positive profile playback used controlled responses and local recordings;
-production profiles with pinned songs were not available for that check. Physical
-audio output, physical-device behavior and interactive Windows/macOS operation
-were not exercised in this cycle.
-
-## 0.18.0 — reverse order and local sound controls
-
-The actual Linux application used native libmpv with null audio output and four
-local WAV recordings. Reverse Play all started at the last available entry;
-manual and automatic transitions followed the reversed queue. Changing mode kept
-the paused song and position. Play next, upward movement and removal followed the
-displayed order, including intentional repeated entries. Repeat-all crossed the
-reverse boundary and repeat-one restarted the same recording.
-
-The full-player and mini-player volume controls changed the same engine state.
-Pointer adjustment, the mouse wheel and focused keyboard arrows worked. Mute
-survived restart and restored the previous nonzero level. Real screenshots covered
-English/Russian, light/dark, wide windows and a 360-pixel desktop window. Percentage
-wrapping and cramped mini-player controls were corrected; Esc dismissed sheets and
-playback menus before their underlying player.
-
-A signed Android APK updated 0.17.0 on an Android 15 emulator. Its four tracks,
-two favorites, one playlist and four memberships survived, with SQLite integrity
-`ok`. The local random mode, repeat-one, 1.5× speed and 9,074 ms paused position
-were retained. Three legacy sound-setting sync rows were removed while the library
-remained intact. Reverse playback from the playlist started at its last entry;
-system Next and an actual end transition advanced in the intended order. The new
-mode choices and track-action row were inspected in Russian at 320 dp with font
-scale 1.3, and the player was inspected in both appearances. Android kept its
-existing touch controls without a desktop volume control.
-
-The compiled sync reader ignored legacy speed/order/repeat fields and retained a
-favorite in the same document. Independent local profiles kept independent modes;
-mode and speed changes created no sound-setting sync rows. Format 2 is unchanged.
-
-Android debug/release assemblies and both Lint checks passed. The final release
-APKs kept the original signer and application ID, used versionCode 37 and passed
-16 KB alignment. The installed x86-64 APK matched the release file byte-for-byte;
-a fresh launch retained reverse order, the paused song, position and 1.5× speed.
-The final production Linux image rebuilt and reopened the retained local catalog.
-Its archive manifest, all 278 payload entries and installer signature verified
-with the existing desktop key; the application reported 0.18.0 with DEBUG false.
-The final packaged volume control adjusted to 55%, muted to zero and restored 55%.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38398113189)
-built on their native runners. Four installer signatures, four archive manifests
-and every archived payload verified with the existing key. The compiled applications
-reported 0.18.0 with DEBUG false and included reverse order and volume controls.
-The release Linux archive reopened the retained queue and 55% volume; manual Next
-and a native end-of-file transition followed the reversed queue. SHA256SUMS covers
-both APKs and every desktop package, archive and detached signature.
-
-These checks used isolated catalogs and local recordings. Production Telegram
-exchange, physical audio output, physical devices and interactive Windows/macOS
-behavior were not exercised in this cycle.
-
-## 0.17.0 — local playback and bounded sync history
-
-Temporary runtime checks used the compiled application with isolated catalogs and
-controlled TDLib responses. A schema 6 catalog upgraded to 7, retaining its queue
-and 125,000 ms bookmark while ignoring a foreign legacy playback position. Its
-playlists and favorites survived; playback-only descriptors left the portable
-snapshot. A fresh client recovered the library without inheriting a queue or
-bookmarks. The actual 0.16.0 reader paused on format 2, sent nothing and retained
-a pending local setting.
-
-Controlled history checks covered the shared tail threshold, old history without
-local edits, deletion failure, cleanup retry without another upload, and restart
-with unfinished cleanup. Concurrent edits arriving after a snapshot's boundary
-survived compaction; a stale offline rename could not restore a deleted playlist.
-The actual one-minute maintenance timer consolidated a short tail and did not
-start an idle publication loop. Android's and desktop's JSON implementations
-both recognized unchanged object values without publishing them again.
-Short history pages were retried; a persistently incomplete history kept cleanup
-pending until a later successful pass. A 10,000-song metadata snapshot was about
-231 kB compressed. Two offline additions converged to 10,002 songs and identical
-portable records, with one retained snapshot. This used the controlled transport
-and does not establish Telegram media availability.
-
-The packaged Linux player used native libmpv with null audio output and a synthetic
-31-minute WAV. Periodic checkpoints, seeking and pausing saved local progress
-without pending playback edits. Received order/repeat preferences updated the
-active queue; later local saves did not overwrite them. Explicit mode changes
-published only settings. Closing and reopening retained the local track and
-paused position. Actual Linux screenshots covered the library, player and settings
-in light English and dark Russian, including a narrow window.
-
-A signed APK upgraded the retained Android 16 catalog from schema 6 to 7, keeping
-three tracks, two favorites, two playlists and three memberships with SQLite
-integrity `ok`. That emulator again reported launcher/system ANRs. A fresh
-Android 15 emulator completed local import, playback, seeking and process restart.
-Its 652,707 ms bookmark remained local with zero cloud queue/progress records and
-integrity `ok`. The application had no AndroidRuntime crash during these checks.
-Actual Android library, player and settings screens were inspected in both themes,
-including Russian at 320 dp with font scale 1.3.
-
-The final Android debug/release assemblies and both Lint checks passed. Both
-release APKs retained the original signer and application ID, used versionCode 36
-and passed 16 KB alignment. The production Linux image built and reopened its
-retained local queue paused. Its archive manifest, every payload hash and installer
-signature verified with the existing desktop key; the packaged version was 0.17.0
-with DEBUG false.
-
-[All four desktop targets](https://github.com/Krablante/spotygram/actions/runs/38293684212)
-also built on their native runners. Four installer signatures, four archive
-manifests and every archived payload hash verified with the existing key. All
-packages reported 0.17.0, DEBUG false and sync format 2. The release Linux archive
-passed the native local-playback and restart checks. The final installed Android
-APK matched the release file byte-for-byte and retained the same catalog counts
-with integrity `ok`.
-
-Native TDLib sandbox sessions reached code entry, but Telegram rejected the reserved
-account codes with `PHONE_CODE_INVALID`. Authenticated format 2 exchange and server
-deletion were not exercised in this cycle. The controlled transport scenarios
-above verify application behavior; the production transport evidence for 0.16.0
-below does not establish a new server check. Current Windows/macOS account flows,
-physical audio output and physical-device behavior were not rechecked.
-
-## 0.16.0 — automatic library sync
-
-Two independent Spotygram TDLib sessions on Linux used a controlled production
-Telegram account. Both found the same private storage channel, with archive
-placement and notifications disabled. Playlists and favorites changed in both
-directions. A fresh second catalog recovered the library, settings and selected
-source even after the channel was renamed. That source indexed an actual uploaded
-MP3. The channel name was restored after the check.
-
-A playlist with 10,000 synthetic song descriptors transferred through Telegram
-in a full snapshot of about 763 kB compressed. After separate offline additions
-and a restart of the second client, both playlists contained all 10,002 songs.
-The clients' portable records matched exactly; a stale offline rename did not
-restore a deleted playlist. A 125,000 ms bookmark and paused queue metadata also
-reached the second catalog. SQLite integrity was `ok`. These are metadata and
-transport checks; the synthetic entries do not establish media availability.
-
-A document advertising an unknown protocol version paused both clients without
-changing their playlists. A new local edit remained pending. Removing that
-temporary document allowed the edit to send. Reading the channel after the large
-snapshot showed that incorporated older protocol documents had been compacted.
-
-A signed APK upgraded the retained Android 16 catalog from schema 5 to 6, keeping
-all three tracks, two favorites, two playlists and three memberships. That emulator
-later terminated with host exit code 139 during sign-in; its System UI had also
-reported an ANR. A fresh Android 15 emulator with the SWANGLE renderer completed
-sign-in and recovered the same library, including the 10,002-song playlist,
-bookmark, source, Russian language and light appearance. Removing a favorite,
-creating a one-song playlist and selecting a Telegram recording through Android's
-UI reached the desktop client. The recording downloaded; application crash logs
-were empty during these checks. Physical audio output was not checked.
-
-Actual desktop screenshots covered the sync error, Retry and ready states, English
-in dark appearance and Russian in light appearance at wide and narrow sizes.
-Android's Russian library, playlists and ready status were inspected, including
-controls at 320 dp with font scale 1.3. A bad document digest retained the library;
-removing the temporary document and using Retry returned the desktop UI to ready.
-
-The final Android debug/release assemblies, both Lint checks and the Linux image
-build passed. The final signed APK reopened the retained Android 15 session and
-10,002-song playlist with no pending edits or application crash; SQLite integrity
-was `ok`. Separate local runtime checks retained a speed change made while detached
-after rebinding the same account, and decoded a descriptor whose long title had
-been bounded to the protocol's 8,192-character limit. Imported placeholders now
-report unavailable audio rather than a deleted Telegram message.
-
-All four desktop targets built on their native runners. The four installer
-signatures, archive manifests and every archived payload hash verified with the
-existing desktop key. Both final APKs kept the original signer and application ID,
-used versionCode 35 and passed 16 KB alignment. The test collection was removed
-from shared storage, leaving a clean muted, archived library channel. The temporary
-audio-source channel was deleted and the controlled Android/desktop sessions signed
-out. Signing out did not publish deletion of the shared library. Account sync was
-exercised on Linux and Android emulators; current Windows/macOS account flows and
-physical devices were not exercised in this cycle.
-
-## 0.15.7 — Windows streaming and seeking
-
-The published 0.15.6 reproduced stalled seeks and an absolute-random end transition
-on native Windows with actual Telegram recordings. Its reader waited for the last
-partial download block while TDLib reported an incomplete, inactive transfer.
-The file already had its expected physical size, but native range queries confirmed
-that the final bytes were not available to the reader. Clearing a UI loading flag
-did not resolve this case.
-
-Windows rejected renaming a file held by `RandomAccessFile`. A NIO channel allowed
-the same rename and kept positional reads working, including a nonzero destination
-buffer offset. With that channel, the same Telegram files completed downloading.
-The release Windows image exercised four local recordings (CBR/VBR MP3, FLAC and
-Opus) and four actual Telegram recordings at 0.3×, 1×, 2× and 4×. Each collection passed 80 individual seeks,
-16 paused seeks, 16 bursts of four rapid seeks, 40 absolute-random end transitions,
-six shuffle/repeat-all transitions and four repeat-one transitions. End transitions
-followed seeks near the ends; no stalls or player errors occurred. Tests used an
-isolated copy of a controlled Spotygram session with fresh media downloads, without
-forced download retries or manual file-state refreshes.
-
-The older player also retained loading after a completed paused seek at 4×:
-the audio clock differed from the target by more than its 500 ms tolerance. The
-updated player acknowledges libmpv's restart event and rejects queued work from
-an earlier seek. Actual Windows and Linux player screenshots were inspected in
-light/dark themes after pointer seeking, paused seeking and resumed playback. The
-timeline advanced and the transport returned to Play/Pause without a loading loop.
-Native audio checks used null output; physical audio drivers and the owner's exact
-recording were not checked.
-
-Android debug/release assembly and both Lint checks passed. Both release APKs kept
-the existing signer and application ID, used versionCode 34 and passed 16 KB
-alignment. All four desktop targets built on native runners. The installer
-signatures, signed archive manifests and all archived payload hashes verified
-with the existing key. All four desktop packages reported 0.15.7 with DEBUG false.
-The signed Linux archive also passed the local seek matrix and 50 end transitions;
-the retained local desktop image was rebuilt as release 0.15.7.
-The signed Android app reached its welcome and local-library screens, but the
-host emulator crashed during UI checks on Android 15/16. Android playback through
-the changed reader was not confirmed in this cycle.
-
-## 0.15.6 — phone codes and desktop playback
-
-A fresh production Windows client requested a code for a controlled account.
-TDLib reported Telegram-message delivery and the correct destination; a new code
-message appeared in that account's existing Spotygram session three seconds after
-the Windows request. The new Windows session did not complete code/password sign-in.
-
-Native Windows and Linux sandbox checks covered international-number normalization,
-rejection of a stale phone-screen submission, server countdowns, early resend
-rejection, incorrect codes, changing the destination, and code → QR → phone.
-The Android debug app exercised code entry, a wrong-code error, number editing and
-QR → phone on Android 16. Actual Windows light/dark and Android Russian screenshots
-were inspected, including 320 dp with font scale 1.3. The resend countdown fit one
-line. An emulator System UI ANR preceded app checks; the application crash log was empty.
-
-The native Windows software adapter selected ANGLE automatically. Hyper-V exposed
-Microsoft Basic Render Driver twice, including one entry without its software flag;
-checking WARP's vendor/device identity handled that case. Continuous redraws of the
-phone screen measured about 51 FPS automatically and 54 FPS with explicit ANGLE;
-the published 0.15.5 ANGLE baseline measured 54 FPS. Earlier software Direct3D runs
-measured about 16–17 FPS. These are software-runner measurements; hardware Direct3D
-and physical-machine scrolling were not measured.
-
-The published 0.15.5 player lost playback intent after a controlled native pause.
-The updated player retained it. Native Windows then completed 38 automatic random
-transitions, six shuffle/repeat-all transitions and four repeat-one transitions.
-The signed Linux package completed 12 random transitions through Telegram recordings
-after seeking near their ends. Desktop checks used libmpv's null audio output;
-physical audio drivers and the owner's exact end-of-song stall were not reproduced.
-
-Android debug/release assembly and both Lint checks passed. Both release APKs kept
-the existing signer and application ID, used versionCode 33 and passed 16 KB alignment.
-All four desktop targets built on native runners. Four installer signatures, four
-archive manifests and every archived payload hash verified with the existing key.
-Packaged desktop versions were 0.15.6 with the release flag; inspection classes were
-absent from their launcher classpaths. Physical-device and account limits below remain.
-
-## 0.15.5 — Windows installation and removal
-
-Windows now uses a per-user Inno Setup EXE with its own uninstaller. The prepared
-application image, profile location and trusted desktop signing key stay the same.
-
-An ordinary account on Windows Server 2025 installed the published 0.15.4 MSI on
-an owned virtual X drive. Restricting its `Config.Msi` folder caused error 1314 and
-MSI exit code 1603. The new EXE found that registered MSI, encountered the failure,
-retried removal with `DISABLEROLLBACK=1` and completed with exit code 0. It retained
-the program directory. EXE reinstallation and removal passed; installed JARs were
-gone and a profile sentinel remained. The isolated server temporarily allowed
-unmanaged MSI packages; that policy was restored after inspection. The product
-installer changes neither system policies nor drive permissions.
-
-The published 0.15.2 MSI also migrated to EXE and uninstalled under the ordinary
-account. A separate failed MSI removal left program files after losing its
-registration. Installing the EXE in that old directory removed obsolete libraries
-from the old launcher classpath. A file outside that classpath survived both
-installation and removal, while the new application libraries were removed.
-
-Interactive installation, installed launch and interactive removal passed on the
-native Windows desktop. The same credential-store key and TDLib database reopened
-after removal. English/Russian wizard screens, the installed app and uninstall
-confirmation/completion were inspected as actual screenshots. Windows's installed
-update marker selected EXE; its portable image selected the archive channel.
-
-Android debug/release builds and both Lint checks passed. Both APKs kept the
-original application ID and signer, used versionCode 32 and passed 16 KB alignment.
-All four desktop targets built on native runners. Four installer signatures,
-four signed archive manifests and every archive entry passed verification with
-the existing public key. Linux and both macOS images launched and initialized
-Telegram with retained keys; macOS ad hoc signatures verified.
-
-The owner's exact file-security error 1926 (`Error: 5`) was not reproduced on the
-physical X drive. The observed failure was the related rollback-folder error 1314;
-the guarded retry also recognizes 1926. Production-account playback and physical
-device behavior were not checked. Old Windows MSI clients need one manual EXE
-download because their updater expects an MSI asset.
-
-## 0.15.4 — return to phone entry during sign-in
-
-The packaged Linux debug launcher and an isolated Android 16 debug APK used
-Telegram's test DCs with reserved phone numbers. Both reached code entry, returned
-to phone entry and requested a code for another number. Linux exercised the arrow,
-Esc and Change phone number, including an invalid-number error that left the field
-editable. Android exercised system Back, Change phone number and the arrow. Actual
-screens were inspected in light appearance on Linux and dark appearance on Android,
-including English at 400 dp and Russian at 320 dp. The Russian action fit the narrow
-screen and its arrow returned to phone entry.
-
-Android debug/release assembly and both Lint checks passed. Both release APKs kept
-the original application ID and signing certificate, increased versionCode to 31
-and passed 16 KB ZIP alignment. All four desktop targets built on native runners.
-Four installer signatures, four signed archive manifests and every archive payload
-entry were verified with the existing public key.
-
-The fresh emulator had System UI, phone-service and Google-service ANRs during cold
-boot, before app checks; installation required a retry. The successful application
-flow had no AndroidRuntime crash. Linux sandbox code submission returned
-PHONE_CODE_INVALID, so this cycle establishes navigation and new code requests,
-not completed account authorization. Password/email transitions were reviewed
-against the pinned TDLib contract, but not exercised with an account. Windows/macOS
-UI, installer lifecycle, production-account playback and physical-device behavior
-were not rechecked in this cycle.
-
-## 0.15.3 — Telegram initialization on Windows
-
-Packaged Windows, Linux and both macOS targets initialized a fresh TDLib database
-and reached phone entry, then reopened it with the same credential-store key.
-Windows and macOS completed 200 key reads with forced garbage collection per run,
-including fresh and restarted processes. The older Windows heap failure did not
-occur with java-keyring 1.0.4. Windows also initialized a profile containing spaces
-and a separate Unicode path. Removing only a temporary desktop key made startup
-reject that database; its files remained byte-for-byte unchanged. Actual Windows
-and macOS phone-entry screens were inspected.
-
-Windows installed the **published 0.15.2 MSI**, upgraded to 0.15.3 and launched the
-installed app through phone entry. The same key and database remained after MSI
-removal. A separate standard account completed installation and removal of 0.15.2,
-reinstallation, upgrade and removal of 0.15.3 without elevation; a profile file
-survived. This isolated Server 2022 runner temporarily allowed unmanaged MSI
-packages, which its default policy blocks for standard accounts.
-`AlwaysInstallElevated` remained off. The original 0.15.2 product identifier and
-its elevated removal command were checked against the public package.
-
-The owner's `X:\Config.Msi` file-security failure was not reproduced. The MSI
-lifecycle passed with both administrator and standard accounts; that release's user guide
-provided elevated removal and log collection for diagnosing that machine's
-rollback-folder permissions. Per-user installation and the upgrade identity remain
-the same.
-
-Android debug/release builds and both Lint checks passed. Both APKs retained the
-original application ID and signer and passed 16 KB ZIP alignment. An isolated
-Android 16 debug installation reached phone entry on a fresh profile and after a
-process restart; its wrapped key was unchanged. The real screens were inspected.
-Cold-boot Pixel Launcher/System UI ANRs and Bluetooth crashes occurred before these
-checks; the app log contained no application crash during the successful scenario.
-
-Four installer signatures, four archive manifests and every archive payload file
-were verified with the existing desktop key. Both macOS bundles passed strict deep
-ad hoc signature checks. This cycle checks initialization, key retention and MSI
-lifecycle; it does not establish authenticated account playback or reproduce the
-owner's Windows drive permissions. Physical-device, audio and battery limits below
-still apply.
-
-## 0.15.2 — native desktop installation
-
-The same prepared application image now produces a Windows MSI, Ubuntu DEB or
-macOS DMG as well as its signed portable archive. Android debug/release builds
-and both full Lint checks passed. Both release APKs retained the original
-application ID and signing certificate and passed 16 KB ZIP alignment checks.
-
-Windows x64 completed silent MSI installation, upgrade from a private MSI wrapping
-the actual 0.15.1 payload, installed launch and native MSI removal. Three recordings
-imported with the older installed launcher survived upgrade and removal with
-integrity `ok`. The Start menu shortcut appeared and was removed on uninstall;
-Windows Installer registered one 0.15.2 product at the separate per-user program
-location. The real welcome wizard and installed application were inspected as PNGs;
-the complete interactive wizard was not driven on the hosted runner.
-
-Both macOS architectures mounted their actual DMGs, showed the Applications
-shortcut and copied the app into a user Applications folder. Installed launchers
-opened the retained catalog and position. Strict deep ad hoc signature checks
-passed before and after installation; removing the app preserved its profile.
-Actual Finder/install and application PNGs were inspected.
-
-Ubuntu 24.04 completed a fresh DEB installation, reinstallation and removal with
-a valid application-menu entry and the RGB Spotygram icon. Installation also
-worked when the standard XDG menu directory was initially absent. The installed
-app restored two recordings, a favorite, playlist membership and the paused
-position. A stale portable transfer in that profile was discarded after switching
-to the installed copy. A separately signed local fixture exercised the real
-Close and open installer flow: Spotygram verified it, closed and opened GDebi.
-All catalog/progress rows matched afterwards, integrity was `ok`, and temporary
-preferences/transfers were restored. The fixture's version label was private
-verification input, not a published future release.
-
-Installed runtime checks verified the selected package asset name, detached
-signature and tamper rejection with the original desktop update key. Portable
-installation/rollback checks also ran against the fresh native builds. This
-release focuses on packaging; authenticated Telegram, physical-device audio,
-battery and the other limits below were not rechecked. Windows Authenticode and
-Apple notarization remain unconfigured; Linux package-handler behavior depends
-on the user's desktop, with `apt install` as the documented alternative.
-One additional credential-store probe on a reused Windows image exited with native
-heap status `0xC0000374`. The accepted MSI lifecycle check used installed applications;
-this run does not establish reliable authenticated Telegram on Windows.
-
-## 0.15.1 — storage, playback and update audit
-
-Android debug and both release APKs, debug/release Lint and the Linux application
-image built successfully. Windows x64 and macOS Intel/Apple Silicon built and ran
-on native GitHub runners. The Android application ID, APK signing certificate,
-desktop update public key and SQLite schema 5 were preserved. Both APKs passed
-signature and 16 KB ZIP alignment checks; both macOS bundles passed strict deep
-ad hoc signature verification.
-
-The signed x86-64 APK installed over 0.15.0 on Android 16. All original tracks,
-sources, playlists, memberships and download/cache rows matched after the checks;
-SQLite integrity was `ok`. Opus playback, seeking, pause/resume, 0.3× and 4× worked.
-A recording paused at 112,602 ms resumed at 112,610 ms after switching tracks.
-Actual screens were inspected in light/dark appearance, English at 400 dp and
-Russian at 320 dp with font scale 1.3. Temporary settings/bookmarks were restored.
-App crash logs were empty during these checks; emulator system cold-boot failures
-occurred before them.
-
-Linux exercised the packaged application with local recordings and the hardware
-Mesa renderer. A retained long-recording position resumed, seeking advanced and
-repeated MPRIS Play calls kept playback running. Native Windows/macOS checks imported
-three recordings, observed playback and persisted long-recording positions; actual
-library/player screenshots were inspected. OS credential stores persisted, reread
-and removed a temporary key. Linux and all three native desktop targets verified
-signed archives and rejected changed application bytes.
-
-After publication, Linux 0.15.0 fetched the actual GitHub Latest release through
-Check for updates → Download and install → Restart and install. The running app
-became 0.15.1; both recordings, the favorite and playlist membership matched the
-original database. The paused position remained 1,172,086 ms, integrity was `ok`
-and the app removed download, staging and helper files. All six uploaded binaries
-and `SHA256SUMS` matched GitHub's server digests.
-
-Windows and both macOS architectures passed installation with startup acknowledgement
-and three rollback cases: blocked acknowledgement, an unlaunchable signed image and
-a corrupt catalog. The Windows checks exposed a child JVM retaining application
-JARs after its launcher exited; stopping the owned process family fixed rollback.
-Catalog failure did not acknowledge a successful update or erase the original data.
-
-Source review removed playlist-by-playlist queries, repeated alias file checks and
-per-file download-list copying. It also covered cancellation during local import,
-transactional deletion, catalog readiness and stale Telegram file IDs after logout.
-These are source and runtime correctness findings, not large-catalog benchmarks.
-The existing 536-record Telegram catalog opened, but authenticated streaming could
-not be repeated because its private Linux QA keyring was locked. The session and
-original key were retained; the authenticated results below belong to **0.15.0**.
-
-## 0.15.0 — one application on four platforms
-
-Shared screens, resources, Haze Glass, catalog, Telegram, cache policy and queue
-compiled into Android and desktop. Android retained Media3; desktop used libmpv
-and pinned native prebuilts, with a bundled Java 21 runtime. SQLite stayed at schema 5.
-
-Android debug/minified release assembly and both full Lint checks passed. The
-signed x86-64 APK installed over 0.14.0 without resetting data; original track,
-playlist, membership and source rows matched, with SQLite integrity `ok`.
-MP3/Opus, speed limits, media controls, settings and saved files were exercised.
-Real screens were inspected in both appearances, English at 400 dp and Russian
-at 320 dp with font scale 1.3. App crash logs were empty after the settings-format
-correction. Recurring emulator cold-boot System UI ANRs preceded app checks.
-
-Windows x64 and both macOS architectures ran packaged launchers on native GitHub
-runners. Three WAV recordings were imported; playback advanced, the player opened
-and a long recording persisted its position. PNGs were inspected. Bundled-runtime
-checks covered OS key-store create/read/remove, signed archive verification,
-tamper rejection, installation and rollback when startup acknowledgement was
-blocked. Both macOS bundles passed strict deep ad hoc signature verification.
-
-Linux completed the normal Install update → Restart and install flow from a
-temporary 0.14.0 image to signed 0.15.0. Two local recordings, a favorite, playlist
-membership and a paused long-recording position survived with integrity `ok`.
-Incomplete published transfers resumed; the installed app cleaned transfer,
-staging and helper files. Closing during an uncached read kept playback alive;
-Raise restored the window and Quit closed it.
-
-A separate Spotygram production Telegram session on Linux completed phone and
-two-step sign-in and indexed **536 recordings**. Phone → QR → phone also worked.
-Playback began before a book finished downloading; 40-minute seeking, 0.3×/4×,
-positions, completion, repeat-one/all and temporary-copy retention/removal were
-observed. A saved book played offline after a fresh launch. Blocking Telegram
-traffic during an incomplete 1.6 GB recording preserved a pending seek and bookmark;
-read timeout stopped playback without advancing, and restored network allowed resume.
-
-| Configuration | Observed process memory / CPU |
-| --- | --- |
-| Windows/macOS native runners, local recordings | About 240–320 MiB RSS; paused 0–1.5% of one core |
-| Windows runner with visible software-rendered player | About 29% of one core while playing |
-| Linux, hardware Mesa through VirtualGL, real Telegram catalog | About 597 MiB RSS; about 19 MiB Java heap |
-| Same Linux process, hidden window | About 0.2% of one core paused; about 2% playing |
-
-RSS includes Telegram, graphics and audio allocations outside Java heap. These
-observations describe those configurations; they are not cross-hardware benchmarks.
-
-## Limits
-
-No physical ARM64 Android device, OEM background policy, speaker quality, battery
-use or physical Windows/macOS hardware was checked. Authenticated Telegram was
-checked on Linux; Windows/macOS used local recordings. Actual Wi-Fi interface
-changes, every audio container and catalogs with hundreds of thousands of distinct
-recordings were not exercised. Older Android's simpler glass fallback was reviewed
-in source, not run on an older emulator.
+This page records observed behavior and its limits. A build does not establish
+account access, physical sound or responsiveness on another computer. Temporary
+inspection code, timings and account data stay outside the checkout.
+
+## 0.26.0 — desktop motion and library reliability
+
+### Desktop
+
+The Linux interface ran with OpenGL on an AMD Radeon 680M through a private
+Weston/Xwayland display. Earlier Xvfb runs fell back to software rendering and
+are excluded from GPU comparisons. Work was limited to two CPU cores.
+
+The comparison uses the release classes and native libraries from 0.25.0 and
+the changed application, the same retained local catalog, JDK 21 and a 256 MiB
+heap. A temporary in-process timer records render callbacks; screen captures
+separately inspect the actual pixels. These are virtual-display measurements,
+not a guarantee of sustained 60 FPS, hardware Direct3D or Metal behavior.
+
+Thirty Settings openings per version used real mouse input, with pixel checks
+that each sheet opened and closed. The last twenty openings gave these results:
+
+| Measurement | 0.25.0 | 0.26.0 |
+| --- | ---: | ---: |
+| Render callback median / P95 | 1.57 / 4.42 ms | 1.52 / 3.46 ms |
+| Frame interval median / P95 | 25.38 / 27.99 ms | 25.30 / 27.42 ms |
+
+The virtual display limits steady animation to about 40 FPS in both versions.
+These results do not establish a sustained FPS improvement. Early openings had
+larger compilation/initialization stalls. An experimental geometry compensation
+did not help and was removed. Settings now compose visible groups lazily; dense
+glass uses the library's Performance sampling profile without changing the design.
+The actual packaged launcher also played the retained local recording, continued
+after minimizing and paused normally, using bundled Java and libmpv with null audio.
+Ten-second samples measured 3.6% of one CPU for visible playback, 2.5% minimized
+and 0.3% after settling on pause; process RSS ranged from 355 to 381 MiB.
+
+Screenshots checked light/dark Settings, the bottom of the lazy form, 1090- and
+390-pixel windows, track popup, imported-track deletion confirmation, player,
+speed and queue. Native dragging dismissed the speed sheet. Cancelling deletion
+kept the imported file and favorite. Windows/Direct3D and macOS/Metal were not
+measured during this audit.
+
+### Android
+
+Debug/release assembly and Lint passed for both variants. Lint retained 54 warnings
+per variant and no errors; neither animated-offset warning remains. Both release
+ABIs passed APK v2 signature verification and 16 KiB ZIP alignment, with the same
+certificate as 0.25.0.
+
+A retained Android 15 installation updated from 0.25.0 (46) to 0.26.0 (47).
+All 16 saved database/preference/application files matched byte-for-byte before
+first launch. After launch all 11 SQLite tables matched; queue IDs, order, cursor
+and paused position at 8,910 ms survived. MediaSession exposed that same position
+without starting playback.
+
+The emulator used host GPU rendering. Russian Settings, its lazy-list bottom,
+switch motion, both themes, track actions and deletion cancellation were checked
+at 320 dp and font scale 1.3. No AndroidRuntime exception appeared in those flows.
+These checks do not establish physical-device frame rate, battery use or sound.
+
+### Sync and data
+
+Temporary runtime inspection used the compiled application and independent
+SQLite catalogs, without replacing the project's manual verification workflow.
+
+- Two catalogs restored 10,000 referenced songs. Independent offline additions
+  converged to identical portable records and all 10,002 playlist entries.
+- Acknowledging an older send left a newer rename pending. Deleting a playlist
+  survived replay of an older offline snapshot.
+- The published 0.25.0 falsely confirmed a send when two chats used the same
+  temporary message ID. The changed code confirmed each chat independently.
+- An imported-track tombstone combined with a later offline membership restored
+  a dangling playlist row in 0.25.0. The changed code kept zero memberships.
+- Concurrent deletion versions converged. A failed account-binding transaction
+  restored both SQLite and the in-memory account; retry retained its local playlist.
+- The old reader accepted a snapshot whose `through` included its own message.
+  The changed reader rejected it. Bad SHA-256 and an unknown format were also
+  rejected with the library and local pending edits unchanged.
+
+These checks establish application merge, confirmation and validation behavior.
+They do **not** establish a new authenticated exchange through Telegram. The
+retained production verification profile could not unlock its separate OS key
+store; the existing encryption key and Telegram database were preserved. Its
+catalog passed SQLite integrity checking and all ten tables matched the pre-check backup. Earlier
+live transport evidence remains available below.
+
+### Source, dependencies and documentation
+
+The shared application and platform-adapter boundaries remain. No service, idle
+poll, alternative player, new runtime dependency or permanent verification scaffold was
+added. Empty sync batches avoid a merge transaction; preference reads select only
+settings. The existing package/release path and signing identities are retained.
+SQLite's query plan confirms a bounded account/key index range for preference reads.
+ELF inspection found glibc 2.35 in the published Linux image and 2.38 in the local
+Ubuntu-JDK image. DEB packaging now derives its dependency from the bundled binaries.
+The portable Linux image retains two libmpv aliases as symlinks, removing
+92,100,902 duplicate bytes (87.8 MiB). The application's own signed-archive reader
+extracted both links successfully and rejected a modified executable. JDK 21's
+DEB copy dereferences them again; installer inspection confirmed this remaining
+duplication. The DEB compressor was observed creating 16 threads and using about
+1.6 GiB on a two-core affinity; packaging now defaults to two compression threads.
+
+OSV returned no matching advisories on 22 October 2026 for the nine queried Maven
+versions: Commons Compress 1.28.0, Commons Lang 3.18.0, Commons IO 2.20.0, SQLite
+JDBC 3.50.3.0, JNA 5.17.0, JSON 20250517, coroutines 1.10.2, ZXing 3.5.4 and
+SLF4J 2.0.17. This is a bounded advisory lookup, not a security certification of
+all native and transitive code. Package inspection found no duplicated application
+or dependency classes; repeated versioned `module-info` entries belong to their
+individual JARs.
+
+English and Russian documentation now explain same-field conflict resolution,
+local-file backups and the correct format-3 minimum version. README introduces
+the product and routes detailed controls to the user guide. Earlier verification
+history is linked instead of copied into the current record.
 
 ## Earlier evidence
 
-The [complete record through 0.15.0](https://github.com/Krablante/spotygram/blob/v0.15.0/docs/verification.md)
-preserves detailed earlier checks, APK hashes, migrations and release-specific
-limits. It is an English historical record. The current guides describe current
-behavior; [GitHub Releases](https://github.com/Krablante/spotygram/releases) owns
-downloads and release notes. Old notes remain available in tagged source history.
+The [complete record through 0.25.0](https://github.com/Krablante/spotygram/blob/8a9900e/docs/verification.md)
+preserves the observations and limitations for each earlier release. The
+[release archive](https://github.com/Krablante/spotygram/releases) contains the
+published binaries and tagged source.
+
+| Area | Earlier observation | Important limit |
+| --- | --- | --- |
+| Telegram transport | 0.16.0 exchanged a 10,000-song library through two owned production sessions and Android; offline additions converged to 10,002 songs | Does not establish a fresh format-3 server exchange |
+| Desktop playback | 0.15.7 exercised local/Telegram seeking and transitions on native Windows and Linux | Null audio output; physical drivers were not checked |
+| Profile music | 0.21.0–0.21.1 added, removed and undid profile audio through an owned Linux session | Other desktop OS account flows were not repeated |
+| Sending audio | 0.24.0 confirmed native upload/copy/forwarding, caption handling and permissions | Authenticated Android sends were not checked |
+| Install and update | 0.15.3–0.15.5 exercised retained keys, MSI-to-EXE migration and uninstall on native Windows; later releases verified all signed assets | macOS notarization and Windows Authenticode remain unconfigured |
+| Android retention | 0.25.0 updated a retained Android 15 emulator, preserving its catalog and 8,910 ms paused position | Emulator graphics/System UI faults are not physical-device performance evidence |
