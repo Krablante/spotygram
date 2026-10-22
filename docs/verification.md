@@ -132,6 +132,8 @@ matched local sizes and SHA-256 digests before publication as the ordinary Lates
 The final downloaded Linux package required glibc 2.35 and ran local playback with
 null audio through its actual bundled launcher. Both APKs carry the release commit
 in their VCS metadata. Release signing identities and application IDs are unchanged.
+After publication, the 0.25.0 client fetched public Latest without credentials and
+selected 0.26.0 with the exact verified Linux archive size and SHA-256.
 
 ## Earlier evidence
 
