@@ -103,6 +103,9 @@ extracted both links successfully and rejected a modified executable. JDK 21's
 DEB copy dereferences them again; installer inspection confirmed this remaining
 duplication. The DEB compressor was observed creating 16 threads and using about
 1.6 GiB on a two-core affinity; packaging now defaults to two compression threads.
+Restoring aliases in macOS ZIP exposed a reader incompatibility: the old streaming
+ZIP reader rejected them. macOS packages retain regular copies to keep updates
+from existing portable clients working; no format transition is required.
 
 OSV returned no matching advisories on 22 October 2026 for the nine queried Maven
 versions: Commons Compress 1.28.0, Commons Lang 3.18.0, Commons IO 2.20.0, SQLite

@@ -188,10 +188,9 @@ tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDi
             }
         }
     }
-    if (targetOs != "windows") doLast {
+    if (targetOs == "linux") doLast {
         val variant = if (name == "createReleaseDistributable") "release" else "main"
-        val resources = layout.buildDirectory.dir("distributions/$variant/app/" +
-            if (targetOs == "macos") "Spotygram.app/Contents/app/resources" else "Spotygram/lib/app/resources")
+        val resources = layout.buildDirectory.dir("distributions/$variant/app/Spotygram/lib/app/resources")
             .get().asFile.toPath()
         // Gradle's resource copy follows native aliases, duplicating large libraries.
         nativeDirectory.listFiles().orEmpty().filter { Files.isSymbolicLink(it.toPath()) }.forEach { source ->

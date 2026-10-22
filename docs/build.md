@@ -141,10 +141,12 @@ targets on their native runners. Set repository secrets `TELEGRAM_API_ID`,
 `TELEGRAM_API_HASH` and `DESKTOP_RELEASE_KEY` (the private PEM), run the workflow,
 and download its four artifacts. It produces assets without publishing a release.
 
-Unix native-library aliases remain symbolic links in the application image and
-portable archive, avoiding duplicate copies after Gradle resource copying.
+Linux native-library aliases remain symbolic links in the application image and
+TAR.GZ archive, avoiding duplicate copies after Gradle resource copying.
 JDK 21's DEB bundler dereferences them again when copying its installer image;
 the installed DEB therefore retains those duplicate files.
+macOS keeps regular copies in ZIP: older portable clients cannot extract ZIP
+symlinks, so flattening preserves their update path.
 DEB compression defaults to two threads via `DPKG_DEB_THREADS_MAX`; an explicit
 environment value overrides that default.
 
