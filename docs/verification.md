@@ -40,6 +40,32 @@ crashed in `glGetString` after loading mpv's private GL dispatch. System GL disp
 avoided that crash; the changed package ran without the environment workaround
 after removing the bundled EGL/GL-dispatch/GBM/DRM copies.
 
+The final CI Linux archive also ran through its actual launcher and bundled
+Temurin 21 runtime, with no GL preload or renderer override. Local playback,
+speed changes, minimize, pause and return worked with the 10,001-recording catalog.
+Eight-second samples measured 6.12% of one CPU while visible, 2.38% minimized and
+0.25% after restoring the paused player; RSS ranged from 397 to 402 MiB. Native
+allocations are outside the 256 MiB Java heap. Audio output was disabled.
+
+On a native Windows VM, both versions used ANGLE with Microsoft's Basic Render
+Driver (software D3D11), JDK 21, two active CPU cores and a 256 MiB heap. Pixel
+checks confirmed playback and the first/last speed panels. Twenty warm openings
+gave these native draw/flush callback timings:
+
+| Windows software adapter | 0.26.0 | 0.27.0 |
+| --- | ---: | ---: |
+| Median | 23.34 ms | 10.01 ms |
+| P95 | 37.25 ms | 12.58 ms |
+
+CPU recording P95 did not improve (15.53 to 28.35 ms); the native draw reduction
+does not establish that every rendering stage became faster. These observations
+do not establish hardware Windows FPS or physical sound.
+
+The final Windows archive was also opened through `Spotygram.exe` with its
+bundled runtime, without an instrumentation agent or external Java. Real mouse
+input opened the player and speed panel; local playback, pause and normal close
+worked. Screenshots confirmed the panel and controls in that packaged run.
+
 The Windows renderer choice follows the unresolved upstream
 [SKIKO-1179](https://youtrack.jetbrains.com/issue/SKIKO-1179), which reports a
 Direct3D first-filter stall in the same Skiko 0.150.1. That report establishes the
@@ -49,13 +75,15 @@ physical Windows GPU. macOS/Metal responsiveness was not measured here.
 ### Android retention and controls
 
 Debug/release assembly and both Lint variants passed: zero errors and 53 warnings
-per variant. Both release ABIs passed 16 KiB ZIP alignment checks; the x86-64 APK
-passed v2 signature verification and matched 0.26.0's signing certificate.
+per variant. Both release ABIs passed 16 KiB ZIP alignment and v2 signature
+checks and matched 0.26.0's signing certificate.
 
 An existing Android 15 emulator updated from 0.26.0 (47) to 0.27.0 (48).
 All 16 saved application files matched byte-for-byte before first launch. After
 launch, all 12 SQLite tables matched the prior contents and integrity checking
 returned `ok`. The queue restored paused at 8,910 ms, also exposed by MediaSession.
+Reinstalling the final APK built from `535b65c` again retained all 16 files before
+launch and all 12 tables afterwards; the later 2,621 ms position also survived.
 
 Manual interaction checked presets, 0.05 steps, speed-sheet drag and button
 dismissal, Settings scrolling, both themes and Russian controls at 320 dp with
@@ -78,6 +106,24 @@ transport, privacy and account evidence from earlier releases remains bounded
 by the observations below; the existing production verification session was
 preserved. Hardware Windows, macOS and physical Android responsiveness remain
 unverified.
+
+### Published artifacts
+
+[0.27.0](https://github.com/Krablante/spotygram/releases/tag/v0.27.0) targets
+`535b65c`. The [native workflow](https://github.com/Krablante/spotygram/actions/runs/39957173501)
+completed Windows, Linux and both macOS architectures. The published 0.26.0
+archive reader verified and extracted all four final archives and rejected a
+modified launcher in each; all four installer signatures matched its trusted key.
+All 15 remote assets matched local sizes and SHA-256 digests before publication
+as Latest. Both APKs carry `535b65c` in their VCS metadata. Signing identities and
+application IDs are unchanged. The Linux DEB declares glibc 2.35 and the system
+graphics dependencies; its Ubuntu 24.04 package dependencies remain separate from
+the portable archive's glibc floor.
+
+After publication, the unmodified 0.26.0 `AppUpdates` fetched public Latest
+without credentials and selected 0.27.0 with the exact verified Linux archive
+size and SHA-256. Temporary Windows inspection used a separate branch; it was
+deleted afterwards and added no diagnostic workflow to the default branch.
 
 ## 0.26.0 — desktop motion and library reliability
 
