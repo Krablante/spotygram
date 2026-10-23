@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,6 +53,7 @@ internal fun SettingsHeader(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SettingsSheet(
     app: SpotygramApp,
@@ -70,14 +73,15 @@ fun SettingsSheet(
     val resumeLongAudio by app.resumeLongAudio.collectAsStateWithLifecycle()
     val resumeMinutes by app.resumeMinutes.collectAsStateWithLifecycle()
     var editingResume by rememberSaveable { mutableStateOf(false) }
-    val syncState by app.cloudSync.state.collectAsStateWithLifecycle()
-    var wifi by
-        remember(syncState.lastSync) { mutableStateOf(app.prefs.getBoolean("wifi_only", false)) }
-    val download by app.downloading.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth()) {
         SettingsHeader(R.string.settings, onClose)
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f, fill = false).navigationBarsPadding(),
+            state =
+                rememberLazyListState(
+                    cacheWindow =
+                        remember { LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 1f) }
+                ),
             contentPadding = PaddingValues(horizontal = 20.dp),
         ) {
             item(key = "appearance") {
@@ -197,15 +201,12 @@ fun SettingsSheet(
                 }
             }
             item(key = "local") {
-                val local =
-                    remember(library, hideDuplicates) {
-                        if (hideDuplicates) library.duplicates.view(library.localTracks)
-                        else library.localTracks
-                    }
+                val localCount =
+                    if (hideDuplicates) library.localRecordingCount else library.localTracks.size
                 ListItem(
                     headlineContent = { Text(tr(R.string.on_device)) },
                     supportingContent = {
-                        Text("${trackCount(local.size)} · ${bytes(library.localSize)}")
+                        Text("${trackCount(localCount)} · ${bytes(library.localSize)}")
                     },
                     leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null) },
                     trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
@@ -266,6 +267,12 @@ fun SettingsSheet(
                 )
             }
             item(key = "downloads") {
+                val syncState by app.cloudSync.state.collectAsStateWithLifecycle()
+                var wifi by
+                    remember(syncState.lastSync) {
+                        mutableStateOf(app.prefs.getBoolean("wifi_only", false))
+                    }
+                val download by app.downloading.collectAsStateWithLifecycle()
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 12.dp),
@@ -308,6 +315,7 @@ fun SettingsSheet(
                 )
             }
             item(key = "account") {
+                val syncState by app.cloudSync.state.collectAsStateWithLifecycle()
                 ActionRow(
                     Icons.Rounded.Forum,
                     if (connected) tr(R.string.logout_telegram) else tr(R.string.connect_telegram),

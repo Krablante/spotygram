@@ -266,7 +266,11 @@ class SpotygramApp(val platform: Platform) {
 
     suspend fun applyCloudPreferences(values: Map<String, Any>) {
         if (values["hide_duplicates"] == true)
-            withContext(Dispatchers.Default) { library.state.value.duplicates }
+            withContext(Dispatchers.Default) {
+                val snapshot = library.state.value
+                snapshot.duplicates
+                snapshot.localRecordingCount
+            }
         val edit = prefs.edit()
         for ((key, value) in values) {
             if (key !in LibrarySync.settings) continue

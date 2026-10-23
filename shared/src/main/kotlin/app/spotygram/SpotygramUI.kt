@@ -43,7 +43,11 @@ import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+    dev.chrisbanes.haze.ExperimentalHazeApi::class,
+)
 @Composable
 fun SpotygramUI(
     app: SpotygramApp,
@@ -103,7 +107,9 @@ fun SpotygramUI(
     val focus = LocalFocusManager.current
     val keyboardVisible = imeVisible()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
-    val trackPopup = LocalConfiguration.current.screenWidthDp >= 600
+    val widePanel = LocalConfiguration.current.screenWidthDp >= 600
+    // Resizing must not replace an open popup's scene with a sheet during measurement.
+    val trackPopup = if (sheet.isNotEmpty()) remember { widePanel } else widePanel
     val settingsPage = sheet in setOf("settings", "sharingSettings", "cache")
     fun closeSheet() {
         if (trackPopup && (settingsPage || sheet in setOf("track", "share", "speed"))) sheet = ""
@@ -651,28 +657,32 @@ fun SpotygramUI(
                                     )
                                 }
                                 if (!keyboardVisible && profile == null)
-                                    Row(
-                                        Modifier.widthIn(max = 720.dp)
-                                            .fillMaxWidth()
-                                            .heightIn(min = 48.dp)
-                                            .padding(start = 16.dp, end = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    CompositionLocalProvider(
+                                        LocalGlassSourceSelection provides GlassEnvironmentSources
                                     ) {
-                                        Image(
-                                            painterResource(headerSticker),
-                                            null,
-                                            Modifier.size(28.dp),
-                                        )
-                                        Text(
-                                            "spotygram",
-                                            Modifier.weight(1f).padding(start = 8.dp),
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        GlassIconButton(
-                                            onClick = { sheet = "settings" },
-                                            modifier = Modifier.padding(end = 8.dp),
+                                        Row(
+                                            Modifier.widthIn(max = 720.dp)
+                                                .fillMaxWidth()
+                                                .heightIn(min = 48.dp)
+                                                .padding(start = 16.dp, end = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            Icon(Icons.Rounded.Settings, tr(R.string.settings))
+                                            Image(
+                                                painterResource(headerSticker),
+                                                null,
+                                                Modifier.size(28.dp),
+                                            )
+                                            Text(
+                                                "spotygram",
+                                                Modifier.weight(1f).padding(start = 8.dp),
+                                                style = MaterialTheme.typography.titleMedium,
+                                            )
+                                            GlassIconButton(
+                                                onClick = { sheet = "settings" },
+                                                modifier = Modifier.padding(end = 8.dp),
+                                            ) {
+                                                Icon(Icons.Rounded.Settings, tr(R.string.settings))
+                                            }
                                         }
                                     }
                                 if (
@@ -838,49 +848,53 @@ fun SpotygramUI(
                         }
                 }
                 if (wide && !fullPlayer && !editor && !authVisible) {
-                    Column(
-                        Modifier.align(Alignment.CenterStart)
-                            .padding(start = 16.dp)
-                            .width(76.dp)
-                            .liquidGlass(32.dp, strong = true)
-                            .padding(vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    CompositionLocalProvider(
+                        LocalGlassSourceSelection provides GlassEnvironmentSources
                     ) {
-                        listOf(
-                                R.string.music to Icons.Rounded.MusicNote,
-                                R.string.favorites to Icons.Rounded.Favorite,
-                                R.string.playlists to Icons.Rounded.PlaylistPlay,
-                                R.string.sources to Icons.Rounded.Widgets,
-                            )
-                            .forEachIndexed { index, (label, icon) ->
-                                Column(
-                                    Modifier.fillMaxWidth()
-                                        .heightIn(min = 68.dp)
-                                        .then(
-                                            if (tab == index)
-                                                Modifier.liquidGlass(
-                                                    26.dp,
-                                                    tint = spectrumAccent(index),
-                                                )
-                                            else Modifier
+                        Column(
+                            Modifier.align(Alignment.CenterStart)
+                                .padding(start = 16.dp)
+                                .width(76.dp)
+                                .liquidGlass(32.dp, strong = true)
+                                .padding(vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            listOf(
+                                    R.string.music to Icons.Rounded.MusicNote,
+                                    R.string.favorites to Icons.Rounded.Favorite,
+                                    R.string.playlists to Icons.Rounded.PlaylistPlay,
+                                    R.string.sources to Icons.Rounded.Widgets,
+                                )
+                                .forEachIndexed { index, (label, icon) ->
+                                    Column(
+                                        Modifier.fillMaxWidth()
+                                            .heightIn(min = 68.dp)
+                                            .then(
+                                                if (tab == index)
+                                                    Modifier.liquidGlass(
+                                                        26.dp,
+                                                        tint = spectrumAccent(index),
+                                                    )
+                                                else Modifier
+                                            )
+                                            .clip(RoundedCornerShape(26.dp))
+                                            .selectable(tab == index, role = Role.Tab) {
+                                                navigate(index)
+                                            },
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                    ) {
+                                        Icon(
+                                            icon,
+                                            null,
+                                            tint =
+                                                if (tab == index) spectrumAccent(index)
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        .clip(RoundedCornerShape(26.dp))
-                                        .selectable(tab == index, role = Role.Tab) {
-                                            navigate(index)
-                                        },
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                ) {
-                                    Icon(
-                                        icon,
-                                        null,
-                                        tint =
-                                            if (tab == index) spectrumAccent(index)
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Text(tr(label), fontSize = 10.sp, maxLines = 1)
+                                        Text(tr(label), fontSize = 10.sp, maxLines = 1)
+                                    }
                                 }
-                            }
+                        }
                     }
                 }
                 if (settingsPage && trackPopup) {

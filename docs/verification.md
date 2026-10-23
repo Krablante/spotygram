@@ -6,6 +6,83 @@ This page records observed behavior and its limits. A build does not establish
 account access, physical sound or responsiveness on another computer. Temporary
 inspection code, timings and account data stay outside the checkout.
 
+## 0.28.0 — wheel cadence and scrolling costs
+
+### Linux comparison
+
+The 0.27.1 comparison and candidate used the same JDK 21, 256 MiB heap,
+two logical CPU cores, AMD Radeon 680M/OpenGL and private Weston/Xwayland display.
+The synthetic catalog contained 10,002 recordings, 60 chats, 40 selected profile
+descriptors, 200 playlists and 20,000 memberships. No Telegram authorization was
+supplied to that catalog.
+
+Native wheel input made five forward/back passes through each surface. The table
+uses the last four passes, excludes deliberate pauses between gestures and
+measures intervals between lazy-list scroll callbacks, including boundary handling:
+
+| P95 scroll-callback interval | 0.27.1 | Candidate |
+| --- | ---: | ---: |
+| Music | 28.88 ms | 19.12 ms |
+| Settings | 22.33 ms | 18.83 ms |
+| Source chooser | 34.63 ms | 18.58 ms |
+
+In the chooser, intervals above 25 ms fell from 17.2% to zero in those passes;
+Music fell from 6.7% to 0.2%, Settings from 4.5% to 0.9%. Settings' scroll callback
+P95 fell from 3.16 to 0.82 ms. The wheel adapter keeps movement continuous between
+notches instead of finishing each short linear segment before the next input.
+
+These are temporary in-process callback observations in a virtual display. They
+are not GPU timer queries, end-to-end input latency or a physical-device FPS
+guarantee. Native draw/flush P95 remained around 15–16 ms; smoother cadence does
+not mean every rendering stage became faster. Some delayed frames remain.
+
+An eight-second idle sample after scrolling recorded no render callbacks and
+about 0.25% of one CPU, with approximately 399 MiB RSS. Native allocations remain
+outside the 256 MiB Java heap. Eight injected fractional wheel events produced
+eight direct scroll updates; a reduced-motion desktop property disabled
+interpolation. These observations do not establish physical touchpad behavior.
+
+The duration-label implementation matched the prior formatter at 17 boundary
+values in English and Russian, including negative values and `Long.MAX_VALUE`.
+Seven warm runs of 100,000 actual compiled calls had median times of 132.13 ms
+before and 2.79 ms after the change. That is a small-function comparison, not an
+application FPS measurement.
+
+Screenshots checked light/dark Settings, its fixed header at the bottom of the
+form, dismissal during wheel motion and the boundary between long profile/chat
+groups in the source chooser. Panel geometry stayed aligned with the lazy rows.
+
+The published 0.27.1 package reproduced `RootNodeOwner is already disposed` when
+an open wide Settings popup crossed the narrow-window threshold. The candidate
+retained the open panel through shrinking, scrolling, closing and growing;
+reopening selected the presentation for the new width. The source chooser retained
+its open popup too. A separate reproduction found the same disposal failure in
+the player's open order menu. Moving the existing controls between layouts kept
+that menu and the speed panel alive; changing the order, resizing again and
+reopening showed the updated selection. No disposal error appeared in those runs.
+
+The packaged launcher also checked local playback with audio output disabled,
+search, browsing 200 playlists and filtering the editor's 10,002-recording catalog.
+These checks do not establish authenticated Telegram transport or physical sound.
+
+### Android update and interface
+
+Debug/release builds and both Lint variants passed with zero errors and 42 warnings
+per variant. Both release APKs passed v2 signature and 16 KiB ZIP alignment checks
+and retained the original signing certificate.
+
+A retained Android 16 installation first updated from 0.17.0 to the published
+0.27.1, then to 0.28.0 (50). The last update preserved all 18 saved application
+files byte-for-byte before launch. The catalog, favorites and paused queue position
+remained visible. Russian Settings at 320 dp/font scale 1.3 scrolled to the bottom
+with its fixed Close button; Close and drag dismissal worked. Local playback
+continued after Home, the media session reported PLAYING, and a media Pause command
+returned to the paused player. The application crash buffer remained empty.
+
+That virtual device also encountered a System UI ANR during cold boot and had
+substantial system delays. It establishes the listed update and interface behavior,
+not a useful Android performance comparison, physical audio or battery behavior.
+
 ## 0.27.1 — desktop Settings dismissal
 
 Settings still used a mobile bottom sheet in wide windows after 0.27.0. It had

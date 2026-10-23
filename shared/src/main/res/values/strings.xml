@@ -85,14 +85,12 @@
     <string name="unmute">Unmute</string>
     <string name="shuffle_no_repeats">Shuffle · no repeats</string>
     <string name="random_mode">Absolute random · repeats possible</string>
-    <string name="random_play">Random play</string>
     <string name="change_playback_order">%1$s. Change playback order</string>
     <string name="random_pool">Random selection</string>
     <string name="random_pool_help">%1$s · each next song is chosen independently. Playback continues until you stop it.</string>
     <string name="next_named">Next: %1$s</string>
     <string name="language">Language</string>
     <string name="language_help">Choose English, Russian or your device language.</string>
-    <string name="language_phone_settings">Change the language in your phone settings.</string>
     <string name="action_failed">"Could not complete the action. Please try again."</string>
     <string name="add_chats">"Add chats"</string>
     <string name="add_query">"Add %1$s"</string>
@@ -101,7 +99,6 @@
     <string name="add_tracks_count">"Add · %1$s"</string>
     <string name="added_to_playlist">"Added to playlist"</string>
     <string name="all_sources">"All sources"</string>
-    <string name="source_filter">Sources</string>
     <string name="alphabetical">"Alphabetical"</string>
     <string name="app_description">"A personal music player using the Telegram API. No own server, app ads or analytics. Your library syncs through a private, muted channel in your Telegram archive. Audio and sessions stay on each device."</string>
     <string name="appearance">"Appearance"</string>
@@ -124,7 +121,6 @@
     <string name="chat_search_complete">"Search in selected chats completed"</string>
     <string name="chat_search_hint">"Chat name or @channel"</string>
     <string name="refresh_chats">Refresh chat list</string>
-    <string name="clear_chat_search">Clear search</string>
     <string name="loading_chats">Loading chats…</string>
     <string name="searching_chats">Searching Telegram…</string>
     <string name="chat_picker_offline">Offline. You can still select loaded chats.</string>
@@ -135,7 +131,6 @@
     <string name="chat_search_empty">No matching chats. Try another name or refresh the chat list.</string>
     <string name="chats">"Chats"</string>
     <string name="choose_chats">"Choose sources"</string>
-    <string name="choose_sources_help">"Choose where to collect your music."</string>
     <string name="clear_search">"Clear search"</string>
     <string name="clear_selection">"Clear selection"</string>
     <string name="close_player">"Close player"</string>
@@ -261,7 +256,6 @@
     <string name="preparing_downloads">"Preparing downloads…"</string>
     <string name="previous_track">"Previous track"</string>
     <string name="queue">"Queue"</string>
-    <string name="refresh">"Refresh"</string>
     <string name="refresh_music">"Refresh music"</string>
     <string name="registration_help">"Create an account in the official Telegram app, then sign in here."</string>
     <string name="remove">"Remove"</string>
@@ -273,7 +267,6 @@
     <string name="remove_from_playlist">"Remove from playlist"</string>
     <string name="remove_from_queue">"Remove from queue"</string>
     <string name="remove_selected_playlist">"Remove selected from playlist"</string>
-    <string name="remove_source_named">"Remove %1$s"</string>
     <string name="remove_tracks_help">"Only from this playlist. The music stays in your library and on this device."</string>
     <string name="remove_tracks_title">"Remove %1$s?"</string>
     <string name="removed_favorite">"Removed from favorites"</string>
@@ -301,8 +294,6 @@
     <string name="selected_count">"Selected: %1$s"</string>
     <string name="settings">"Settings"</string>
     <string name="show_password">"Show password"</string>
-    <string name="shuffle_mode">"Shuffle"</string>
-    <string name="shuffle_play">"Shuffle play"</string>
     <string name="shuffled_queue">"Shuffled queue"</string>
     <string name="sources_empty">"Add a profile, Saved Messages, a music channel or a group chat."</string>
     <string name="stop">"Stop"</string>
@@ -323,7 +314,6 @@
     <string name="track_download_failed">"Could not load this track. Check your connection and try again."</string>
     <string name="track_missing">"This track is no longer in your library"</string>
     <string name="track_order">"Track order"</string>
-    <string name="tracks">"Tracks"</string>
     <string name="undo">"Undo"</string>
     <string name="unlike">"Remove from favorites"</string>
     <string name="unlike_named">"Remove from favorites: %1$s"</string>
@@ -335,7 +325,6 @@
     <string name="wifi_downloads_paused">"Downloads paused: Wi-Fi required. Resume them in Settings."</string>
     <string name="wifi_only">"Download over Wi-Fi only"</string>
     <string name="wifi_only_help">"Applies to downloads, not streaming playback"</string>
-    <string name="your_chats">"Your chats"</string>
     <plurals name="track_count">
         <item quantity="one">%d track</item>
         <item quantity="other">%d tracks</item>

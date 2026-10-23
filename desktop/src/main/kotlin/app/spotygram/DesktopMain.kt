@@ -56,6 +56,7 @@ fun main(arguments: Array<String>) {
         platform.close()
         return
     }
+    val wheelScrolling = DesktopWheelScrolling()
     var started: SpotygramApp? = null
     try {
         prepareDesktopGraphics(platform.cacheDir)
@@ -167,6 +168,7 @@ fun main(arguments: Array<String>) {
                 },
             ) {
                 window.minimumSize = java.awt.Dimension(360, 500)
+                wheelScrolling.Observe(active)
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val density = LocalDensity.current
                     CompositionLocalProvider(
@@ -208,6 +210,8 @@ fun main(arguments: Array<String>) {
         JOptionPane.showMessageDialog(null, error.message ?: "spotygram could not start", "spotygram", JOptionPane.ERROR_MESSAGE)
         error.printStackTrace()
         kotlin.system.exitProcess(1)
+    } finally {
+        wheelScrolling.close()
     }
     // The settings, database and TDLib have settled; terminate native credential-service worker threads.
     kotlin.system.exitProcess(0)

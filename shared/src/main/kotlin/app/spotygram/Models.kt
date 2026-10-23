@@ -113,6 +113,9 @@ data class LibraryState(
     val localGroups by lazy { tracks.filter { it.local && !it.temporary }.groupBy { it.path } }
     val localTracks by lazy { localView(tracks) }
     val localSize by lazy { localTracks.sumOf { it.size } }
+    val localRecordingCount by lazy {
+        localTracks.asSequence().map { duplicates.key(it.id) }.distinct().count()
+    }
     val allSources by lazy { sources + profiles.filter { it.selected }.map { it.source() } }
     val sourceCounts by lazy {
         tracks.asSequence().filter { it.profileUserId == 0L }.groupingBy { it.chatId }.eachCount()
@@ -194,8 +197,11 @@ fun json(type: String, vararg fields: Pair<String, Any?>) =
 
 fun JSONObject.kind() = optString("@type")
 
-fun seconds(value: Long): String =
-    "%d:%02d".format(value.coerceAtLeast(0) / 60, value.coerceAtLeast(0) % 60)
+fun seconds(value: Long): String {
+    val positive = value.coerceAtLeast(0)
+    val remainder = positive % 60
+    return "${positive / 60}:${if (remainder < 10) "0" else ""}$remainder"
+}
 
 fun bytes(value: Long): String =
     if (value >= 1_073_741_824) tr(R.string.gigabytes).format(value / 1_073_741_824.0)

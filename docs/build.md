@@ -88,6 +88,11 @@ on Windows. Without an override, a D3D12-capable hardware adapter uses OpenGL;
 other adapters use ANGLE. See the [architecture guide](architecture.md#visual-system-and-idle-work)
 for the upstream Direct3D limitation.
 
+Discrete wheel input is interpolated on the frame clock on Windows and Linux.
+For input diagnosis, `-Dcompose.scrolling.smooth.enabled=false` keeps immediate
+wheel input. Fractional high-resolution events and macOS input retain their
+platform path.
+
 ```sh
 python3 tools/build-desktop.py --image-only
 ```
@@ -232,5 +237,14 @@ permits isolated Telegram test-DC use through `-Dspotygram.telegram.test=true`;
 debug images cannot be signed for the ordinary update channel. Keep checks and
 private account data outside source, and report unverified cases in the
 [verification record](verification.md).
+
+For responsiveness, scroll the library, playlists, source chooser and Settings in
+both directions, including while music plays. Check first entry and repeated
+passes separately, plus wheel input, touchpad input and touch where available.
+Opening a panel quickly does not establish smooth scrolling. Compare sustained
+frame intervals on the same renderer and display; CPU recording and native
+draw/flush timings describe different parts of a frame. Keep inspection code and
+traces outside source. A virtual display or software Windows adapter cannot
+establish responsiveness on a physical GPU or a high-refresh-rate screen.
 
 For repeatable downloads, the wrapper's distribution checksum is pinned. Dependencies use explicit versions. No machine-specific paths, credentials, or media library are needed in Git.

@@ -420,6 +420,8 @@ the top-right Close button, Escape or a click outside to dismiss it. The header
 stays visible while scrolling. Back on a cache/sharing page returns to Settings;
 Escape does the same there. Narrow screens keep the draggable bottom sheet and
 also have a Close button.
+Resizing an open panel changes its size while keeping its current presentation.
+Close and reopen it to choose the layout for the new window width.
 
 Choose light or dark appearance in Settings. Until then, the app follows your
 system. Switching appearance does not interrupt playback.

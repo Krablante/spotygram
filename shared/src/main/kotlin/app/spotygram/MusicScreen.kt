@@ -55,7 +55,11 @@ private data class MusicView(
     val playable: Boolean = false,
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class,
+    dev.chrisbanes.haze.ExperimentalHazeApi::class,
+)
 @Composable
 fun MusicScreen(
     hideDuplicates: Boolean,
@@ -203,254 +207,264 @@ fun MusicScreen(
     val playingPath =
         if (offline) library.byId[playingId]?.path?.takeIf { it.isNotEmpty() } else null
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp).heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (selecting)
-                IconButton(onClick = ::clearSelection) {
-                    Icon(Icons.Rounded.Close, tr(R.string.clear_selection))
-                }
-            else if (playlist != null || source != null)
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr(R.string.back))
-                }
-            else if (favorites)
-                Icon(
-                    Icons.Rounded.Favorite,
-                    null,
-                    Modifier.padding(end = 8.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            val expandable = !selecting && source != null && sourceTitleOverflow
+        CompositionLocalProvider(LocalGlassSourceSelection provides GlassEnvironmentSources) {
             Row(
-                Modifier.weight(1f)
-                    .heightIn(min = 48.dp)
-                    .then(
-                        if (expandable)
-                            Modifier.clickable(role = Role.Button) { showSourceTitle = true }
-                        else Modifier
-                    ),
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp).heightIn(min = 48.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    if (selecting) tr(R.string.selected_count, selected.size) else heading,
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    onTextLayout = { sourceTitleOverflow = it.hasVisualOverflow },
-                )
-                if (expandable)
+                if (selecting)
+                    IconButton(onClick = ::clearSelection) {
+                        Icon(Icons.Rounded.Close, tr(R.string.clear_selection))
+                    }
+                else if (playlist != null || source != null)
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr(R.string.back))
+                    }
+                else if (favorites)
                     Icon(
-                        Icons.Rounded.UnfoldMore,
+                        Icons.Rounded.Favorite,
                         null,
-                        Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Modifier.padding(end = 8.dp),
+                        tint = MaterialTheme.colorScheme.primary,
                     )
-            }
-            if (!selecting) {
-                if (profile == null)
-                    Text(
-                        trackCount(tracks.size),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    )
-                if (playlist != null)
-                    IconButton(onClick = onPlaylistMenu) {
-                        Icon(Icons.Rounded.MoreVert, tr(R.string.playlist_actions))
-                    }
-                else
-                    IconButton(onClick = onRefresh, enabled = !busy) {
-                        if (busy)
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
-                    }
-            }
-        }
-        if (profile != null && !selecting) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ProfileAvatar(profile, 52.dp)
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(
-                        if (profile.username.isEmpty() || ownProfile) tr(R.string.profile_music)
-                        else "@${profile.username}",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        if (ownProfile)
-                            (if (profile.loadedAt != 0L) trackCount(profile.count) + " · "
-                            else "") + tr(R.string.profile_order)
-                        else
-                            tr(R.string.profile_music_source) +
-                                if (profile.loadedAt != 0L) " · ${trackCount(profile.count)}"
-                                else "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (profile.selected)
-                        TextButton(
-                            onClick = { removeProfile = true },
-                            contentPadding = PaddingValues(0.dp),
-                        ) {
-                            Icon(Icons.Rounded.CheckCircle, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(tr(R.string.in_library))
-                            Icon(Icons.Rounded.ArrowDropDown, null, Modifier.size(18.dp))
-                        }
-                    else
-                        GlassButton(
-                            onClick = { onProfileSelected(true) },
-                            modifier = Modifier.padding(top = 8.dp),
-                        ) {
-                            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(tr(R.string.add_to_library))
-                        }
-                }
-            }
-            if (profileError != null)
+                val expandable = !selecting && source != null && sourceTitleOverflow
                 Row(
-                    Modifier.padding(horizontal = 20.dp),
+                    Modifier.weight(1f)
+                        .heightIn(min = 48.dp)
+                        .then(
+                            if (expandable)
+                                Modifier.clickable(role = Role.Button) { showSourceTitle = true }
+                            else Modifier
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        profileError,
+                        if (selecting) tr(R.string.selected_count, selected.size) else heading,
                         Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { sourceTitleOverflow = it.hasVisualOverflow },
                     )
-                    TextButton(onClick = onRefresh, enabled = !busy) {
-                        Text(tr(R.string.retry_chat_loading))
+                    if (expandable)
+                        Icon(
+                            Icons.Rounded.UnfoldMore,
+                            null,
+                            Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                }
+                if (!selecting) {
+                    if (profile == null)
+                        Text(
+                            trackCount(tracks.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                        )
+                    if (playlist != null)
+                        IconButton(onClick = onPlaylistMenu) {
+                            Icon(Icons.Rounded.MoreVert, tr(R.string.playlist_actions))
+                        }
+                    else
+                        IconButton(onClick = onRefresh, enabled = !busy) {
+                            if (busy)
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else Icon(Icons.Rounded.Refresh, tr(R.string.refresh_music))
+                        }
+                }
+            }
+            if (profile != null && !selecting) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ProfileAvatar(profile, 52.dp)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(
+                            if (profile.username.isEmpty() || ownProfile) tr(R.string.profile_music)
+                            else "@${profile.username}",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            if (ownProfile)
+                                (if (profile.loadedAt != 0L) trackCount(profile.count) + " · "
+                                else "") + tr(R.string.profile_order)
+                            else
+                                tr(R.string.profile_music_source) +
+                                    if (profile.loadedAt != 0L) " · ${trackCount(profile.count)}"
+                                    else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (profile.selected)
+                            TextButton(
+                                onClick = { removeProfile = true },
+                                contentPadding = PaddingValues(0.dp),
+                            ) {
+                                Icon(Icons.Rounded.CheckCircle, null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(tr(R.string.in_library))
+                                Icon(Icons.Rounded.ArrowDropDown, null, Modifier.size(18.dp))
+                            }
+                        else
+                            GlassButton(
+                                onClick = { onProfileSelected(true) },
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) {
+                                Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(tr(R.string.add_to_library))
+                            }
                     }
                 }
-        }
-        MusicSearch(
-            query,
-            { query = it },
-            if (profile != null) tr(R.string.search_profile)
-            else if (favorites) tr(R.string.search_favorites) else tr(R.string.search_music),
-        )
-        if (selecting) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val all = tracks.isNotEmpty() && visibleKeys.all { it in selectedSet }
-                val selectLabel = tr(if (all) R.string.deselect_visible else R.string.select_all)
-                val selectVisible = {
-                    selected =
-                        ArrayList(
-                            if (all) selected.filter { selectionKey(it) !in visibleKeys }
-                            else (selected + visibleIds).distinctBy(::selectionKey)
+                if (profileError != null)
+                    Row(
+                        Modifier.padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            profileError,
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                }
-                GlassButton(
-                    onClick = selectVisible,
-                    enabled = tracks.isNotEmpty(),
-                    modifier = Modifier.weight(1f).semantics { this.selected = all },
-                    tint = if (all) spectrumAccent(0) else Color.Transparent,
+                        TextButton(onClick = onRefresh, enabled = !busy) {
+                            Text(tr(R.string.retry_chat_loading))
+                        }
+                    }
+            }
+            MusicSearch(
+                query,
+                { query = it },
+                if (profile != null) tr(R.string.search_profile)
+                else if (favorites) tr(R.string.search_favorites) else tr(R.string.search_music),
+            )
+            if (selecting) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (compactPlaylist)
-                        Icon(
-                            if (all) Icons.Rounded.Deselect else Icons.Rounded.SelectAll,
-                            selectLabel,
-                        )
-                    else Text(selectLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                IconButton(
-                    onClick = { onAddToPlaylist(selected.toList()) },
-                    enabled = selected.isNotEmpty(),
-                ) {
-                    Icon(Icons.Rounded.PlaylistAdd, tr(R.string.to_playlist))
-                }
-                IconButton(
-                    onClick = { onDownload(selected.toList()) },
-                    enabled = selected.isNotEmpty(),
-                ) {
-                    Icon(Icons.Rounded.Download, tr(R.string.download_selected))
-                }
-                if (playlist != null)
+                    val all = tracks.isNotEmpty() && visibleKeys.all { it in selectedSet }
+                    val selectLabel =
+                        tr(if (all) R.string.deselect_visible else R.string.select_all)
+                    val selectVisible = {
+                        selected =
+                            ArrayList(
+                                if (all) selected.filter { selectionKey(it) !in visibleKeys }
+                                else (selected + visibleIds).distinctBy(::selectionKey)
+                            )
+                    }
+                    GlassButton(
+                        onClick = selectVisible,
+                        enabled = tracks.isNotEmpty(),
+                        modifier = Modifier.weight(1f).semantics { this.selected = all },
+                        tint = if (all) spectrumAccent(0) else Color.Transparent,
+                    ) {
+                        if (compactPlaylist)
+                            Icon(
+                                if (all) Icons.Rounded.Deselect else Icons.Rounded.SelectAll,
+                                selectLabel,
+                            )
+                        else Text(selectLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     IconButton(
-                        onClick = { removeSelected = true },
+                        onClick = { onAddToPlaylist(selected.toList()) },
                         enabled = selected.isNotEmpty(),
                     ) {
-                        Icon(Icons.Rounded.PlaylistRemove, tr(R.string.remove_selected_playlist))
+                        Icon(Icons.Rounded.PlaylistAdd, tr(R.string.to_playlist))
                     }
-            }
-        } else {
-            if (!favorites && playlist == null && profile == null)
-                MusicFilters(
-                    library,
-                    source,
-                    offline,
-                    sort,
-                    onSource,
-                    onOffline,
-                    { sort = !sort },
-                    onChooseSource,
-                    onChats,
-                )
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                GlassButton(
-                    modifier = Modifier.weight(1f),
-                    tint = spectrumAccent(0),
-                    onClick = {
-                        val first =
-                            when {
-                                order.shuffled -> randomTrack(tracks)
-                                order == PlaybackOrder.REVERSED ->
-                                    tracks.lastOrNull { it.local || it.available }
-                                else -> tracks.firstOrNull { it.local || it.available }
-                            }
-                        first?.let { onPlay(it, tracks) }
-                    },
-                    enabled = playable,
-                ) {
-                    Icon(
-                        Icons.Rounded.PlayArrow,
-                        if (compactPlaylist) tr(R.string.play_all) else null,
-                        Modifier.size(22.dp),
+                    IconButton(
+                        onClick = { onDownload(selected.toList()) },
+                        enabled = selected.isNotEmpty(),
+                    ) {
+                        Icon(Icons.Rounded.Download, tr(R.string.download_selected))
+                    }
+                    if (playlist != null)
+                        IconButton(
+                            onClick = { removeSelected = true },
+                            enabled = selected.isNotEmpty(),
+                        ) {
+                            Icon(
+                                Icons.Rounded.PlaylistRemove,
+                                tr(R.string.remove_selected_playlist),
+                            )
+                        }
+                }
+            } else {
+                if (!favorites && playlist == null && profile == null)
+                    MusicFilters(
+                        library,
+                        source,
+                        offline,
+                        sort,
+                        onSource,
+                        onOffline,
+                        { sort = !sort },
+                        onChooseSource,
+                        onChats,
                     )
-                    if (!compactPlaylist) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(tr(R.string.play_all), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    GlassButton(
+                        modifier = Modifier.weight(1f),
+                        tint = spectrumAccent(0),
+                        onClick = {
+                            val first =
+                                when {
+                                    order.shuffled -> randomTrack(tracks)
+                                    order == PlaybackOrder.REVERSED ->
+                                        tracks.lastOrNull { it.local || it.available }
+                                    else -> tracks.firstOrNull { it.local || it.available }
+                                }
+                            first?.let { onPlay(it, tracks) }
+                        },
+                        enabled = playable,
+                    ) {
+                        Icon(
+                            Icons.Rounded.PlayArrow,
+                            if (compactPlaylist) tr(R.string.play_all) else null,
+                            Modifier.size(22.dp),
+                        )
+                        if (!compactPlaylist) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                tr(R.string.play_all),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                }
-                PlaybackOrderControl(order, onOrder, enabled = playable, glass = true)
-                if (playlist != null)
-                    IconButton(onClick = onAddTracks) {
-                        Icon(Icons.Rounded.PlaylistAdd, tr(R.string.add_tracks))
+                    PlaybackOrderControl(order, onOrder, enabled = playable, glass = true)
+                    if (playlist != null)
+                        IconButton(onClick = onAddTracks) {
+                            Icon(Icons.Rounded.PlaylistAdd, tr(R.string.add_tracks))
+                        }
+                    IconButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
+                        Icon(Icons.Rounded.Checklist, tr(R.string.select))
                     }
-                IconButton(onClick = { selecting = true }, enabled = tracks.isNotEmpty()) {
-                    Icon(Icons.Rounded.Checklist, tr(R.string.select))
                 }
             }
+            if (
+                query.isNotBlank() &&
+                    !favorites &&
+                    profile == null &&
+                    playlist == null &&
+                    library.sources.isNotEmpty() &&
+                    !selecting
+            )
+                TextButton(
+                    onClick = { onSearchChats(query) },
+                    enabled = !busy,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                ) {
+                    Text(tr(R.string.search_selected_chats))
+                }
         }
-        if (
-            query.isNotBlank() &&
-                !favorites &&
-                profile == null &&
-                playlist == null &&
-                library.sources.isNotEmpty() &&
-                !selecting
-        )
-            TextButton(
-                onClick = { onSearchChats(query) },
-                enabled = !busy,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            ) {
-                Text(tr(R.string.search_selected_chats))
-            }
         PullToRefreshBox(
             isRefreshing = busy,
             onRefresh = { if (!selecting) onRefresh() },
@@ -617,6 +631,7 @@ fun MusicScreen(
 }
 
 @Composable
+@OptIn(dev.chrisbanes.haze.ExperimentalHazeApi::class)
 private fun MusicFilters(
     library: LibraryState,
     source: Source?,
@@ -631,7 +646,8 @@ private fun MusicFilters(
     var expanded by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val popup = configuration.screenWidthDp >= 600
+    val widePopup = configuration.screenWidthDp >= 600
+    val popup = if (expanded) remember { widePopup } else widePopup
     var availableHeight by remember { mutableStateOf(400.dp) }
     val menuWidth = minOf(360.dp, (configuration.screenWidthDp - 32).dp)
     val menuPosition = remember(density) { SourceMenuPosition(with(density) { 8.dp.roundToPx() }) }
@@ -679,24 +695,29 @@ private fun MusicFilters(
                     onDismissRequest = { expanded = false },
                     properties = PopupProperties(focusable = true),
                 ) {
-                    SourceSelectionPanel(
-                        library,
-                        source,
-                        onSource = {
-                            expanded = false
-                            onSource(it)
-                        },
-                        onManage = {
-                            expanded = false
-                            onManageSources()
-                        },
-                        onClose = { expanded = false },
-                        modifier =
-                            Modifier.width(menuWidth)
-                                .liquidGlass(24.dp, strong = true)
-                                .padding(vertical = 8.dp),
-                        maxHeight = availableHeight,
-                    )
+                    CompositionLocalProvider(
+                        LocalGlassSourceSelection provides
+                            dev.chrisbanes.haze.HazeSourceSelection.Behind
+                    ) {
+                        SourceSelectionPanel(
+                            library,
+                            source,
+                            onSource = {
+                                expanded = false
+                                onSource(it)
+                            },
+                            onManage = {
+                                expanded = false
+                                onManageSources()
+                            },
+                            onClose = { expanded = false },
+                            modifier =
+                                Modifier.width(menuWidth)
+                                    .liquidGlass(24.dp, strong = true)
+                                    .padding(vertical = 8.dp),
+                            maxHeight = availableHeight,
+                        )
+                    }
                 }
         }
         GlassIconButton(
@@ -746,6 +767,7 @@ private class SourceMenuPosition(private val margin: Int) : PopupPositionProvide
 }
 
 @Composable
+@OptIn(dev.chrisbanes.haze.ExperimentalHazeApi::class)
 fun MusicSearch(
     value: String,
     onChange: (String) -> Unit,
@@ -761,7 +783,11 @@ fun MusicSearch(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .heightIn(min = 50.dp)
-            .liquidGlass(25.dp, interaction = interaction)
+            .liquidGlass(
+                25.dp,
+                interaction = interaction,
+                sourceSelection = GlassEnvironmentSources,
+            )
             .clip(RoundedCornerShape(25.dp)),
         singleLine = true,
         interactionSource = interaction,

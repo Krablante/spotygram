@@ -87,14 +87,12 @@
     <string name="unmute">Включить звук</string>
     <string name="shuffle_no_repeats">Перемешивание · без повторов</string>
     <string name="random_mode">Абсолютный рандом · возможны повторы</string>
-    <string name="random_play">Рандом</string>
     <string name="change_playback_order">%1$s. Изменить порядок воспроизведения</string>
     <string name="random_pool">Подборка для рандома</string>
     <string name="random_pool_help">%1$s · каждая следующая песня выбирается независимо. Воспроизведение продолжается, пока ты его не остановишь.</string>
     <string name="next_named">Следующая: %1$s</string>
     <string name="language">Язык</string>
     <string name="language_help">Выбери русский, английский или язык устройства.</string>
-    <string name="language_phone_settings">Измените язык в настройках телефона.</string>
     <string name="action_failed">"Не удалось выполнить действие. Попробуйте ещё раз."</string>
     <string name="add_chats">"Добавить чаты"</string>
     <string name="add_query">"Добавить %1$s"</string>
@@ -103,7 +101,6 @@
     <string name="add_tracks_count">"Добавить · %1$s"</string>
     <string name="added_to_playlist">"Добавлено в плейлист"</string>
     <string name="all_sources">"Все источники"</string>
-    <string name="source_filter">Источники</string>
     <string name="alphabetical">"По алфавиту"</string>
     <string name="app_description">"Личный музыкальный плеер на Telegram API. Без своего сервера, рекламы приложения и аналитики. Библиотека синхронизируется через приватный канал без уведомлений в архиве Telegram. Аудиофайлы и сессии хранятся на каждом устройстве."</string>
     <string name="appearance">"Оформление"</string>
@@ -126,7 +123,6 @@
     <string name="chat_search_complete">"Поиск в выбранных чатах завершён"</string>
     <string name="chat_search_hint">"Название чата или @канал"</string>
     <string name="refresh_chats">Обновить список чатов</string>
-    <string name="clear_chat_search">Очистить поиск</string>
     <string name="loading_chats">Загружаем чаты…</string>
     <string name="searching_chats">Ищем в Telegram…</string>
     <string name="chat_picker_offline">Нет сети. Уже загруженные чаты можно выбрать.</string>
@@ -137,7 +133,6 @@
     <string name="chat_search_empty">Чаты не найдены. Попробуйте другое название или обновите список чатов.</string>
     <string name="chats">"Чаты"</string>
     <string name="choose_chats">"Выбрать источники"</string>
-    <string name="choose_sources_help">"Выбирай, откуда собирать музыку."</string>
     <string name="clear_search">"Очистить поиск"</string>
     <string name="clear_selection">"Снять выделение"</string>
     <string name="close_player">"Свернуть плеер"</string>
@@ -263,7 +258,6 @@
     <string name="preparing_downloads">"Подготовка загрузок…"</string>
     <string name="previous_track">"Предыдущий трек"</string>
     <string name="queue">"Очередь"</string>
-    <string name="refresh">"Обновить"</string>
     <string name="refresh_music">"Обновить музыку"</string>
     <string name="registration_help">"Сначала создайте аккаунт в официальном Telegram, затем войдите здесь."</string>
     <string name="remove">"Убрать"</string>
@@ -275,7 +269,6 @@
     <string name="remove_from_playlist">"Убрать из плейлиста"</string>
     <string name="remove_from_queue">"Убрать из очереди"</string>
     <string name="remove_selected_playlist">"Убрать выбранные из плейлиста"</string>
-    <string name="remove_source_named">"Убрать %1$s"</string>
     <string name="remove_tracks_help">"Только из этого плейлиста. Музыка останется в медиатеке и на устройстве."</string>
     <string name="remove_tracks_title">"Убрать %1$s?"</string>
     <string name="removed_favorite">"Убрано из любимых"</string>
@@ -303,8 +296,6 @@
     <string name="selected_count">"Выбрано: %1$s"</string>
     <string name="settings">"Настройки"</string>
     <string name="show_password">"Показать пароль"</string>
-    <string name="shuffle_mode">"Перемешивание"</string>
-    <string name="shuffle_play">"Перемешать"</string>
     <string name="shuffled_queue">"Перемешанная очередь"</string>
     <string name="sources_empty">"Добавь профиль, «Избранное», музыкальный канал или общий чат."</string>
     <string name="stop">"Остановить"</string>
@@ -325,7 +316,6 @@
     <string name="track_download_failed">"Не удалось загрузить трек. Проверьте сеть и повторите."</string>
     <string name="track_missing">"Трек больше не в библиотеке"</string>
     <string name="track_order">"Порядок треков"</string>
-    <string name="tracks">"Треки"</string>
     <string name="undo">"Отменить"</string>
     <string name="unlike">"Убрать из любимых"</string>
     <string name="unlike_named">"Убрать из любимых: %1$s"</string>
@@ -337,7 +327,6 @@
     <string name="wifi_downloads_paused">"Загрузки приостановлены: требуется Wi-Fi. Возобновите их в настройках."</string>
     <string name="wifi_only">"Скачивать только по Wi-Fi"</string>
     <string name="wifi_only_help">"Для кнопки «Скачать», не для прослушивания"</string>
-    <string name="your_chats">"Твои чаты"</string>
     <plurals name="track_count">
         <item quantity="one">%d трек</item>
         <item quantity="few">%d трека</item>

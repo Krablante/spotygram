@@ -21,11 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -100,35 +100,54 @@ fun SourceGroupList(
     val scroll = state
     val density = LocalDensity.current
     val edge = with(density) { 24.dp.roundToPx() }
-    val panels by
+    val groups by
         remember(scroll, edge) {
             derivedStateOf {
-                val info = scroll.layoutInfo
-                info.visibleItemsInfo
-                    .filter { it.contentType is SourceGroup }
-                    .groupBy { it.contentType as SourceGroup }
-                    .map { (group, rows) ->
-                        val first = rows.first()
-                        val last = rows.last()
-                        val top =
-                            if (first.key == group.first) first.offset
-                            else minOf(first.offset, info.viewportStartOffset - edge)
-                        val bottom =
-                            if (last.key == group.last) last.offset + last.size
-                            else maxOf(last.offset + last.size, info.viewportEndOffset + edge)
-                        (top - info.viewportStartOffset) to (bottom - top)
-                    }
+                scroll.layoutInfo.visibleItemsInfo
+                    .mapNotNull { it.contentType as? SourceGroup }
+                    .distinct()
             }
         }
     Box(modifier.clipToBounds()) {
-        panels.forEach { (top, height) ->
-            Box(
-                Modifier.offset { IntOffset(0, top) }
-                    .fillMaxWidth()
-                    .wrapContentHeight(Alignment.Top, unbounded = true)
-                    .height(with(density) { height.toDp() })
-                    .liquidGlass(22.dp)
-            )
+        groups.forEach { group ->
+            key(group) {
+                Box(
+                    Modifier.layout { measurable, constraints ->
+                            // Scroll offsets belong to layout; composition only tracks which
+                            // groups are visible, rather than rerunning for every pixel.
+                            val info = scroll.layoutInfo
+                            val rows = info.visibleItemsInfo
+                            val first = rows.firstOrNull { it.contentType == group }
+                            val last = rows.lastOrNull { it.contentType == group }
+                            val top =
+                                when {
+                                    first == null -> 0
+                                    first.key == group.first -> first.offset
+                                    else -> minOf(first.offset, info.viewportStartOffset - edge)
+                                }
+                            val bottom =
+                                when {
+                                    last == null -> top
+                                    last.key == group.last -> last.offset + last.size
+                                    else ->
+                                        maxOf(
+                                            last.offset + last.size,
+                                            info.viewportEndOffset + edge,
+                                        )
+                                }
+                            val height = (bottom - top).coerceAtLeast(0)
+                            val panel =
+                                measurable.measure(
+                                    constraints.copy(minHeight = height, maxHeight = height)
+                                )
+                            layout(panel.width, 0) {
+                                panel.place(0, top - info.viewportStartOffset)
+                            }
+                        }
+                        .fillMaxWidth()
+                        .liquidGlass(22.dp)
+                )
+            }
         }
         LazyColumn(
             state = scroll,
@@ -247,10 +266,7 @@ fun SourceSelectionPanel(
         remember(library.sources, search) {
             library.sources.filter { it.displayTitle.contains(search, ignoreCase = true) }
         }
-    val counts =
-        remember(library.tracks) {
-            library.tracks.filter { it.profileUserId == 0L }.groupingBy { it.chatId }.eachCount()
-        }
+    val counts = library.sourceCounts
     val showSelf =
         self != null &&
             (search.isEmpty() ||

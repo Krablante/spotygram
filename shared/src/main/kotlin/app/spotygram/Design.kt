@@ -109,6 +109,8 @@ private val Light =
 val LocalGlassState = staticCompositionLocalOf<HazeState?> { null }
 val LocalGlassSourceSelection =
     staticCompositionLocalOf<HazeSourceSelection> { HazeSourceSelection.Behind }
+@OptIn(ExperimentalHazeApi::class)
+internal val GlassEnvironmentSources = HazeSourceSelection.Behind.where { it.zIndex == 0f }
 val LocalDockInset = staticCompositionLocalOf { 0.dp }
 
 @OptIn(ExperimentalHazeApi::class)
@@ -157,10 +159,11 @@ fun Modifier.liquidGlass(
     strong: Boolean = false,
     tint: Color = Color.Transparent,
     interaction: MutableInteractionSource? = null,
+    sourceSelection: HazeSourceSelection? = null,
 ): Modifier {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val state = LocalGlassState.current
-    val selection = LocalGlassSourceSelection.current
+    val selection = sourceSelection ?: LocalGlassSourceSelection.current
     val background = MaterialTheme.colorScheme.background
     val shape = RoundedCornerShape(radius)
     val fullOptics = LocalApp.current.platform.fullOptics

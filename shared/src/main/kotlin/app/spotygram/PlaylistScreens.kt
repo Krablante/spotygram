@@ -59,7 +59,7 @@ private fun PlaylistCover(playlist: Playlist, library: LibraryState) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, dev.chrisbanes.haze.ExperimentalHazeApi::class)
 @Composable
 fun PlaylistsScreen(
     library: LibraryState,
@@ -82,12 +82,14 @@ fun PlaylistsScreen(
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            GlassIconButton(onClick = onCreate, tint = spectrumAccent(2)) {
-                Icon(
-                    Icons.Rounded.Add,
-                    tr(R.string.new_playlist),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+            CompositionLocalProvider(LocalGlassSourceSelection provides GlassEnvironmentSources) {
+                GlassIconButton(onClick = onCreate, tint = spectrumAccent(2)) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        tr(R.string.new_playlist),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
         if (library.playlists.isNotEmpty())
@@ -153,7 +155,11 @@ fun PlaylistsScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalLayoutApi::class,
+    ExperimentalFoundationApi::class,
+    dev.chrisbanes.haze.ExperimentalHazeApi::class,
+)
 @Composable
 fun PlaylistEditor(
     app: SpotygramApp,
@@ -227,7 +233,7 @@ fun PlaylistEditor(
                             modifier =
                                 Modifier.fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 6.dp)
-                                    .liquidGlass(24.dp),
+                                    .liquidGlass(24.dp, sourceSelection = GlassEnvironmentSources),
                             colors = glassFieldColors(),
                         )
                     }

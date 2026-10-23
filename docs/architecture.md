@@ -33,7 +33,7 @@ For tool versions, credentials, packaging and publishing, use the [build guide](
 | --- | --- | --- |
 | `shared/` | Screens, resources, catalog, Telegram requests, queue and cache rules | Small `Platform`, `TdClient` and `Player` contracts |
 | `app/` | Android lifecycle, file picker, Keystore, SQLite, services, Media3 and APK installation | Shared application source and Android APIs |
-| `desktop/` | Window/tray, activation, OS key stores, SQLite JDBC, libmpv, media controls and archive installation | Shared application source and JVM/native libraries |
+| `desktop/` | Window/tray, wheel input, activation, OS key stores, SQLite JDBC, libmpv, media controls and archive installation | Shared application source and JVM/native libraries |
 | `tools/` | Native Android build, pinned desktop dependencies, application images and signed archives | Build state outside source |
 
 `shared/` is a source directory, not another Gradle module or separately published
@@ -136,6 +136,9 @@ results. IDs are unique in the merged view; secret chats stay excluded. Native
 directory events coalesce over 200 ms. Picker work stops with its visible lifecycle;
 errors wait for refresh, reconnection or a new query rather than retrying in a loop.
 Only events used by the music catalog enter the application's update queue.
+The picker merges and sorts directory results on cancellable Default-dispatcher
+work. Its case-insensitive comparator does not allocate lowercase titles for
+every comparison.
 
 `ChatPhotos` retains photo metadata only for requested chats. Visible rows request
 the small JPEG through `getChat` and reuse TDLib's file cache; chat-photo events
@@ -147,7 +150,7 @@ and add no catalog schema or library-sync fields.
 
 `Library.reload` reads the entire visible catalog and all playlist membership in
 five queries, regardless of the number of playlists. ID lookup, local-file groups,
-source/playlist counts and enabled duplicate grouping are prepared on IO before
+source/playlist counts, local storage totals and enabled duplicate grouping are prepared on IO before
 publishing a changed snapshot. Chat-thumbnail writes and their file-resolution changes
 coalesce over 250 ms before publishing; loading each visible cover does not require
 another full catalog read. Missing paths are checked once per distinct path/size pair.
@@ -404,17 +407,46 @@ pages use a centered, height-bounded popup rather than a sliding bottom sheet.
 Their headers stay outside scrolling content, with Close and subpage Back controls.
 Escape follows Back navigation; outside clicks close the panel. Narrow settings
 retain sheet gestures.
+An open panel keeps its popup/sheet presentation while the window resizes, with
+its bounds still adapting. A fresh opening chooses the current width. The source
+chooser follows the same rule. This avoids disposing a popup scene during the
+layout pass that is still measuring it.
+Settings retains one viewport ahead and behind its visible groups. Returning to
+a nearby section reuses its composed controls, while memory stays bounded by the
+panel size. Download and sync observations belong to their own settings rows;
+progress does not recompose the whole form. Storage counts come from the prepared
+catalog snapshot rather than scanning recordings as the row enters the viewport.
 Switch and tab-lens animation offsets are read
 during placement, avoiding recomposition for each animation frame.
 Music and playlist browsing use Compose's bounded cache window: half a viewport
 ahead and a quarter behind. Upcoming rows can be prepared between frames without
 retaining the whole library's UI. Menu anchors resolve their window bounds on click,
 instead of recalculating them for every row during scrolling.
+Music's controls above the list, the library header and the wide navigation rail
+sample only the environment. They do not subscribe to the moving list below or
+beside them. The mini-player, overlays and menus retain their content reflections.
+Search fields, playlist name entry and the playlist creation button use the same
+stationary environment selection.
+On Windows and Linux, one desktop input adapter joins discrete wheel notches with
+a critically damped spring on Compose's frame clock. A new notch extends the
+target while retaining velocity; it does not start another short linear segment.
+Per-frame displacement is bounded so a delayed frame does not make a lazy list
+compose several viewports at once; the remaining distance carries forward.
+The same input reaches ordinary lists, Settings, popups and dialogs through AWT.
+Fractional high-resolution events and native file dialogs pass through directly;
+macOS retains its platform input. Reduced motion and
+`-Dcompose.scrolling.smooth.enabled=false` disable wheel interpolation. Hiding the
+window, changing the pointer target or dismissing a surface cancels pending
+motion. The frame loop sleeps when no gesture is active; there is no input timer
+or background polling.
 The speed control opens an anchored glass panel from 600 dp and a draggable
 bottom sheet below that width. Explicit sheet close buttons and Back wait for
 the native dismissal animation. Only the seek bar/time labels and mini-player
 progress observe the playback clock; timers stop on pause and UI listeners detach
 when the window or activity is hidden.
+The full player's details and transport use one movable composition across its
+wide and narrow layouts. Resizing preserves open control menus and player
+observations; the movable content reads current callbacks and playback state.
 
 Track actions share one header and list. The profile button is centered beneath
 the artwork/title row with short To profile/Remove labels and a 48 dp minimum touch
@@ -424,8 +456,10 @@ menu anchored to the chosen track's three-dot button; narrower windows use the
 native bottom sheet. Both surfaces bound their height and scroll longer content.
 
 Sources uses lazy rows inside common glass panels. Each visible group draws one
-surface bounded to the viewport, including groups taller than the screen. The
-source chooser keeps search and management controls outside its scrolling list,
+surface bounded to the viewport, including groups taller than the screen. Visible
+group identities drive composition; panel offsets and heights are read during
+layout. Scrolling by a pixel does not recompose those panels. The source chooser
+keeps search and management controls outside its scrolling list,
 reveals the current choice and uses denser rows in wide-window popups. Its inner
 glass surfaces select the environment capture only, so library text cannot show
 through source names or the search field. Narrow widths use the existing native

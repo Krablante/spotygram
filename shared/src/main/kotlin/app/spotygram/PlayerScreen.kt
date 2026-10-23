@@ -48,6 +48,22 @@ fun PlayerScreen(
     val volumeInset = if (player?.supportsVolumeControl == true) 48.dp else 0.dp
     var menuCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var shareCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val controls: @Composable () -> Unit = {
+        PlayerDetails(track, onLike)
+        PlayerTransport(
+            track,
+            state,
+            player,
+            { onDownload() },
+            { onQueue() },
+            onSpeed,
+            onOrder,
+            onRepeat,
+        )
+    }
+    val latestControls by rememberUpdatedState(controls)
+    // Keep controls, observations and open menus alive when the responsive layout moves them.
+    val movableControls = remember { movableContentOf { latestControls() } }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val wide = maxWidth >= 600.dp && maxWidth > maxHeight
         val cover =
@@ -134,32 +150,12 @@ fun PlayerScreen(
                 }
                 if (wide)
                     Column(Modifier.weight(1f)) {
-                        PlayerDetails(track, onLike)
-                        PlayerTransport(
-                            track,
-                            state,
-                            player,
-                            { onDownload() },
-                            { onQueue() },
-                            onSpeed,
-                            onOrder,
-                            onRepeat,
-                        )
+                        movableControls()
                     }
             }
             if (!wide) {
                 Spacer(Modifier.height(20.dp))
-                PlayerDetails(track, onLike)
-                PlayerTransport(
-                    track,
-                    state,
-                    player,
-                    { onDownload() },
-                    { onQueue() },
-                    onSpeed,
-                    onOrder,
-                    onRepeat,
-                )
+                movableControls()
             }
             Spacer(Modifier.height(12.dp))
         }

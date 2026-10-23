@@ -254,10 +254,13 @@ class Library(private val platform: Platform) : AutoCloseable {
             if (snapshot != state.value) {
                 snapshot.byId
                 snapshot.localGroups
+                snapshot.localSize
                 snapshot.sourceCounts
                 snapshot.playlistCounts
-                if (platform.preferences("settings").getBoolean("hide_duplicates", true))
+                if (platform.preferences("settings").getBoolean("hide_duplicates", true)) {
                     snapshot.duplicates
+                    snapshot.localRecordingCount
+                }
                 state.value = snapshot
             }
         }

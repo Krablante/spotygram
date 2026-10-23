@@ -28,14 +28,17 @@ import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SourcesScreen(
@@ -597,14 +600,32 @@ fun ChatPicker(
             }
         }
     }
-    val chats =
-        remember(local, remote) {
-            (local + remote)
-                .distinctBy { it.id }
-                .sortedWith(
-                    compareBy<ChatChoice> { it.id != AppText.savedChatId }
-                        .thenBy { it.displayTitle.lowercase() }
-                )
+    val savedChatId = AppText.savedChatId
+    val chats by
+        produceState(
+            emptyList<ChatChoice>(),
+            local,
+            remote,
+            savedChatId,
+            LocalConfiguration.current.locales,
+        ) {
+            value =
+                withContext(Dispatchers.Default) {
+                    val seen = HashSet<Long>()
+                    val merged = ArrayList<ChatChoice>(local.size + remote.size)
+                    for (choices in listOf(local, remote)) {
+                        for (choice in choices) {
+                            ensureActive()
+                            if (seen.add(choice.id)) merged.add(choice)
+                        }
+                    }
+                    merged.sortWith(
+                        compareBy<ChatChoice> { it.id != savedChatId }
+                            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayTitle }
+                    )
+                    ensureActive()
+                    merged
+                }
         }
     val error = localError ?: loadError ?: searchError
     Column(
