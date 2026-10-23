@@ -6,6 +6,22 @@ This page records observed behavior and its limits. A build does not establish
 account access, physical sound or responsiveness on another computer. Temporary
 inspection code, timings and account data stay outside the checkout.
 
+## 0.27.1 — desktop Settings dismissal
+
+Settings still used a mobile bottom sheet in wide windows after 0.27.0. It had
+no Close button, and opening moved a large glass surface across the window.
+From 600 dp, Settings and its cache/sharing pages now use a stationary centered
+popup. Headers stay visible while the content scrolls; narrow screens retain
+the draggable sheet and gain the same Close control.
+
+Manual Linux/OpenGL interaction checked Close after scrolling to the bottom,
+Escape, outside clicks, cache/sharing navigation, an inner duration dialog and
+both themes at 1090 px. Twenty openings alternating Close/Escape/outside dismissal
+were confirmed by screen pixels. A 314 px window retained the bottom sheet,
+scrolling and fixed Close button. Screenshots checked the actual rendered panels.
+These checks establish those interactions; they do not establish a new physical
+Windows GPU measurement or a cold-start frame-time guarantee.
+
 ## 0.27.0 — playback controls and library responsiveness
 
 ### Desktop interface and resources

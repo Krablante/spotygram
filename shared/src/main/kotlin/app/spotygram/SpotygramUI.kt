@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -103,8 +104,9 @@ fun SpotygramUI(
     val keyboardVisible = imeVisible()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
     val trackPopup = LocalConfiguration.current.screenWidthDp >= 600
+    val settingsPage = sheet in setOf("settings", "sharingSettings", "cache")
     fun closeSheet() {
-        if (trackPopup && sheet in setOf("track", "share", "speed")) sheet = ""
+        if (trackPopup && (settingsPage || sheet in setOf("track", "share", "speed"))) sheet = ""
         else {
             val closingSheet = sheet
             scope.launch {
@@ -329,6 +331,62 @@ fun SpotygramUI(
             )
         }
     }
+    val settingsContent: @Composable () -> Unit = {
+        when (sheet) {
+            "settings" ->
+                SettingsSheet(
+                    app,
+                    library,
+                    auth.type == "authorizationStateReady",
+                    onConnect = {
+                        sheet = ""
+                        connect = true
+                        app.telegram.start()
+                    },
+                    onLogout = {
+                        sheet = ""
+                        confirmLogout = true
+                    },
+                    onImport = {
+                        sheet = ""
+                        onImport()
+                    },
+                    onLocal = {
+                        navigate(0)
+                        offline = true
+                        sheet = ""
+                    },
+                    onResume = {
+                        app.action {
+                            val ids = app.library.pending()
+                            if (ids.isEmpty()) app.notices.emit(tr(R.string.no_pending_downloads))
+                            else onDownload(ids)
+                        }
+                    },
+                    onCache = { sheet = "cache" },
+                    onSharing = { sheet = "sharingSettings" },
+                    onClose = ::closeSheet,
+                )
+            "sharingSettings" ->
+                SharingSettings(
+                    app,
+                    onBack = { sheet = "settings" },
+                    onClose = ::closeSheet,
+                )
+            "cache" ->
+                CacheScreen(
+                    app,
+                    auth.type == "authorizationStateReady",
+                    onBack = { sheet = "settings" },
+                    onConnect = {
+                        sheet = ""
+                        connect = true
+                        app.telegram.start()
+                    },
+                    onClose = ::closeSheet,
+                )
+        }
+    }
     BackHandler(
         enabled =
             sheet.isEmpty() &&
@@ -351,7 +409,9 @@ fun SpotygramUI(
             }
         }
     }
-    BackHandler(enabled = sheet.isNotEmpty()) { closeSheet() }
+    BackHandler(enabled = sheet.isNotEmpty()) {
+        if (sheet == "cache" || sheet == "sharingSettings") sheet = "settings" else closeSheet()
+    }
     CompositionLocalProvider(
         LocalGlassState provides glassState,
         LocalDockInset provides
@@ -823,6 +883,32 @@ fun SpotygramUI(
                             }
                     }
                 }
+                if (settingsPage && trackPopup) {
+                    Popup(
+                        alignment = Alignment.Center,
+                        onDismissRequest = ::closeSheet,
+                        properties = PopupProperties(focusable = true),
+                    ) {
+                        Column(
+                            Modifier.width(
+                                    (LocalConfiguration.current.screenWidthDp - 48)
+                                        .dp
+                                        .coerceAtMost(640.dp)
+                                )
+                                .heightIn(max = (LocalConfiguration.current.screenHeightDp - 48).dp)
+                                .onPreviewKeyEvent {
+                                    it.key == Key.Escape &&
+                                        it.type == KeyEventType.KeyDown &&
+                                        app.backActions.back()
+                                }
+                                .liquidGlass(30.dp, strong = true)
+                                .padding(vertical = 12.dp)
+                        ) {
+                            GlassSnackbarHost(snackbar)
+                            settingsContent()
+                        }
+                    }
+                }
                 if ((fullPlayer || editor || authVisible) && sheet.isEmpty())
                     Box(
                         Modifier.fillMaxSize().safeDrawingPadding().imePadding(),
@@ -864,7 +950,8 @@ fun SpotygramUI(
                 }
                 if (
                     sheet.isNotEmpty() &&
-                        !(sheet in listOf("track", "share", "speed") && trackPopup)
+                        !(trackPopup &&
+                            (settingsPage || sheet in listOf("track", "share", "speed")))
                 ) {
                     ModalBottomSheet(
                         onDismissRequest = { sheet = "" },
@@ -899,56 +986,10 @@ fun SpotygramUI(
                             ) {
                                 GlassSnackbarHost(snackbar)
                                 when (sheet) {
-                                    "settings" ->
-                                        SettingsSheet(
-                                            app,
-                                            library,
-                                            auth.type == "authorizationStateReady",
-                                            onConnect = {
-                                                sheet = ""
-                                                connect = true
-                                                app.telegram.start()
-                                            },
-                                            onLogout = {
-                                                sheet = ""
-                                                confirmLogout = true
-                                            },
-                                            onImport = {
-                                                sheet = ""
-                                                onImport()
-                                            },
-                                            onLocal = {
-                                                navigate(0)
-                                                offline = true
-                                                sheet = ""
-                                            },
-                                            onResume = {
-                                                app.action {
-                                                    val ids = app.library.pending()
-                                                    if (ids.isEmpty())
-                                                        app.notices.emit(
-                                                            tr(R.string.no_pending_downloads)
-                                                        )
-                                                    else onDownload(ids)
-                                                }
-                                            },
-                                            onCache = { sheet = "cache" },
-                                            onSharing = { sheet = "sharingSettings" },
-                                        )
-                                    "sharingSettings" ->
-                                        SharingSettings(app, onBack = { sheet = "settings" })
+                                    "settings",
+                                    "sharingSettings",
+                                    "cache" -> settingsContent()
                                     "share" -> shareContent(Modifier, null)
-                                    "cache" ->
-                                        CacheScreen(
-                                            app,
-                                            auth.type == "authorizationStateReady",
-                                            onBack = { sheet = "settings" },
-                                            onConnect = {
-                                                sheet = ""
-                                                connect = true
-                                                app.telegram.start()
-                                            },
-                                        )
                                     "chats" ->
                                         SourcePicker(
                                             app,

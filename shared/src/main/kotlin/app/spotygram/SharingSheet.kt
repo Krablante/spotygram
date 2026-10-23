@@ -221,6 +221,7 @@ fun SharingSheet(
             SharingSettings(
                 app,
                 onBack = { configuring = false },
+                onClose = onClose,
                 modifier = modifier.heightIn(max = height),
             )
         } else
@@ -609,77 +610,79 @@ fun SharingSheet(
 }
 
 @Composable
-fun SharingSettings(app: SpotygramApp, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun SharingSettings(
+    app: SpotygramApp,
+    onBack: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val defaults by app.sharing.defaults.collectAsStateWithLifecycle()
-    Column(
-        modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding()
-            .padding(horizontal = 20.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr(R.string.back))
-            }
-            Text(tr(R.string.share_settings), style = MaterialTheme.typography.titleLarge)
-        }
-        Text(
-            tr(R.string.share_default_help),
-            Modifier.fillMaxWidth().padding(vertical = 18.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        listOf(
-                Triple(
-                    R.string.share_keep_author,
-                    R.string.share_keep_author_help,
-                    defaults.author,
-                ),
-                Triple(
-                    R.string.share_keep_caption,
-                    R.string.share_keep_caption_help,
-                    defaults.caption,
-                ),
+    Column(modifier.fillMaxWidth()) {
+        SettingsHeader(R.string.share_settings, onClose, onBack)
+        Column(
+            Modifier.fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+        ) {
+            Text(
+                tr(R.string.share_default_help),
+                Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            .forEachIndexed { index, (label, help, checked) ->
-                Row(
-                    Modifier.fillMaxWidth()
-                        .toggleable(
-                            checked,
-                            role = Role.Switch,
-                            onValueChange = {
-                                if (index == 0) app.sharing.changeDefaults(author = it)
-                                else app.sharing.changeDefaults(caption = it)
-                            },
-                        )
-                        .padding(vertical = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(tr(label))
-                        Text(
-                            tr(help),
-                            Modifier.padding(top = 5.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+            listOf(
+                    Triple(
+                        R.string.share_keep_author,
+                        R.string.share_keep_author_help,
+                        defaults.author,
+                    ),
+                    Triple(
+                        R.string.share_keep_caption,
+                        R.string.share_keep_caption_help,
+                        defaults.caption,
+                    ),
+                )
+                .forEachIndexed { index, (label, help, checked) ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .toggleable(
+                                checked,
+                                role = Role.Switch,
+                                onValueChange = {
+                                    if (index == 0) app.sharing.changeDefaults(author = it)
+                                    else app.sharing.changeDefaults(caption = it)
+                                },
+                            )
+                            .padding(vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(tr(label))
+                            Text(
+                                tr(help),
+                                Modifier.padding(top = 5.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        GlassSwitch(checked, onCheckedChange = null)
                     }
-                    GlassSwitch(checked, onCheckedChange = null)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        Text(
-            tr(R.string.share_author_caption_rule),
-            Modifier.padding(vertical = 18.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            tr(R.string.share_channel_identity_help),
-            Modifier.padding(bottom = 20.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+            Text(
+                tr(R.string.share_author_caption_rule),
+                Modifier.padding(vertical = 18.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                tr(R.string.share_channel_identity_help),
+                Modifier.padding(bottom = 20.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

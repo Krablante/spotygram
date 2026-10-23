@@ -415,6 +415,12 @@ for other languages. **Settings → Language** offers English, Russian or the
 system language on every supported platform.
 Song and chat names are not translated.
 
+Open Settings with the gear. In wide windows it opens a centered panel: use
+the top-right Close button, Escape or a click outside to dismiss it. The header
+stays visible while scrolling. Back on a cache/sharing page returns to Settings;
+Escape does the same there. Narrow screens keep the draggable bottom sheet and
+also have a Close button.
+
 Choose light or dark appearance in Settings. Until then, the app follows your
 system. Switching appearance does not interrupt playback.
 

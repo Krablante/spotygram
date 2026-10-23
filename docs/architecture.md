@@ -399,7 +399,11 @@ Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with
 secondary touch targets. Sheet glass travels inside its native placement transform;
 keyboard layout changes preserve text-field identity and focus. Settings
 compose visible groups through a lazy list rather than building the entire form
-before the first animation frame. Switch and tab-lens animation offsets are read
+before the first animation frame. From 600 dp, Settings and its cache/sharing
+pages use a centered, height-bounded popup rather than a sliding bottom sheet.
+Their headers stay outside scrolling content, with Close and subpage Back controls;
+Escape and outside clicks dismiss the panel. Narrow settings retain sheet gestures.
+Switch and tab-lens animation offsets are read
 during placement, avoiding recomposition for each animation frame.
 Music and playlist browsing use Compose's bounded cache window: half a viewport
 ahead and a quarter behind. Upcoming rows can be prepared between frames without
