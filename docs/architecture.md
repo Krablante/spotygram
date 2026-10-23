@@ -146,16 +146,19 @@ closure cancels the jobs and clears native identities. Photos stay on each devic
 and add no catalog schema or library-sync fields.
 
 `Library.reload` reads the entire visible catalog and all playlist membership in
-five queries, regardless of the number of playlists. ID lookup and enabled duplicate
-grouping are prepared on IO before publishing a changed snapshot. Local-file groups
-are cached on demand. Shared-thumbnail aliases update in one transaction and one
-reload. Missing paths are checked once per distinct path/size pair.
+five queries, regardless of the number of playlists. ID lookup, local-file groups,
+source/playlist counts and enabled duplicate grouping are prepared on IO before
+publishing a changed snapshot. Chat-thumbnail writes and their file-resolution changes
+coalesce over 250 ms before publishing; loading each visible cover does not require
+another full catalog read. Missing paths are checked once per distinct path/size pair.
 
 The catalog still lives in memory: its storage cost is **O(tracks + memberships)**.
 Search/filtering scans metadata, sorting costs **O(n log n)**, and a reload reads the
 whole catalog. Lazy lists limit drawing, not catalog memory. This design fits the
 observed collection; it is not a claim of tested performance at hundreds of thousands
-of distinct recordings. See the [verification record](verification.md).
+of distinct recordings. Music search, filtering, duplicate selection and sorting,
+plus the playlist editor's search, run on cancellable Default-dispatcher work.
+Typing does not run a catalog scan in composition. See the [verification record](verification.md).
 
 Duplicate hiding is a reversible view over Music, Favorites and On device. A
 snapshot joins stable file keys, shared paths and exact normalized
@@ -164,7 +167,8 @@ Known duration and size are required for metadata matching. Filters run before
 choosing a retained local, temporary local or available remote representative.
 Group favorites and highlights include hidden aliases; Undo restores exact previous
 marks. Explicit playlists and queues keep their entries. Hidden physical copies
-still contribute to storage size.
+still contribute to storage size. Group favorite marks are cached per snapshot;
+choosing representatives uses one pass without building another list for each group.
 
 Imports create an app-owned copy. Copying checks cancellation between chunks;
 failed imports remove their staged audio and artwork. Once SQLite owns the entry,
@@ -379,13 +383,16 @@ remain, while the secondary detail pass is disabled. There is no row effect or a
 wallpaper. Desktop and Android 13+ use full optics; older Android uses denser tint,
 lighting and rim fallback. Compose/Haze follows the system reduced-motion policy.
 Static environment and rim gradients are cached until their size or theme changes.
-Dense, already diffused surfaces use Haze's Performance sampling profile; clear
-controls retain the default profile and the same optics.
-Windows uses Skiko's default Direct3D path, which performs drawing and presentation
-outside the UI event thread. A startup check selects ANGLE when no hardware
-DXGI adapter supports Direct3D 12; ANGLE was faster than software Direct3D in native
-measurements. The choice is made before creating a window. Explicit Skiko renderer
-overrides remain available; both paths use the same glass material.
+Glass uses Haze's Performance sampling profile: half-resolution input for its
+diffusion and refraction, with a sharp procedural rim. Lighting, dispersion, blur
+radius and refraction strength remain the same.
+Windows prefers hardware OpenGL to avoid Skiko 0.150.1's known first-draw Direct3D
+runtime-filter stall ([SKIKO-1179](https://youtrack.jetbrains.com/issue/SKIKO-1179)).
+A startup check selects ANGLE when no hardware DXGI adapter supports Direct3D 12;
+this retains the faster path for virtual/software adapters. The choice precedes
+window creation. Explicit Skiko renderer overrides remain available.
+Linux uses the installed OS's EGL, GL dispatch, GBM and DRM libraries, so Skiko
+and mpv share the display driver's graphics stack.
 
 At 840 dp, navigation becomes a side rail; wide players separate artwork and controls.
 Music lists are bounded to 720 dp. Narrow/increased-font toolbars use icons with 48 dp
@@ -394,6 +401,15 @@ keyboard layout changes preserve text-field identity and focus. Settings
 compose visible groups through a lazy list rather than building the entire form
 before the first animation frame. Switch and tab-lens animation offsets are read
 during placement, avoiding recomposition for each animation frame.
+Music and playlist browsing use Compose's bounded cache window: half a viewport
+ahead and a quarter behind. Upcoming rows can be prepared between frames without
+retaining the whole library's UI. Menu anchors resolve their window bounds on click,
+instead of recalculating them for every row during scrolling.
+The speed control opens an anchored glass panel from 600 dp and a draggable
+bottom sheet below that width. Explicit sheet close buttons and Back wait for
+the native dismissal animation. Only the seek bar/time labels and mini-player
+progress observe the playback clock; timers stop on pause and UI listeners detach
+when the window or activity is hidden.
 
 Track actions share one header and list. The profile button is centered beneath
 the artwork/title row with short To profile/Remove labels and a 48 dp minimum touch
@@ -416,6 +432,7 @@ components. Android reports network events; desktop TDLib handles reconnection.
 Desktop Wi-Fi detection runs only during explicit downloads. There is no idle network
 polling. The bundled Java runtime uses a 256 MiB heap limit; native audio, Telegram and
 graphics memory remain outside that limit.
+G1 targets 10 ms collection pauses; this is a latency target, not a frame-time guarantee.
 
 ## Update trust and installation
 

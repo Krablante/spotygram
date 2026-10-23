@@ -186,7 +186,7 @@ def installer(image, target, version, state, destination):
                     '--linux-deb-maintainer', 'gkrablante@gmail.com',
                     '--resource-dir', str(ROOT / 'desktop/packaging/linux'),
                     '--linux-package-deps',
-                    f'libc6 (>= {linux_glibc_requirement(image)}), libgl1, libegl1, libx11-6, xdg-utils']
+                    f'libc6 (>= {linux_glibc_requirement(image)}), libgl1, libegl1, libgbm1, libdrm2, libx11-6, xdg-utils']
     else:
         command += ['--mac-package-identifier', 'app.spotygram']
     marker.write_text(extension + '\n')

@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -53,6 +54,7 @@ class SpotygramApp(val platform: Platform) {
     private val thumbnails = ConcurrentHashMap<String, Int>()
     private val resolvedFiles = ConcurrentHashMap<String, Int>()
     private val artworkFiles = ConcurrentHashMap<Int, MutableSet<String>>()
+    private val artworkChanges = Channel<Unit>(Channel.CONFLATED)
     var player: Player? = null
     var playback: PlaybackQueue? = null
     var downloadService: Downloads? = null
@@ -127,6 +129,21 @@ class SpotygramApp(val platform: Platform) {
                 if (e is CancellationException) throw e
                 startupError.value = tr(R.string.library_open_failed)
                 throw e
+            }
+        }
+        scope.launch {
+            for (change in artworkChanges) {
+                delay(250)
+                while (artworkChanges.tryReceive().isSuccess) {
+                    /* One snapshot for this burst. */
+                }
+                try {
+                    awaitLibrary()
+                    library.reload()
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    notices.tryEmit(friendly(e))
+                }
             }
         }
         scope.launch {
@@ -247,7 +264,9 @@ class SpotygramApp(val platform: Platform) {
     }
         .also { preferencesSaving = it }
 
-    fun applyCloudPreferences(values: Map<String, Any>) {
+    suspend fun applyCloudPreferences(values: Map<String, Any>) {
+        if (values["hide_duplicates"] == true)
+            withContext(Dispatchers.Default) { library.state.value.duplicates }
         val edit = prefs.edit()
         for ((key, value) in values) {
             if (key !in LibrarySync.settings) continue
@@ -608,9 +627,10 @@ class SpotygramApp(val platform: Platform) {
                 val id = update.getInt("id")
                 val path = update.getString("path")
                 val artwork = artworkFiles.remove(id)
-                if (artwork != null) library.art(artwork, path)
-                else if (library.state.value.tracks.any { it.fileId == id }) {
-                    library.file(id, path)
+                if (artwork != null) {
+                    library.art(artwork, path)
+                    artworkChanges.trySend(Unit)
+                } else if (library.file(id, path)) {
                     listeningCache.signal()
                     withContext(Dispatchers.IO) {
                         val tracks =
@@ -674,7 +694,7 @@ class SpotygramApp(val platform: Platform) {
         }
     }
 
-    suspend fun resolve(track: Track): Int {
+    suspend fun resolve(track: Track, publish: Boolean = true): Int {
         if (track.imported) return 0
         resolvedFiles[track.id]?.let {
             return it
@@ -686,7 +706,7 @@ class SpotygramApp(val platform: Platform) {
             )
         val parsed = parseTrack(response, track.source) ?: error(tr(R.string.message_audio_missing))
         library.upsert(listOf(parsed))
-        library.reload()
+        if (publish) library.reload() else artworkChanges.trySend(Unit)
         return parsed.fileId
     }
 
@@ -699,11 +719,13 @@ class SpotygramApp(val platform: Platform) {
         )
             return@withPermit
         try {
-            if (!thumbnails.containsKey(track.id)) resolve(track)
+            if (!thumbnails.containsKey(track.id)) resolve(track, publish = false)
             val id = thumbnails[track.id]?.takeIf { it != 0 } ?: return@withPermit
             val complete = telegram.files[id]?.takeIf { it.complete }
-            if (complete != null) library.art(track.id, complete.path)
-            else {
+            if (complete != null) {
+                library.art(listOf(track.id), complete.path)
+                artworkChanges.trySend(Unit)
+            } else {
                 artworkFiles.getOrPut(id) { ConcurrentHashMap.newKeySet() }.add(track.id)
                 telegram.download(id, priority = 1)
                 withTimeout(15_000) {

@@ -15,6 +15,9 @@ import zipfile
 TD_VERSION = "0.1008067.0"
 MPV_RELEASE = "20260906162952"
 ROOT = Path(__file__).resolve().parent.parent
+# The display driver and its dispatch table must come from the same OS installation.
+# Loading mpv's private GL dispatch before Skiko creates two incompatible GLX contexts.
+SYSTEM_GRAPHICS = {"libEGL.so.1", "libGLdispatch.so.0", "libgbm.so.1", "libdrm.so.2"}
 TARGETS = {
     "linux-x64": (
         "linux-x64-glibc",
@@ -92,7 +95,7 @@ def prepare(target, state):
         raise RuntimeError("Build state must be outside the source checkout")
     package, td_integrity, mpv_name, mpv_sha = TARGETS[target]
     destination = state / "desktop" / "deps" / target
-    identity = json.dumps([TD_VERSION, td_integrity, mpv_name, mpv_sha])
+    identity = json.dumps([TD_VERSION, td_integrity, mpv_name, mpv_sha, sorted(SYSTEM_GRAPHICS)])
     marker = destination / ".complete"
     if marker.is_file() and marker.read_text() == identity:
         print(destination)
@@ -124,6 +127,8 @@ def prepare(target, state):
         "libtdjson.dylib" if target.startswith("macos") else "libtdjson.so")
     shutil.copy2(td_binary, destination / td_output)
     for path in (staging / "mpv").rglob("*"):
+        if target.startswith("linux") and path.name in SYSTEM_GRAPHICS:
+            continue
         if path.is_file() and (".so" in path.name or path.name.endswith((".dll", ".dylib"))):
             output = destination / path.name
             if path.is_symlink():

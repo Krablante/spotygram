@@ -5,7 +5,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlin.math.roundToInt
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 const val MIN_PLAYBACK_SPEED = 0.3f
 const val MAX_PLAYBACK_SPEED = 4f
@@ -39,7 +41,7 @@ data class Playing(
 fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
     var state by remember(player) { mutableStateOf(Playing()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(player) {
+    LaunchedEffect(player, lifecycle, positionUpdates) {
         fun snapshot() {
             if (player == null) {
                 state = Playing()
@@ -50,7 +52,7 @@ fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
                     player.currentMediaItem?.mediaId.orEmpty(),
                     player.isPlaying,
                     player.playbackState == Player.STATE_BUFFERING,
-                    player.currentPosition.coerceAtLeast(0),
+                    if (positionUpdates) player.currentPosition.coerceAtLeast(0) else 0,
                     player.duration.coerceAtLeast(0),
                     if (player.shuffleModeEnabled) PlaybackOrder.SHUFFLE else PlaybackOrder.ORDERED,
                     player.repeatMode,
@@ -62,21 +64,26 @@ fun observePlayer(player: Player?, positionUpdates: Boolean = false): Playing {
             object : Player.Listener {
                 override fun onEvents(player: Player, events: Player.Events) = snapshot()
             }
-        player?.addListener(listener)
-        snapshot()
-        onDispose { player?.removeListener(listener) }
-    }
-    LaunchedEffect(player, lifecycle, positionUpdates) {
-        if (!positionUpdates) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                delay(500)
-                if (player != null)
-                    state =
-                        state.copy(
-                            position = player.currentPosition.coerceAtLeast(0),
-                            duration = player.duration.coerceAtLeast(0),
-                        )
+            player?.addListener(listener)
+            snapshot()
+            try {
+                if (!positionUpdates) awaitCancellation()
+                snapshotFlow { state.playing || state.loading }
+                    .collectLatest { active ->
+                        if (active)
+                            while (true) {
+                                delay(500)
+                                if (player != null)
+                                    state =
+                                        state.copy(
+                                            position = player.currentPosition.coerceAtLeast(0),
+                                            duration = player.duration.coerceAtLeast(0),
+                                        )
+                            }
+                    }
+            } finally {
+                player?.removeListener(listener)
             }
         }
     }

@@ -222,8 +222,8 @@ fun Modifier.liquidGlass(
             Modifier.hazeGlass(
                 HazeInput.Sources(state, selection = selection),
                 style,
-                performanceMode =
-                    if (strong) HazePerformanceMode.Performance else HazePerformanceMode.Default,
+                // Diffused input tolerates half-resolution sampling; the optical rim stays sharp.
+                performanceMode = HazePerformanceMode.Performance,
                 interactionSource = interaction,
             )
         else Modifier.background(background.copy(alpha = 0.72f), shape)

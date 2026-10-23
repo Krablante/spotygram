@@ -253,6 +253,9 @@ class Library(private val platform: Platform) : AutoCloseable {
             val snapshot = LibraryState(tracks, sources, lists, profiles)
             if (snapshot != state.value) {
                 snapshot.byId
+                snapshot.localGroups
+                snapshot.sourceCounts
+                snapshot.playlistCounts
                 if (platform.preferences("settings").getBoolean("hide_duplicates", true))
                     snapshot.duplicates
                 state.value = snapshot
@@ -577,21 +580,22 @@ class Library(private val platform: Platform) : AutoCloseable {
 
     suspend fun file(fileId: Int, path: String) =
         withContext(Dispatchers.IO) {
-            if (fileId <= 0) return@withContext
+            if (fileId <= 0) return@withContext false
             val copy = File(path)
             val size = copy.length()
-            if (!copy.isFile || size <= 0) return@withContext
-            writableDatabase.update(
-                "tracks",
-                Values().apply { put("path", path) },
-                "file=? AND (size=0 OR size=?)",
-                arrayOf(fileId.toString(), size.toString()),
-            )
-            reload()
+            if (!copy.isFile || size <= 0) return@withContext false
+            val changed =
+                writableDatabase.update(
+                    "tracks",
+                    Values().apply { put("path", path) },
+                    "file=? AND (size=0 OR size=?)",
+                    arrayOf(fileId.toString(), size.toString()),
+                )
+            if (changed > 0) reload()
+            changed > 0
         }
 
-    suspend fun art(id: String, path: String) = art(listOf(id), path)
-
+    // Thumbnail bursts are published together by SpotygramApp, after the writes settle.
     suspend fun art(ids: Collection<String>, path: String) =
         withContext(Dispatchers.IO) {
             writableDatabase.transaction {
@@ -603,7 +607,6 @@ class Library(private val platform: Platform) : AutoCloseable {
                     }
                 }
             }
-            reload()
         }
 
     suspend fun unavailable(chat: Long, messages: List<Long>) =

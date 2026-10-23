@@ -81,6 +81,13 @@ There is no native source compilation or Node.js runtime. Keep `SPOTYGRAM_STATE`
 outside the checkout and use the same `telegram.env`, or supply `TELEGRAM_API_ID`
 and `TELEGRAM_API_HASH` as environment variables.
 
+Linux uses the host's OpenGL/EGL, GBM and DRM libraries. They belong to the display
+driver installation and are not bundled with mpv; the DEB declares their packages.
+For renderer diagnosis, `SKIKO_RENDER_API` accepts `OPENGL`, `ANGLE` or `DIRECT3D`
+on Windows. Without an override, a D3D12-capable hardware adapter uses OpenGL;
+other adapters use ANGLE. See the [architecture guide](architecture.md#visual-system-and-idle-work)
+for the upstream Direct3D limitation.
+
 ```sh
 python3 tools/build-desktop.py --image-only
 ```

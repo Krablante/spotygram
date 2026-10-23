@@ -51,10 +51,7 @@ fun SourcesScreen(
     onRefresh: () -> Unit,
 ) {
     var removing by remember { mutableStateOf<Source?>(null) }
-    val counts =
-        remember(library.tracks) {
-            library.tracks.filter { it.profileUserId == 0L }.groupingBy { it.chatId }.eachCount()
-        }
+    val counts = library.sourceCounts
     val selfId by app.profiles.selfId.collectAsStateWithLifecycle()
     val loading by app.profiles.loading.collectAsStateWithLifecycle()
     val errors by app.profiles.errors.collectAsStateWithLifecycle()

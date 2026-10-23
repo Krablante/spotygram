@@ -87,7 +87,7 @@ fun SpotygramUI(
     var offline by rememberSaveable { mutableStateOf(false) }
     var editor by rememberSaveable { mutableStateOf(false) }
     var addingTo by rememberSaveable { mutableStateOf<Long?>(null) }
-    var playlistTracks by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    var playlistTracks by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectionReset by rememberSaveable { mutableIntStateOf(0) }
     var managedPlaylist by remember { mutableStateOf<Playlist?>(null) }
     var rename by remember { mutableStateOf(false) }
@@ -97,11 +97,22 @@ fun SpotygramUI(
     var deletingImportId by remember { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val modalState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
     val focus = LocalFocusManager.current
     val keyboardVisible = imeVisible()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
     val trackPopup = LocalConfiguration.current.screenWidthDp >= 600
+    fun closeSheet() {
+        if (trackPopup && sheet in setOf("track", "share", "speed")) sheet = ""
+        else {
+            val closingSheet = sheet
+            scope.launch {
+                modalState.hide()
+                if (!modalState.isVisible && sheet == closingSheet) sheet = ""
+            }
+        }
+    }
     val pages = rememberSaveableStateHolder()
     val glassState = rememberHazeState()
     val playlist = library.playlists.firstOrNull { it.id == playlistId }
@@ -199,7 +210,7 @@ fun SpotygramUI(
         onStartPlayback(available, index, null)
     }
     fun addToPlaylist(ids: List<String>) {
-        playlistTracks = ArrayList(ids)
+        playlistTracks = ids
         sheet = "addPlaylist"
     }
     fun editPlaylist(id: Long? = null) {
@@ -251,7 +262,7 @@ fun SpotygramUI(
                 SharingSheet(
                     app,
                     track,
-                    onClose = { sheet = "" },
+                    onClose = ::closeSheet,
                     onSent = { recipient, message ->
                         if (sheet == "share" && selectedTrackId == track.id) sheet = ""
                         snackbar.currentSnackbarData?.dismiss()
@@ -313,7 +324,7 @@ fun SpotygramUI(
                     profileChanged(track, it)
                     sheet = ""
                 },
-                onClose = { sheet = "" },
+                onClose = ::closeSheet,
                 modifier = modifier,
             )
         }
@@ -340,7 +351,7 @@ fun SpotygramUI(
             }
         }
     }
-    BackHandler(enabled = sheet.isNotEmpty()) { sheet = "" }
+    BackHandler(enabled = sheet.isNotEmpty()) { closeSheet() }
     CompositionLocalProvider(
         LocalGlassState provides glassState,
         LocalDockInset provides
@@ -426,7 +437,10 @@ fun SpotygramUI(
                             onLike = { like(current) },
                             onDownload = { onDownload(listOf(current.id)) },
                             onQueue = { sheet = "queue" },
-                            onSpeed = { sheet = "speed" },
+                            onSpeed = { anchor ->
+                                trackAnchor = anchor
+                                sheet = "speed"
+                            },
                             onOrder = { app.changePlaybackOrder(it) },
                             onRepeat = { app.playback?.setMode(repeat = it) },
                         )
@@ -816,7 +830,7 @@ fun SpotygramUI(
                     ) {
                         GlassSnackbarHost(snackbar)
                     }
-                if (sheet in listOf("track", "share") && trackPopup) {
+                if (sheet in listOf("track", "share", "speed") && trackPopup) {
                     val density = LocalDensity.current
                     val margin = with(density) { 8.dp.roundToPx() }
                     Popup(
@@ -837,7 +851,9 @@ fun SpotygramUI(
                                 .liquidGlass(24.dp, strong = true)
                                 .padding(vertical = 8.dp)
                         ) {
-                            if (sheet == "share")
+                            if (sheet == "speed")
+                                PlaybackSpeedSheet(playing, player, onClose = ::closeSheet)
+                            else if (sheet == "share")
                                 shareContent(
                                     Modifier,
                                     (LocalConfiguration.current.screenHeightDp - 64).dp,
@@ -846,10 +862,13 @@ fun SpotygramUI(
                         }
                     }
                 }
-                if (sheet.isNotEmpty() && !(sheet in listOf("track", "share") && trackPopup)) {
+                if (
+                    sheet.isNotEmpty() &&
+                        !(sheet in listOf("track", "share", "speed") && trackPopup)
+                ) {
                     ModalBottomSheet(
                         onDismissRequest = { sheet = "" },
-                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        sheetState = modalState,
                         containerColor = Color.Transparent,
                         dragHandle = null,
                     ) {
@@ -952,7 +971,7 @@ fun SpotygramUI(
                                                     sheet = ""
                                                     navigate(3)
                                                 },
-                                                onClose = { sheet = "" },
+                                                onClose = ::closeSheet,
                                             )
                                         }
                                     "queue" -> QueueSheet(library, playing, app)
@@ -960,7 +979,7 @@ fun SpotygramUI(
                                         PlaybackSpeedSheet(
                                             playing,
                                             player,
-                                            onClose = { sheet = "" },
+                                            onClose = ::closeSheet,
                                         )
                                     "playbackOrder" ->
                                         Column(
@@ -1222,7 +1241,7 @@ private fun MiniPlayer(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
-    val state = observePlayer(player, positionUpdates = true)
+    val state = observePlayer(player)
     val narrow = LocalConfiguration.current.screenWidthDp < 360
     val controlSize =
         if (player?.supportsVolumeControl == true && LocalConfiguration.current.screenWidthDp < 480)
@@ -1290,13 +1309,19 @@ private fun MiniPlayer(
             if (player?.supportsVolumeControl == true)
                 PlaybackVolumeButton(player, state, controlSize)
         }
-        LinearProgressIndicator(
-            progress = {
-                if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f)
-                else 0f
-            },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(2.dp),
-            trackColor = Color.Transparent,
-        )
+        MiniPlayerProgress(player)
     }
+}
+
+@Composable
+private fun MiniPlayerProgress(player: Player?) {
+    val state = observePlayer(player, positionUpdates = true)
+    LinearProgressIndicator(
+        progress = {
+            if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f)
+            else 0f
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(2.dp),
+        trackColor = Color.Transparent,
+    )
 }

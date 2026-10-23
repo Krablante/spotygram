@@ -244,6 +244,8 @@ random is already endless. Reopening the app restores the queue and position
 without starting playback automatically.
 
 Tap the round speed button between **Download** and **Queue** in the full player.
+Wide windows open a compact panel beside the button. Narrow screens use a bottom
+sheet that you can drag down to dismiss.
 The slider covers **0.3×–4×**; **− / +** adjust by 0.05×. Quick choices are
 0.5×, 1×, 1.5×, 2× and 3×. Changes apply immediately without a confirmation
 button; close the panel with its cross, Back or a tap outside it.
@@ -253,6 +255,8 @@ including after an app restart. **1×** restores normal speed. The button gains
 a subtle accent and the mini-player shows the value whenever speed differs from 1×.
 
 <img src="screenshots/speed-light.png" width="300" alt="Playback speed panel with slider and quick choices">
+
+<img src="screenshots/speed-desktop-dark.png" width="900" alt="The compact desktop speed panel anchored to its player button">
 
 On desktop, the full player has a **0–100% volume slider** below Download, speed
 and Queue. The speaker button after Next in the mini-player opens the same slider

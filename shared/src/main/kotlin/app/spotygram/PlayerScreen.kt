@@ -16,7 +16,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -40,15 +40,14 @@ fun PlayerScreen(
     onLike: () -> Unit,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
-    onSpeed: () -> Unit,
+    onSpeed: (IntRect) -> Unit,
     onOrder: (PlaybackOrder) -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
-    val progress = observePlayer(player, positionUpdates = true)
     val largeText = LocalConfiguration.current.fontScale > 1.2f
     val volumeInset = if (player?.supportsVolumeControl == true) 48.dp else 0.dp
-    var menuAnchor by remember { mutableStateOf(IntRect.Zero) }
-    var shareAnchor by remember { mutableStateOf(IntRect.Zero) }
+    var menuCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var shareCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val wide = maxWidth >= 600.dp && maxWidth > maxHeight
         val cover =
@@ -106,36 +105,16 @@ fun PlayerScreen(
                 }
                 if (onShare != null) {
                     GlassIconButton(
-                        onClick = { onShare(shareAnchor) },
-                        modifier =
-                            Modifier.onGloballyPositioned {
-                                val b = it.boundsInWindow()
-                                shareAnchor =
-                                    IntRect(
-                                        b.left.toInt(),
-                                        b.top.toInt(),
-                                        b.right.toInt(),
-                                        b.bottom.toInt(),
-                                    )
-                            },
+                        onClick = { onShare(shareCoordinates.popupBounds()) },
+                        modifier = Modifier.onGloballyPositioned { shareCoordinates = it },
                     ) {
                         Icon(Icons.Rounded.IosShare, tr(R.string.share_audio))
                     }
                     Spacer(Modifier.width(8.dp))
                 }
                 GlassIconButton(
-                    onClick = { onMore(menuAnchor) },
-                    modifier =
-                        Modifier.onGloballyPositioned {
-                            val b = it.boundsInWindow()
-                            menuAnchor =
-                                IntRect(
-                                    b.left.toInt(),
-                                    b.top.toInt(),
-                                    b.right.toInt(),
-                                    b.bottom.toInt(),
-                                )
-                        },
+                    onClick = { onMore(menuCoordinates.popupBounds()) },
+                    modifier = Modifier.onGloballyPositioned { menuCoordinates = it },
                 ) {
                     Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions))
                 }
@@ -159,7 +138,6 @@ fun PlayerScreen(
                         PlayerTransport(
                             track,
                             state,
-                            progress,
                             player,
                             { onDownload() },
                             { onQueue() },
@@ -175,7 +153,6 @@ fun PlayerScreen(
                 PlayerTransport(
                     track,
                     state,
-                    progress,
                     player,
                     { onDownload() },
                     { onQueue() },
@@ -228,64 +205,17 @@ private fun PlayerDetails(track: Track, onLike: () -> Unit) {
 private fun PlayerTransport(
     track: Track,
     state: Playing,
-    progress: Playing,
     player: Player?,
     onDownload: () -> Unit,
     onQueue: () -> Unit,
-    onSpeed: () -> Unit,
+    onSpeed: (IntRect) -> Unit,
     onOrder: (PlaybackOrder) -> Unit,
     onRepeat: (Int) -> Unit,
 ) {
-    var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
+    var speedCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Column(Modifier.fillMaxWidth()) {
         Spacer(Modifier.height(16.dp))
-        val duration = progress.duration.takeIf { it > 0 } ?: track.duration * 1000L
-        Slider(
-            value =
-                scrub
-                    ?: progress.position
-                        .toFloat()
-                        .coerceIn(0f, duration.toFloat().coerceAtLeast(1f)),
-            onValueChange = { scrub = it },
-            onValueChangeFinished = {
-                scrub?.let { player?.seekTo(it.toLong()) }
-                scrub = null
-            },
-            valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
-            enabled = duration > 0,
-            thumb = {
-                Box(Modifier.size(12.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
-            },
-            track = { slider ->
-                val fraction =
-                    (slider.value / duration.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
-                Box(
-                    Modifier.fillMaxWidth()
-                        .height(4.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Box(
-                        Modifier.fillMaxWidth(fraction)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                seconds((scrub?.toLong() ?: progress.position) / 1000),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                seconds(duration / 1000),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        PlayerProgress(track, player)
         Row(
             Modifier.fillMaxWidth()
                 .padding(vertical = 12.dp)
@@ -297,7 +227,7 @@ private fun PlayerTransport(
             PlaybackOrderControl(state.order, onOrder)
             IconButton(
                 onClick = {
-                    if (progress.position > 3000) player?.seekTo(0)
+                    if ((player?.currentPosition ?: 0) > 3000) player?.seekTo(0)
                     else player?.seekToPreviousMediaItem()
                 }
             ) {
@@ -393,12 +323,13 @@ private fun PlayerTransport(
                         )
                 }
                 GlassIconButton(
-                    onClick = onSpeed,
+                    onClick = { onSpeed(speedCoordinates.popupBounds()) },
                     modifier =
-                        Modifier.semantics {
-                            contentDescription = speedDescription
-                            stateDescription = speedLabel
-                        },
+                        Modifier.onGloballyPositioned { speedCoordinates = it }
+                            .semantics {
+                                contentDescription = speedDescription
+                                stateDescription = speedLabel
+                            },
                     size = if (largeText) 56.dp else 48.dp,
                     tint = if (state.speed != 1f) spectrumAccent(0) else Color.Transparent,
                     enabled =
@@ -437,6 +368,57 @@ private fun PlayerTransport(
                 state,
                 Modifier.align(Alignment.CenterHorizontally).widthIn(max = 280.dp).fillMaxWidth(),
             )
+    }
+}
+
+/** Only the seek bar and time labels observe the playback clock. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerProgress(track: Track, player: Player?) {
+    val progress = observePlayer(player, positionUpdates = true)
+    var scrub by remember(track.id) { mutableStateOf<Float?>(null) }
+    val duration = progress.duration.takeIf { it > 0 } ?: track.duration * 1000L
+    Slider(
+        value =
+            scrub ?: progress.position.toFloat().coerceIn(0f, duration.toFloat().coerceAtLeast(1f)),
+        onValueChange = { scrub = it },
+        onValueChangeFinished = {
+            scrub?.let { player?.seekTo(it.toLong()) }
+            scrub = null
+        },
+        valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+        enabled = duration > 0,
+        thumb = {
+            Box(Modifier.size(12.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+        },
+        track = { slider ->
+            val fraction = (slider.value / duration.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+            Box(
+                Modifier.fillMaxWidth()
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Box(
+                    Modifier.fillMaxWidth(fraction)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            seconds((scrub?.toLong() ?: progress.position) / 1000),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            seconds(duration / 1000),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

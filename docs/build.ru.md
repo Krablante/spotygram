@@ -102,6 +102,13 @@ Windows установи Inno Setup 6.4.3 или укажи его `ISCC.exe` в
 оставаться вне репозитория. Используй тот же `telegram.env` или переменные
 окружения `TELEGRAM_API_ID` и `TELEGRAM_API_HASH`.
 
+Linux использует системные OpenGL/EGL, GBM и DRM. Они относятся к установленному
+драйверу графики и не поставляются вместе с mpv; DEB объявляет нужные пакеты.
+Для диагностики рендерера `SKIKO_RENDER_API` на Windows принимает `OPENGL`, `ANGLE`
+или `DIRECT3D`. Без явного выбора аппаратный адаптер с D3D12 использует OpenGL,
+остальные адаптеры — ANGLE. Причина обхода Direct3D описана
+в [архитектуре](architecture.ru.md#визуальная-система-и-работа-в-покое).
+
 ```sh
 python3 tools/build-desktop.py --image-only
 ```

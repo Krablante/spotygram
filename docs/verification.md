@@ -6,6 +6,79 @@ This page records observed behavior and its limits. A build does not establish
 account access, physical sound or responsiveness on another computer. Temporary
 inspection code, timings and account data stay outside the checkout.
 
+## 0.27.0 — playback controls and library responsiveness
+
+### Desktop interface and resources
+
+Linux checks used OpenGL on the AMD Radeon 680M in a private Weston/Xwayland
+display, JDK 21 and a 256 MiB heap. Temporary instrumentation timed Skiko's
+recording and native draw/flush callbacks; screenshots checked the actual pixels.
+The speed-panel comparison used the same two logical CPU threads, catalog and
+native libraries in 0.26.0 and the changed app. Twenty repeated openings gave:
+
+| Native draw/flush callback | 0.26.0 | 0.27.0 |
+| --- | ---: | ---: |
+| Median | 18.78 ms | 3.77 ms |
+| P95 | 24.04 ms | 6.40 ms |
+
+The wide speed panel is now anchored to its button, so opening it also needs
+fewer animation frames. These are callback timings in a virtual display, not GPU
+timer queries, end-to-end input latency or a sustained-FPS guarantee. Cold JVM,
+Compose and shader initialization still produced multi-frame stalls; the warm
+figures do not describe a cold launch or prove performance on another GPU.
+
+A separate catalog held 10,001 recordings, 60 sources, 200 playlists and 20,000
+memberships. Manual interaction checked search, scrolling, a menu opened after
+scrolling, a favorite edit, Favorites and a 100-song playlist. The catalog passed
+SQLite integrity checking. The new G1 pause target retained the 256 MiB heap;
+65 recorded collections in that run had pauses from 0.64 to 30.58 ms. The 10 ms
+target is not a hard bound.
+
+Screenshots checked dark/light controls, the anchored speed panel, narrow player,
+bottom sheet and a frame during animated dismissal. Linux's original package
+crashed in `glGetString` after loading mpv's private GL dispatch. System GL dispatch
+avoided that crash; the changed package ran without the environment workaround
+after removing the bundled EGL/GL-dispatch/GBM/DRM copies.
+
+The Windows renderer choice follows the unresolved upstream
+[SKIKO-1179](https://youtrack.jetbrains.com/issue/SKIKO-1179), which reports a
+Direct3D first-filter stall in the same Skiko 0.150.1. That report establishes the
+backend issue on its reporter's hardware, not a measurement of Spotygram on a
+physical Windows GPU. macOS/Metal responsiveness was not measured here.
+
+### Android retention and controls
+
+Debug/release assembly and both Lint variants passed: zero errors and 53 warnings
+per variant. Both release ABIs passed 16 KiB ZIP alignment checks; the x86-64 APK
+passed v2 signature verification and matched 0.26.0's signing certificate.
+
+An existing Android 15 emulator updated from 0.26.0 (47) to 0.27.0 (48).
+All 16 saved application files matched byte-for-byte before first launch. After
+launch, all 12 SQLite tables matched the prior contents and integrity checking
+returned `ok`. The queue restored paused at 8,910 ms, also exposed by MediaSession.
+
+Manual interaction checked presets, 0.05 steps, speed-sheet drag and button
+dismissal, Settings scrolling, both themes and Russian controls at 320 dp with
+font scale 1.3. Local playback continued after Home; the system Pause command
+stopped it at 2,621 ms, and returning to the player showed that position. The
+crash buffer contained no AndroidRuntime exception from these flows. The emulator
+used host GPU rendering with audio output disabled. These checks do not establish
+physical-device FPS, battery use or physical sound.
+
+### Scope and remaining limits
+
+The audit covered shared screens and state publication, catalog costs, playback
+observation, platform adapters, native dependencies, packaging, update trust and
+the English/Russian guides. The existing shared/platform boundaries, release path
+and documentation language-suffix structure remain. No runtime dependency,
+service, idle poll or permanent diagnostic/test scaffold was added.
+
+No fresh authenticated Telegram exchange was established in this audit. Live
+transport, privacy and account evidence from earlier releases remains bounded
+by the observations below; the existing production verification session was
+preserved. Hardware Windows, macOS and physical Android responsiveness remain
+unverified.
+
 ## 0.26.0 — desktop motion and library reliability
 
 ### Desktop

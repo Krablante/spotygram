@@ -146,7 +146,7 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "app.spotygram.DesktopMainKt"
-        jvmArgs += listOf("-Xms32m", "-Xmx256m", "-XX:+UseG1GC")
+        jvmArgs += listOf("-Xms32m", "-Xmx256m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=10")
         nativeDistributions {
             packageName = "Spotygram"
             packageVersion = rootProject.version.toString()

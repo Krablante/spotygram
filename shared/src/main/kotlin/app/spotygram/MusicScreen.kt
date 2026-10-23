@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -43,8 +44,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class MusicView(
+    val tracks: List<Track> = emptyList(),
+    val ids: List<String> = emptyList(),
+    val keys: Set<String> = emptySet(),
+    val playable: Boolean = false,
+)
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MusicScreen(
     hideDuplicates: Boolean,
@@ -101,7 +112,7 @@ fun MusicScreen(
             ?: if (favorites) tr(R.string.favorites)
             else if (offline) tr(R.string.on_device) else tr(R.string.music)
     val haptic = LocalHapticFeedback.current
-    val scroll = rememberLazyListState()
+    val scroll = rememberLazyListState(cacheWindow = MusicListCacheWindow)
     val dockInset = LocalDockInset.current
     fun clearSelection() {
         selected = arrayListOf()
@@ -133,9 +144,10 @@ fun MusicScreen(
         remember(selected, library.tracks, offline, hideDuplicates) {
             selected.map(::selectionKey).toSet()
         }
-    val tracks =
-        remember(
-            library.tracks,
+    val view by
+        produceState(
+            MusicView(),
+            library,
             favorites,
             offline,
             source,
@@ -145,38 +157,49 @@ fun MusicScreen(
             hideDuplicates,
             profileFavorites,
         ) {
-            val positions = playlist?.tracks?.withIndex()?.associate { it.value to it.index }
-            val matching =
-                library.tracks.filter { track ->
-                    (!favorites || track.liked) &&
-                        (!offline || (track.local && !track.temporary)) &&
-                        (source != null ||
-                            favorites ||
-                            offline ||
-                            playlist != null ||
-                            track.inLibrary) &&
-                        (source == null || track.sourceKey == source.key) &&
-                        (profile == null || track.profilePosition >= 0) &&
-                        (positions == null || track.id in positions) &&
-                        (query.isBlank() ||
-                            "${track.title} ${track.artist} ${track.source}"
-                                .contains(query.trim(), ignoreCase = true))
+            value =
+                withContext(Dispatchers.Default) {
+                    val search = query.trim()
+                    val positions =
+                        playlist?.tracks?.withIndex()?.associate { it.value to it.index }
+                    val matching =
+                        library.tracks.filter { track ->
+                            ensureActive()
+                            (!favorites || track.liked) &&
+                                (!offline || (track.local && !track.temporary)) &&
+                                (source != null ||
+                                    favorites ||
+                                    offline ||
+                                    playlist != null ||
+                                    track.inLibrary) &&
+                                (source == null || track.sourceKey == source.key) &&
+                                (profile == null || track.profilePosition >= 0) &&
+                                (positions == null || track.id in positions) &&
+                                track.matches(search)
+                        }
+                    val local = if (offline) library.localView(matching) else matching
+                    val result =
+                        if (hideDuplicates) library.duplicates.view(local)
+                        else if (profile != null && profileFavorites)
+                            local.map(library.duplicates::display)
+                        else local
+                    val ordered =
+                        if (sort)
+                            result.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+                        else if (positions != null) result.sortedBy { positions[it.id] }
+                        else if (profile != null) result.sortedBy { it.profilePosition } else result
+                    MusicView(
+                        ordered,
+                        ordered.map { it.id },
+                        ordered.map { selectionKey(it.id) }.toSet(),
+                        ordered.any { it.local || it.available },
+                    )
                 }
-            val local = if (offline) library.localView(matching) else matching
-            val result =
-                if (hideDuplicates) library.duplicates.view(local)
-                else if (profile != null && profileFavorites) local.map(library.duplicates::display)
-                else local
-            if (sort) result.sortedBy { it.title.lowercase() }
-            else if (positions != null) result.sortedBy { positions[it.id] }
-            else if (profile != null) result.sortedBy { it.profilePosition } else result
         }
-    val visibleIds = remember(tracks) { tracks.map { it.id } }
-    val playable = remember(tracks) { tracks.any { it.local || it.available } }
-    val visibleKeys =
-        remember(tracks, library.tracks, offline, hideDuplicates) {
-            tracks.map { selectionKey(it.id) }.toSet()
-        }
+    val tracks = view.tracks
+    val visibleIds = view.ids
+    val playable = view.playable
+    val visibleKeys = view.keys
     val playingPath =
         if (offline) library.byId[playingId]?.path?.takeIf { it.isNotEmpty() } else null
     Column(Modifier.fillMaxSize()) {
@@ -791,7 +814,7 @@ fun TrackRow(
     onMore: ((IntRect) -> Unit)? = null,
 ) {
     val narrow = LocalConfiguration.current.screenWidthDp < 360
-    var menuAnchor by remember { mutableStateOf(IntRect.Zero) }
+    var menuCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Row(
         Modifier.fillMaxWidth()
             .background(
@@ -895,18 +918,8 @@ fun TrackRow(
             }
         if (selected == null && onMore != null)
             IconButton(
-                onClick = { onMore(menuAnchor) },
-                modifier =
-                    Modifier.onGloballyPositioned {
-                        val b = it.boundsInWindow()
-                        menuAnchor =
-                            IntRect(
-                                b.left.toInt(),
-                                b.top.toInt(),
-                                b.right.toInt(),
-                                b.bottom.toInt(),
-                            )
-                    },
+                onClick = { onMore(menuCoordinates.popupBounds()) },
+                modifier = Modifier.onGloballyPositioned { menuCoordinates = it },
             ) {
                 Icon(Icons.Rounded.MoreVert, tr(R.string.track_actions_named, track.title))
             }

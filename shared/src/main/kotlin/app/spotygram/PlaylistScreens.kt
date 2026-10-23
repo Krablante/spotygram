@@ -28,7 +28,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 @Composable
 private fun PlaylistCover(playlist: Playlist, library: LibraryState) {
@@ -90,7 +93,7 @@ fun PlaylistsScreen(
         if (library.playlists.isNotEmpty())
             MusicSearch(query, { query = it }, tr(R.string.find_playlist))
         LazyColumn(
-            state = rememberLazyListState(),
+            state = rememberLazyListState(cacheWindow = MusicListCacheWindow),
             modifier = Modifier.weight(1f).glassContent(),
             contentPadding = PaddingValues(top = 8.dp, bottom = LocalDockInset.current + 12.dp),
         ) {
@@ -133,7 +136,7 @@ fun PlaylistsScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            trackCount(playlist.tracks.count { it in library.byId }),
+                            trackCount(library.playlistCounts[playlist.id] ?: 0),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -150,7 +153,7 @@ fun PlaylistsScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun PlaylistEditor(
     app: SpotygramApp,
@@ -169,14 +172,16 @@ fun PlaylistEditor(
     val playlist = library.playlists.firstOrNull { it.id == addingTo }
     val members = remember(playlist) { playlist?.tracks?.toSet().orEmpty() }
     val chosen = remember(selected) { selected.toSet() }
-    val tracks =
-        remember(library.tracks, query, members) {
-            library.tracks.filter {
-                it.inLibrary &&
-                    it.id !in members &&
-                    "${it.title} ${it.artist} ${it.source}"
-                        .contains(query.trim(), ignoreCase = true)
-            }
+    val tracks by
+        produceState(emptyList<Track>(), library.tracks, query, members) {
+            value =
+                withContext(Dispatchers.Default) {
+                    val search = query.trim()
+                    library.tracks.filter {
+                        ensureActive()
+                        it.inLibrary && it.id !in members && it.matches(search)
+                    }
+                }
         }
     fun leave() {
         if (!saving) {
@@ -269,7 +274,10 @@ fun PlaylistEditor(
                 )
             }
         }
-        LazyColumn(Modifier.weight(1f).glassContent(), state = rememberLazyListState()) {
+        LazyColumn(
+            Modifier.weight(1f).glassContent(),
+            state = rememberLazyListState(cacheWindow = MusicListCacheWindow),
+        ) {
             if (tracks.isEmpty())
                 item {
                     Text(

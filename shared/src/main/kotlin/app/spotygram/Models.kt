@@ -44,6 +44,14 @@ data class Track(
         get() =
             if (profileUserId != 0L) tr(R.string.profile_music_named, source)
             else chatTitle(chatId, source)
+
+    // Most searches need no temporary concatenated string. Keep cross-field phrases working.
+    fun matches(query: String): Boolean =
+        query.isEmpty() ||
+            title.contains(query, ignoreCase = true) ||
+            artist.contains(query, ignoreCase = true) ||
+            source.contains(query, ignoreCase = true) ||
+            (' ' in query && "$title $artist $source".contains(query, ignoreCase = true))
 }
 
 data class PlaybackProgress(
@@ -106,6 +114,12 @@ data class LibraryState(
     val localTracks by lazy { localView(tracks) }
     val localSize by lazy { localTracks.sumOf { it.size } }
     val allSources by lazy { sources + profiles.filter { it.selected }.map { it.source() } }
+    val sourceCounts by lazy {
+        tracks.asSequence().filter { it.profileUserId == 0L }.groupingBy { it.chatId }.eachCount()
+    }
+    val playlistCounts by lazy {
+        playlists.associate { playlist -> playlist.id to playlist.tracks.count { it in byId } }
+    }
 
     fun localDisplay(track: Track): Track {
         val liked = localGroups[track.path]?.any { it.liked } ?: track.liked

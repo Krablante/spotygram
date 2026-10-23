@@ -58,10 +58,12 @@ fun prepareDesktopGraphics(cache: File) {
     if (DesktopTarget.os != "windows") return
     val renderer = System.getenv("SKIKO_RENDER_API") ?: System.getProperty("skiko.renderApi")
     if (renderer == null && System.getProperty("skiko.rendering.angle.enabled") == null) {
-        // Skiko's software Direct3D adapter is slower than ANGLE. Choose before creating the window.
+        // Skiko 0.150.1 can stall on the first runtime ImageFilter draw in Direct3D (SKIKO-1179).
+        // Prefer hardware OpenGL; keep ANGLE for virtual/software adapters with no usable desktop GL.
         // Probe without loading Skiko: its renderer preferences are cached during native initialization.
         val hardware = runCatching { hardwareDirect3D() }.getOrDefault(false)
-        if (!hardware) System.setProperty("skiko.rendering.angle.enabled", "true")
+        if (hardware) System.setProperty("skiko.renderApi", "OPENGL")
+        else System.setProperty("skiko.rendering.angle.enabled", "true")
     }
     if (System.getProperty("skiko.library.path") != null) return
     if (renderer != "ANGLE" && System.getProperty("skiko.rendering.angle.enabled") != "true") return

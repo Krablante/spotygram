@@ -12,6 +12,7 @@ class TrackDuplicates(tracks: List<Track>) {
     )
 
     private val groups: Map<String, List<Track>>
+    private val likedGroups: Set<String>
 
     init {
         val parents = IntArray(tracks.size) { it }
@@ -45,6 +46,12 @@ class TrackDuplicates(tracks: List<Track>) {
         val members =
             tracks.indices.groupBy(::root).values.map { indices -> indices.map { tracks[it] } }
         groups = buildMap { members.forEach { group -> group.forEach { put(it.id, group) } } }
+        likedGroups =
+            members
+                .asSequence()
+                .filter { group -> group.any { it.liked } }
+                .map { it.first().id }
+                .toSet()
     }
 
     fun aliases(id: String): List<Track> = groups[id].orEmpty()
@@ -52,21 +59,21 @@ class TrackDuplicates(tracks: List<Track>) {
     fun key(id: String): String = groups[id]?.firstOrNull()?.id ?: id
 
     fun display(track: Track): Track {
-        val liked = aliases(track.id).any { it.liked } || track.liked
+        val liked = key(track.id) in likedGroups || track.liked
         return if (liked == track.liked) track else track.copy(liked = liked)
     }
 
     /** Filter first: a representative must belong to the selected source/search results. */
-    fun view(candidates: List<Track>): List<Track> =
-        candidates
-            .groupBy { key(it.id) }
-            .values
-            .map { group ->
-                display(
-                    group.maxBy {
-                        if (it.local && !it.temporary) 3
-                        else if (it.local) 2 else if (it.available) 1 else 0
-                    }
-                )
-            }
+    fun view(candidates: List<Track>): List<Track> {
+        fun rank(track: Track) =
+            if (track.local && !track.temporary) 3
+            else if (track.local) 2 else if (track.available) 1 else 0
+        val representatives = LinkedHashMap<String, Track>()
+        for (track in candidates) {
+            val key = key(track.id)
+            val previous = representatives[key]
+            if (previous == null || rank(track) > rank(previous)) representatives[key] = track
+        }
+        return representatives.values.map(::display)
+    }
 }
