@@ -22,6 +22,29 @@ scrolling and fixed Close button. Screenshots checked the actual rendered panels
 These checks establish those interactions; they do not establish a new physical
 Windows GPU measurement or a cold-start frame-time guarantee.
 
+The final Windows ZIP ran through its actual `Spotygram.exe` and bundled Java
+on a Windows VM using ANGLE/Microsoft Basic Render Driver. Real mouse and keyboard
+input checked opening, scrolling to the bottom, fixed Close, Escape, outside
+dismissal and sharing-page Back navigation. Pixel inspection confirmed every
+result and the packaged app closed normally. The temporary inspection branch was
+deleted; no diagnostic workflow was added to the default branch.
+
+Android debug/release and both Lint variants passed (zero errors, 53 warnings
+per variant). Both APKs passed v2 signature and 16 KiB ZIP alignment checks,
+retained the original certificate and carry `f74ed7e` in their VCS metadata.
+An Android 15 installation updated from 0.27.0 (48) to 0.27.1 (49), retaining all
+16 saved application files byte-for-byte before launch. Russian Settings at
+320 dp/font scale 1.3 retained its fixed Close button after scrolling; Close and
+drag dismissal worked, with an empty crash buffer. This remains emulator evidence.
+
+[0.27.1](https://github.com/Krablante/spotygram/releases/tag/v0.27.1) targets
+`f74ed7e`. All four jobs in the [native workflow](https://github.com/Krablante/spotygram/actions/runs/39968659718)
+passed. The published 0.27.0 reader verified/extracted all four final archives,
+rejected modified launchers and verified all four installer signatures. All 15
+uploaded sizes and SHA-256 digests matched local files before publication as
+Latest. Afterwards, 0.27.0 `AppUpdates` selected 0.27.1 from public Latest with
+the exact verified Linux archive size and SHA-256.
+
 ## 0.27.0 — playback controls and library responsiveness
 
 ### Desktop interface and resources
