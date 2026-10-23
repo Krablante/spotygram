@@ -65,11 +65,46 @@ The packaged launcher also checked local playback with audio output disabled,
 search, browsing 200 playlists and filtering the editor's 10,002-recording catalog.
 These checks do not establish authenticated Telegram transport or physical sound.
 
+The final CI Linux archive ran through its actual launcher and bundled Temurin 21,
+without a renderer override or GL preload. Playlist scrolling during local
+playback, minimize/return, pause and Settings Close after scrolling worked. Separate
+eight-second samples used 4.37% of one CPU while visible, 1.25% minimized and 0.12%
+after pausing and dismissing Settings. RSS ranged from 383 to 396 MiB; native
+allocations are outside the 256 MiB Java heap. Audio output was disabled.
+
+### Windows software adapter
+
+Native Windows Server 2025 runs compared both packages on ANGLE/Microsoft Basic
+Render Driver, JDK 21, two active CPU cores and a 256 MiB heap. Both used the same
+10,000-recording, 60-chat, 200-playlist catalog with 20,000 memberships. The VM's
+client-area animation policy was enabled for both processes and restored after
+inspection. Real wheel input made six forward/back passes; the last four gave:
+
+| P95 scroll-callback interval | 0.27.1 | 0.28.0 |
+| --- | ---: | ---: |
+| Music | 47.29 ms | 30.28 ms |
+| Settings | 64.36 ms | 74.65 ms |
+| Source chooser | 85.99 ms | 86.43 ms |
+| Playlists | 32.05 ms | 31.53 ms |
+
+The chooser was measured in a separate paired run, with list-position changes and
+mid-gesture pixels confirming movement. The new adapter generated frame-driven
+steps on every surface. Settings and the chooser still had long rendering frames
+on this software adapter: their scroll-callback cadence did not consistently
+improve. Interpolation does not remove the software renderer's cost. These results
+do not establish 60 FPS, physical Windows GPU behavior or touchpad behavior.
+
+Screenshots checked the four surfaces and the scrolled chooser's group geometry.
+The actual `Spotygram.exe` and bundled runtime opened Settings, scrolled to its
+bottom, used the fixed Close button and exited normally. The comparative runs used
+temporary external instrumentation; it is absent from the release packages.
+
 ### Android update and interface
 
 Debug/release builds and both Lint variants passed with zero errors and 42 warnings
 per variant. Both release APKs passed v2 signature and 16 KiB ZIP alignment checks
 and retained the original signing certificate.
+The final APKs carry `48eb37b` in their VCS metadata.
 
 A retained Android 16 installation first updated from 0.17.0 to the published
 0.27.1, then to 0.28.0 (50). The last update preserved all 18 saved application
@@ -82,6 +117,22 @@ returned to the paused player. The application crash buffer remained empty.
 That virtual device also encountered a System UI ANR during cold boot and had
 substantial system delays. It establishes the listed update and interface behavior,
 not a useful Android performance comparison, physical audio or battery behavior.
+
+### Published packages
+
+[0.28.0](https://github.com/Krablante/spotygram/releases/tag/v0.28.0) targets
+`48eb37b`. All four [native workflow jobs](https://github.com/Krablante/spotygram/actions/runs/39996039035)
+passed. Windows used the exact native artifact in the
+[Music/Settings/playlists run](https://github.com/Krablante/spotygram/actions/runs/39996769462)
+and [verified chooser run](https://github.com/Krablante/spotygram/actions/runs/39997898388).
+The temporary inspection branch was removed; the default branch has no diagnostic
+workflow or test scaffold.
+
+The published 0.27.1 reader verified and extracted all four final archives,
+rejected modified launchers and verified all four installer signatures. All 15
+uploaded asset sizes and SHA-256 digests matched local files before publication
+as Latest. Afterwards, the actual 0.27.1 `AppUpdates` selected 0.28.0 from public
+Latest with the exact verified Linux archive size and SHA-256.
 
 ## 0.27.1 — desktop Settings dismissal
 
