@@ -1,6 +1,13 @@
 .gradle/
 .kotlin/
 .idea/
+target/
+__pycache__/
+*.pyc
+.DS_Store
+*.db
+*.db-wal
+*.db-shm
 **/build/
 local.properties
 *.jks

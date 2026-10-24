@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <application android:name="app.spotygram.rust.PlatformBridge"
+        android:label="spotygram rust" android:icon="@drawable/ic_launcher"
+        android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false" android:enableOnBackInvokedCallback="true"
+        android:theme="@style/MakepadAppTheme">
+        <activity android:name="app.spotygram.rust.MainActivity" android:exported="true"
+            android:launchMode="singleTask" android:theme="@style/SpotygramLaunchTheme"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|density|fontScale|layoutDirection|locale|smallestScreenSize"
+            android:windowSoftInputMode="adjustNothing|stateUnchanged">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+            </intent-filter>
+        </activity>
+        <service android:name="app.spotygram.rust.PlaybackService" android:exported="true"
+            android:foregroundServiceType="mediaPlayback" android:stopWithTask="false">
+            <intent-filter><action android:name="androidx.media3.session.MediaSessionService" /></intent-filter>
+        </service>
+        <service android:name="app.spotygram.rust.TransferService" android:exported="false"
+            android:foregroundServiceType="dataSync" android:stopWithTask="false" />
+    </application>
+</manifest>

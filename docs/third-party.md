@@ -2,53 +2,28 @@
 
 [Documentation](README.md) · **English** · [Русский](third-party.ru.md)
 
-| Component | Version / source | License |
+| Component | Source/version | License |
 | --- | --- | --- |
-| TDLib Android | `d1085f9cebc5a62379991ae1652673954f229c1f`, [tdlib/td](https://github.com/tdlib/td) | Boost 1.0 |
-| OpenSSL Android | `openssl-3.5.6`, [openssl/openssl](https://github.com/openssl/openssl) | Apache 2.0 |
-| Kotlin | 2.4.20 | Apache 2.0 |
-| kotlinx.coroutines | 1.10.2 | Apache 2.0 |
-| Compose Multiplatform / Skiko | Pinned Gradle dependencies in root and desktop build files | Apache 2.0 |
-| AndroidX / Media3 | Exact versions in `app/build.gradle.kts` | Apache 2.0 |
-| Coil | 3.3.0 | Apache 2.0 |
-| Haze / Haze Glass | 2.0.1, [chrisbanes/haze](https://github.com/chrisbanes/haze) | Apache 2.0 |
-| Fluent Emoji artwork | 40 cropped/resized 3D PNGs from [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji/tree/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets); default yellow hand variants | MIT, copyright Microsoft Corporation |
-| SQLite (TDLib) | Upstream bundled version | Public domain |
-| Desktop TDLib prebuilts | `prebuilt-tdlib` 0.1008067.0 | Boost 1.0 for TDLib; bundled components retain their licenses |
-| libmpv / FFmpeg desktop runtime | [mpv-prebuilt](https://github.com/jason-yau/mpv-prebuilt/releases/tag/20260906162952), libmpv 0.41.0 LGPL assets | LGPL 2.1+ and component licenses |
-| SQLite JDBC | 3.50.3.0 | Apache 2.0 / BSD-2-Clause; SQLite is public domain |
-| JNA / JNA Platform | 5.17.0 | Apache 2.0 or LGPL 2.1+ |
-| java-keyring | 1.0.4 | BSD-3-Clause |
-| jaudiotagger | 3.0.1 | LGPL 2.1+ |
-| Nucleus media-control / core-runtime | 2.5.0, [Nucleus](https://github.com/NucleusFramework/Nucleus/tree/v2.5.0) | MIT; bundled code retains its notices |
-| Apache Commons Compress | 1.28.0; Commons Lang 3.18.0, IO 2.20.0 and Codec 1.19.0 | Apache 2.0 |
-| ZXing core | 3.5.4 | Apache 2.0 |
-| libphonenumber | 9.0.41 | Apache 2.0 |
-| JSON-java | 20250517 | Public domain |
-| Bundled desktop Java runtime | JDK 21 distribution used by the build runner | GPL 2 with Classpath Exception and component notices |
-| Windows installer packaging | [Inno Setup 6.4.3 sources](https://github.com/jrsoftware/issrc/tree/is-6_4_3) | [Inno Setup License](https://github.com/jrsoftware/issrc/blob/is-6_4_3/license.txt); copyright Jordan Russell 1997–2025 and Martijn Laan 2000–2025; free for commercial and noncommercial use |
+| Makepad | [44ecb822](https://github.com/makepad/makepad/tree/44ecb822b48106fa76bde4dfd309e5a8a7ff1932) | MIT and bundled component notices |
+| TDLib Android | [d1085f9c](https://github.com/tdlib/td/tree/d1085f9cebc5a62379991ae1652673954f229c1f) | Boost 1.0 |
+| OpenSSL Android | openssl-3.5.6 | Apache 2.0 |
+| Desktop TDLib | prebuilt-tdlib 0.1008067.0 | Boost 1.0 and component notices |
+| libmpv / FFmpeg | [mpv-prebuilt 20260906162952](https://github.com/jason-yau/mpv-prebuilt/releases/tag/20260906162952), libmpv 0.41.0 LGPL binaries | LGPL 2.1+ and component notices |
+| AndroidX Media3 | Pinned in `android/build.gradle.kts` | Apache 2.0 |
+| SQLite / rusqlite | Pinned in Cargo.lock | Public domain / MIT |
+| Tokio, serde, keyring, souvlaki, rfd and other Rust crates | Exact revisions and versions in Cargo.lock | License expressions and notices included in packages |
+| Lofty | Pinned in Cargo.lock | MIT or Apache 2.0 |
+| Fonts | Makepad's international font set: IBM Plex, Noto, LXGW and Font Awesome; JetBrains Mono for the optional code face | SIL OFL 1.1; copyright/license metadata and notices included in packages |
 
-Android native libraries are compiled from upstream sources. `JsonClient.java`
-is a reduced JNI declaration compatible with the upstream interface. Native
-license texts and notices are included in APK assets. Desktop uses pinned,
-checksum-verified prebuilts without a local native toolchain. Their license texts,
-Spotygram's license and additional notices are in application resources under
-`licenses/`; JVM dependencies retain their notices inside their JARs and Java's
-notices are under the bundled runtime's `legal/` directory.
+Native library notices remain with their bundles. The build also includes Rust
+dependency license texts and font metadata in `licenses/` (Android assets).
+Desktop LGPL libraries are separate replaceable files; their sources and build
+instructions are linked from the pinned mpv-prebuilt release. No desktop JVM or
+Kotlin runtime is included.
 
-LGPL dependencies are supplied as separate libraries/JARs and can be replaced.
-Sources and build instructions for the pinned audio binaries are available from
-the linked mpv-prebuilt release; jaudiotagger sources are available through
-[Maven Central](https://repo.maven.apache.org/maven2/net/jthink/jaudiotagger/3.0.1/).
-
-UI icons use Material Icons. Compose supplies platform font handling. There are
-no Spotify logos, Telegram logos, bundled music files or AI-generated album covers.
-The Fluent Emoji notice is retained in `shared/licenses/Fluent-Emoji-MIT.txt`
-and included in Android APK assets and desktop `resources/licenses/`.
-
-The Takopi plush identity uses a photograph supplied by the project owner, with
-its background removed and separate icon surfaces prepared for Spotygram. The
-software's MIT license does not grant rights to the character or source photo.
-`shared/licenses/Takopi-artwork-NOTICE.txt` is included in both platform packages.
-
-The manually imported development recording is [The Entertainer by Scott Joplin](https://commons.wikimedia.org/wiki/File:%22The_Entertainer%22,_by_Scott_Joplin_(1902,_Ragtime_piano).opus), marked public domain on Wikimedia Commons. The audio is not part of the repository or APK.
+The Takopi identity is a photograph supplied by the owner, prepared with its
+background removed. The software's MIT license grants no rights to the character
+or photograph; its notice is bundled. The small SVG settings/selection symbols
+are application artwork. Development audio is private build/verification state,
+not part of the repository or released application. The application contains no
+bundled music catalog.

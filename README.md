@@ -1,210 +1,94 @@
-<p align="center">
-  <strong>English</strong> · <a href="README.ru.md">Русский</a>
-</p>
+<p align="center"><strong>English</strong> · <a href="README.ru.md">Русский</a></p>
+<p align="center"><img src="docs/banner.png" alt="spotygram and its photographed pink Takopi plush" width="100%"></p>
 
-<p align="center">
-  <img src="docs/banner.png" alt="spotygram — Telegram music player with a pink Takopi plush" width="100%">
-</p>
+# spotygram rust
 
-<p align="center">
-  <strong>A music player for Telegram chats, profile music and local files.</strong><br>
-  Android · Windows · Linux · macOS
-</p>
+A music player for Telegram chats, profile music and local files. This is the
+personal **Rust rewrite**, developed on `rust-rewrite` for Android, Windows, Linux
+and macOS. The shared interface uses Makepad; desktop playback uses libmpv and
+Android uses Media3. Telegram connects directly through TDLib.
 
-<p align="center">
-  <a href="https://github.com/Krablante/spotygram/releases/latest"><strong>Download Spotygram</strong></a> ·
-  <a href="docs/usage.md">User guide</a> ·
-  <a href="docs/README.md">Documentation</a>
-</p>
+**This is an experimental app with a separate local profile.** The stable Kotlin
+app remains on [`main`](https://github.com/Krablante/spotygram/tree/main).
+Rust previews use `rust-v…` prerelease tags and never become GitHub's latest stable
+release. Desktop packages contain no Java runtime.
 
-## From a chat to a music library
+[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.1.0)
+· [User guide](docs/usage.md) · [Build from source](docs/build.md)
+· [Verification and limits](docs/verification.md)
 
-A song in Saved Messages, an album in a channel, a few recordings from a friend.
-Telegram holds the files, but finding the next song should not mean scrolling
-through a conversation.
+<p align="center"><img src="docs/screenshots/rust-desktop-light.png" alt="Rust desktop preview in light appearance with a 10,001-track verification catalog" width="70%"> <img src="docs/screenshots/rust-android-dark.png" alt="Rust Android player in dark appearance" width="27%"></p>
 
-Spotygram plays that collection on **Android, Windows, Linux and macOS**. Choose the chats you want
-to listen to, and their audio appears in one searchable library. Save favorites,
-make playlists, download music for later. You can also import files from your
-device and use the player without connecting Telegram. All versions share the
-same screens, glass material, library and playback rules.
+## Install and start
 
-**Sources** keeps your Telegram profile at the top, with connected profiles and
-chats in shared glass panels below. Their avatars also appear in the searchable
-source menu in Music. Open a profile to listen to its pinned music, then choose **Add to library**
-if you want all its songs in your collection. A heart or playlist saves an individual
-song without connecting the profile. Other people’s music follows Telegram’s privacy settings.
-
-Open a song's menu and use **To profile** to add it to your Telegram profile,
-or **Remove** to take it out. The glass button is centered beneath the artwork and
-song information. Both actions apply in one click. Local
-recordings can be uploaded there too; the button explains the upload before you choose it.
-
-<p align="center">
-  <img src="docs/screenshots/sources-dark.png" width="30%" alt="Glass source groups with chat avatars and My profile pinned at the top">
-  &nbsp;
-  <img src="docs/screenshots/source-picker-light.png" width="30%" alt="Searchable source selection with avatars">
-  &nbsp;
-  <img src="docs/screenshots/profile-dark.png" width="30%" alt="Listening to a profile before adding it to the library">
-</p>
-
-These screens show demonstration sources and recordings in the shared desktop interface.
-The current app uses a photographed Takopi plush for its system and sign-in identity;
-the library keeps its changing emoji sticker.
-
-Sign in to the same Telegram account on another device to restore your playlists,
-favorites, selected chats and profiles, and library settings automatically. Each device keeps its own
-queue, last track and listening positions, including long-recording bookmarks. Spotygram
-keeps its library documents in a private, muted channel in your Telegram archive.
-
-<p align="center">
-  <img src="docs/screenshots/library-dark.png" width="30%" alt="Music library in the dark theme">
-  &nbsp;
-  <img src="docs/screenshots/player-light.png" width="30%" alt="Full player in the light theme">
-  &nbsp;
-  <img src="docs/screenshots/playlists-light.png" width="30%" alt="Playlists">
-</p>
-
-The library screenshot shows 0.23.0 with its changing emoji sticker. The header
-chooses from 40 yellow gestures and faces at a fresh launch or after 30 minutes
-away, and keeps one sticker while you use the app. The player and playlist
-screenshots were captured in 0.18.0; the fourth tab is now Sources.
-
-## Put it on your phone
-
-Download **`spotygram-…-arm64.apk`** from the [latest release](https://github.com/Krablante/spotygram/releases/latest).
-It requires **Android 8.0 or newer** and a 64-bit ARM device. The separate
-`x86_64` APK is for x86-64 Android environments; there is no 32-bit ARM build.
-
-Install the APK, connect your Telegram account, then open **Sources**.
-Your profile is ready to open. **Add → Chats** selects Saved Messages, groups or channels;
-**Add → Profiles** finds people by name, @username or a t.me link. You do not need
-developer API keys to use the published APK. Prefer local files? Skip sign-in
-and choose **Settings → Import audio files**.
-
-Install future APKs over the existing app to keep your library. Spotygram checks
-for new releases when you open it, at most once a day. It stays quiet unless
-there is an update. You can dismiss that version's reminder, turn automatic
-checks off, or check manually in Settings. **Download and install** is available
-in both the update banner and Settings: it downloads the right APK, verifies it
-and opens Android's installation confirmation. There is no need to find the
-file on GitHub. Nothing downloads until you choose it.
-
-## Put it on your computer
-
-Choose the installer for your computer from the same [release](https://github.com/Krablante/spotygram/releases/latest):
-
-| System | Download | Requirements |
+| Device | Preview package | Requirements |
 | --- | --- | --- |
-| Windows | `spotygram-…-windows-x64.exe` | Windows 10+ on x86-64 |
-| Linux | `spotygram-…-linux-x64.deb` | Ubuntu 24.04+, x86-64, a graphical desktop and Secret Service for Telegram sign-in |
-| macOS, Apple Silicon | `spotygram-…-macos-arm64.dmg` | macOS 14+ |
-| macOS, Intel | `spotygram-…-macos-x64.dmg` | macOS 14+ |
+| Android ARM64 | `spotygram-rust-…-arm64.apk` | Android 8.0+, 64-bit ARM, OpenGL ES 3 |
+| Android x86-64 | `spotygram-rust-…-x86_64.apk` | Android 8.0+, x86-64, OpenGL ES 3 |
+| Windows | `spotygram-rust-…-windows-x64.zip` | Windows 10+, x86-64 |
+| Linux | `spotygram-rust-…-linux-x64.tar.gz` | Ubuntu 24.04+ or a compatible graphical Linux environment, x86-64 |
+| macOS Apple Silicon | `spotygram-rust-…-macos-arm64.zip` | macOS 14+ |
+| macOS Intel | `spotygram-rust-…-macos-x64.zip` | macOS 14+ |
 
-- **Windows:** open the EXE and follow the installation wizard. It installs for your user,
-  adds a Start menu shortcut and an optional desktop shortcut, and appears in **Settings → Apps** for removal.
-  For an existing MSI installation (0.15.2–0.15.4), download and run this EXE once;
-  it replaces the old installer registration and keeps your library and sign-in.
-- **macOS:** open the DMG and drag Spotygram onto Applications. Eject the disk image,
-  then open the installed app from Applications.
-- **Linux:** open the DEB with your software installer, or run `sudo apt install ./spotygram-…-linux-x64.deb`
-  with the downloaded file's actual name. Launch Spotygram from the applications menu.
+Install the APK alongside stable Spotygram. On a computer, extract the **whole
+archive** and launch `spotygram-rust.exe`, the Linux `spotygram-rust` launcher, or
+`spotygram rust.app`. Keep the adjacent native libraries and resources. Linux
+Telegram sign-in needs an unlocked Secret Service key store.
 
-Java, TDLib and the audio engine are included. Windows packages do not have an
-Authenticode publisher certificate. macOS builds are ad hoc signed, without Apple
-notarization; if macOS blocks the first launch, use **System Settings → Privacy &
-Security → Open Anyway**.
+Windows previews have no Authenticode publisher certificate. macOS previews are
+ad hoc signed without notarization; the first launch may require **System
+Settings → Privacy & Security → Open Anyway**.
 
-ZIP archives and the Linux TAR.GZ remain available for portable use; the published
-Linux archive supports other distributions with glibc 2.35+. Extract the **whole archive**
-and open its launcher. An existing portable library is also available to the
-installer version under the same OS user; quit the old copy before switching.
+Open **Settings → Import audio files** to listen without an account. Desktop
+also accepts dropped files and **Ctrl/⌘+O**. For Telegram music, connect your
+account in Settings, then choose chats or profiles under **Sources**. Published
+packages already include the Telegram application API configuration.
 
-Sign in using your phone number or the QR code, or import local files.
-**Ctrl/⌘+O** opens the import picker; **Esc** closes the current sheet or player.
-Closing the window keeps active playback or downloads running in the tray, or
-minimizes the window when a tray is unavailable. **Ctrl/⌘+Q** quits.
-
-Desktop updates use the same **Download and install** action. Installed copies
-verify the package and its release signature, then offer to close Spotygram and
-open the system installer. Complete installation and launch from your applications.
-Portable copies update their writable application folder and reopen automatically.
-Your library and Telegram session are stored separately from the program.
-
-<p align="center">
-  <img src="docs/screenshots/desktop-player-light.png" width="900" alt="The shared desktop player with reverse order and volume controls">
-</p>
+The preview has a separate Telegram session, database and import directory.
+**Cloud playlists, favorites, connected sources and library settings are shared
+with stable Spotygram when you sign in to the same account.** Editing those
+items in either version changes the same synced library. Queue, positions,
+volume and speed remain local to each app.
 
 ## While you listen
 
-Playback continues in the background, with Android lock-screen controls and desktop
-media keys. The small player opens the full player and queue.
+Search and sort the library, filter its sources, save favorites and make
+playlists. The catalog reads pages from SQLite and draws visible rows instead
+of retaining every song's metadata in the interface. Covers decode for their
+displayed size. English and Russian, light and dark appearances, glass controls
+and the original photographed Takopi identity are retained.
 
-- Listen in order, in reverse, through a shuffled pass or with an independent random draw.
-- Adjust speed from **0.3× to 4×** without changing pitch; desktop also has volume and mute.
-- Resume recordings **30 minutes or longer** where you left them. The threshold is adjustable.
-- Select several songs for a playlist or download; drag playlist entries to reorder them.
-- Keep downloads under **On device**, or let temporary playback copies expire through
-  **Do not keep played tracks**. Imports and explicit downloads stay saved.
-- Send a song to a Telegram recipient after confirmation. Sender and caption are omitted
-  by default; [sharing settings](docs/usage.md#send-audio-to-a-chat) control both.
+The small player opens the full player and queue. Playback supports normal,
+reverse, shuffle and random order, three repeat modes, and speed from **0.3× to
+4×** with pitch correction. Long recordings have local bookmarks with an
+adjustable duration threshold. Desktop also has volume, mute and system media
+controls; Android has a foreground media service and lock-screen controls.
 
-Queue, listening positions and sound controls stay on each device. The
-[user guide](docs/usage.md) covers the controls, offline storage and sync conflicts.
-The interface supports English and Russian, with light and dark appearances.
+Use a song's menu to download it, add it to a playlist or Telegram profile, or
+send it to a chat. Sending requires confirmation and rechecks the recipient's
+permissions. The recipient chooser includes chat folders and forum topics.
+Queue and playlist menus offer **Move up / Move down**.
 
-Glass controls reflect the artwork and the library scrolling beneath them.
-Light and dark share the same layout and material; wide screens use side
-navigation and a player with separate artwork and control columns. Full
-refraction works on desktop and Android 13+; older supported Android versions use simpler glass.
+Imports are copied into app-owned storage. Explicit downloads stay saved.
+**Do not keep played tracks** allows older temporary Telegram playback copies
+to be removed. Deleting an imported copy requires confirmation and preserves
+the original external file.
 
-Repeated recordings are hidden by default. Turn **Settings → Hide duplicates**
-off to see separate entries again. This only changes the lists; nothing is deleted.
+Closing an active desktop player minimizes it. **Ctrl/⌘+Q**, or **Quit** in
+Settings, saves state and closes the app. **Esc** closes the current sheet or
+player. Preview updates are checked manually in Settings and open the Rust
+prerelease page; they do not use the stable installer/update channel.
 
-Prefer not to keep every song? Turn on **Do not keep played tracks** in Settings.
-The player keeps a temporary working set and removes older playback copies.
-Existing files, explicit downloads and imports stay saved; **Save on device**
-keeps a temporary copy. The mode is off by default and still uses temporary
-disk space. Returning to older songs may require another download.
+## Development
 
-## Your files and your account
+Start with [the build guide](docs/build.md) and [architecture](docs/architecture.md).
+Generated state, native dependencies and release packages live outside source
+under `SPOTYGRAM_STATE`. The UI and library logic are Rust; Android's small Java
+layer owns the activity, file picker, Keystore and Media3 service.
 
-Audio files and the Telegram session live on each device. Library data also syncs
-through your Telegram account using Telegram's ordinary cloud protection. Spotygram has no
-backend, separate registration or analytics. It connects directly to Telegram;
-release checks contact GitHub, which sees your connection IP and app version.
+Performance claims and platform coverage belong in [verification](docs/verification.md).
+A smaller runtime does not by itself prove lower battery use or smoother frames
+on a particular device. This preview needs device testing before replacing the
+stable app.
 
-A Telegram sign-in grants a **full account session**. Choosing source chats
-limits what Spotygram indexes, not what that session is permitted to access.
-You can revoke it from Telegram's device settings.
-
-**Clear music cache also removes Telegram songs you explicitly downloaded.**
-Imported files, favorites, playlists and sign-in remain. If the original
-message or profile audio is no longer accessible, a deleted local copy may not be recoverable.
-Uninstalling the Android app removes its local music and settings. Deleting the
-desktop application folder leaves its separate user data in place. Synced library
-data returns after sign-in; imported audio files need their own backup.
-
-## Under the cover
-
-One Kotlin/Compose visual system and shared application code. TDLib handles
-Telegram; Media3 on Android and libmpv on desktop decode audio through the same
-file reader. SQLite stores the library. There is no web view or streaming proxy.
-One shared queue supplies a small playback window while retaining the full list
-inside the app. Desktop uses a bundled, limited Java runtime.
-
-For the details, start with [architecture](docs/architecture.md) or
-[building from source](docs/build.md). The [documentation index](docs/README.md)
-links both language editions.
-
-This is an early public release. Secret chats, voice notes and automatic transfer
-of imported audio files are not supported. The [verification record](docs/verification.md) separates
-observed behavior from untested cases, including physical-device and
-authenticated Telegram checks. Screenshots show the real app with local
-demonstration recordings, not music bundled with the APK.
-
-## License
-
-[MIT](LICENSE). Dependencies retain [their own licenses](docs/third-party.md).
-Spotygram is an unofficial app using the Telegram API and is not affiliated
-with Telegram or Spotify.
+[Third-party software](docs/third-party.md) · [MIT license](LICENSE)

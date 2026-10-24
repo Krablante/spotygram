@@ -1,0 +1,65 @@
+[package]
+name = "spotygram-rust"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "A native Telegram music player"
+build = "build.rs"
+
+[lib]
+name = "spotygram_rust"
+crate-type = ["lib"]
+
+[[bin]]
+name = "spotygram-rust"
+path = "src/main.rs"
+
+[dependencies]
+makepad-widgets = { git = "https://github.com/makepad/makepad", rev = "44ecb822b48106fa76bde4dfd309e5a8a7ff1932", default-features = false, features = ["glass", "vector"] }
+anyhow = "1"
+arc-swap = "1"
+base64 = "0.22"
+directories = "6"
+flate2 = "1"
+fs2 = "0.4"
+libloading = "0.8"
+lofty = "0.22"
+rand = "0.9"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+regex = "1"
+rusqlite = { version = "0.37", features = ["bundled", "functions", "collation"] }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
+souvlaki = "0.8"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+ureq = { version = "3", features = ["json"] }
+
+[target.'cfg(target_os="windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+panic = "abort"
+
+[profile.dev]
+debug = 1
+
+[package.metadata.makepad]
+app-id = "app.spotygram.rust"
+app-label = "spotygram rust"

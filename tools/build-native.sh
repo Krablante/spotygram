@@ -9,7 +9,7 @@ case "$SPOTYGRAM_STATE/" in "$ROOT/"*) printf 'SPOTYGRAM_STATE must be outside s
 NDK="$ANDROID_HOME/ndk/28.2.13676358"
 JOBS=${SPOTYGRAM_JOBS:-2}
 TD_COMMIT=d1085f9cebc5a62379991ae1652673954f229c1f
-mkdir -p "$SPOTYGRAM_STATE/native" "$SPOTYGRAM_STATE/jniLibs"
+mkdir -p "$SPOTYGRAM_STATE/native"
 if [ ! -d "$SPOTYGRAM_STATE/tdlib-src/.git" ]; then
   git init "$SPOTYGRAM_STATE/tdlib-src"
   git -C "$SPOTYGRAM_STATE/tdlib-src" remote add origin https://github.com/tdlib/td.git
@@ -25,7 +25,7 @@ fi
 export ANDROID_NDK_ROOT="$NDK"
 export PATH="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
 TD="$SPOTYGRAM_STATE/tdlib-src/example/android"
-cmake -S "$TD" -B "$SPOTYGRAM_STATE/native/generate" -GNinja -DTD_ANDROID_JSON_JAVA=ON -DTD_GENERATE_SOURCE_FILES=ON
+cmake -S "$TD" -B "$SPOTYGRAM_STATE/native/generate" -GNinja -DTD_ANDROID_JSON=ON -DTD_GENERATE_SOURCE_FILES=ON
 cmake --build "$SPOTYGRAM_STATE/native/generate" -j "$JOBS"
 for ABI in ${SPOTYGRAM_ABIS:-arm64-v8a x86_64}; do
   case "$ABI" in
@@ -45,10 +45,8 @@ for ABI in ${SPOTYGRAM_ABIS:-arm64-v8a x86_64}; do
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
     -DOPENSSL_ROOT_DIR="$PREFIX" -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DANDROID_ABI="$ABI" -DANDROID_STL=c++_static -DANDROID_PLATFORM=android-26 \
-    -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--thinlto-jobs=$JOBS -Wl,--threads=$JOBS" \
-    -DTD_ANDROID_JSON_JAVA=ON
-  cmake --build "$SPOTYGRAM_STATE/native/td-$ABI" --target tdjni -j "$JOBS"
-  mkdir -p "$SPOTYGRAM_STATE/jniLibs/$ABI"
-  cp "$SPOTYGRAM_STATE/native/td-$ABI/libtdjsonjava.so" "$SPOTYGRAM_STATE/jniLibs/$ABI/"
+    -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--thinlto-jobs=$JOBS -Wl,--threads=$JOBS -Wl,-z,max-page-size=16384" \
+    -DTD_ANDROID_JSON=ON
+  cmake --build "$SPOTYGRAM_STATE/native/td-$ABI" --target tdjson -j "$JOBS"
 done
-printf 'TDLib %s built. Libraries: %s/jniLibs\n' "$TD_COMMIT" "$SPOTYGRAM_STATE"
+printf 'TDLib C API %s built under %s/native.\n' "$TD_COMMIT" "$SPOTYGRAM_STATE"

@@ -1,7 +1,0 @@
-Takopi plush artwork
-
-The application identity is adapted from a photograph of a Takopi plush supplied
-by the project owner. Background removal, cropping and icon surfaces were prepared
-for Spotygram. The character and source photograph remain their respective rights
-holders' material; Spotygram's software MIT license does not grant rights to them.
-No affiliation with the character's creators or the plush manufacturer is claimed.

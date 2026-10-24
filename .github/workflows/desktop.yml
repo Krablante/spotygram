@@ -1,4 +1,4 @@
-name: Desktop release assets
+name: Rust preview desktop builds
 
 on:
   workflow_dispatch:
@@ -23,16 +23,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2'
       TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
       TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-      DESKTOP_RELEASE_KEY: ${{ secrets.DESKTOP_RELEASE_KEY }}
+      CARGO_BUILD_JOBS: '2'
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: '21'
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -43,26 +39,73 @@ jobs:
           from pathlib import Path
           with open(os.environ['GITHUB_ENV'], 'a') as environment:
               environment.write('SPOTYGRAM_STATE=' + str(Path(os.environ['RUNNER_TEMP']) / 'spotygram-state') + '\n')
-      - uses: gradle/actions/setup-gradle@v6
-      - name: Prepare Linux packaging
+      - name: Install Rust
+        shell: bash
+        run: rustup toolchain install 1.97.0 --profile minimal && rustup default 1.97.0
+      - name: Prepare Linux graphics and media integration
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot binutils
-      - name: Prepare Windows packaging
-        if: runner.os == 'Windows'
-        shell: pwsh
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxinerama-dev libxkbcommon-dev libwayland-dev libasound2-dev libpulse-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libdbus-1-dev
+      - name: Prepare app icon tools
+        run: python -m pip install Pillow==12.0.0
+      - name: Build portable preview
+        run: python -B tools/build-rust.py
+      - name: Verify packaged native engines
+        shell: python
         run: |
-          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.4.3.exe'
-          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_4_3/innosetup-6.4.3.exe' -OutFile $setup
-          if ((Get-FileHash $setup).Hash -ne 'F3C42116542C4CC57263C5BA6C4FEABFC49FE771F2F98A79D2F7628B8762723B') { throw 'Inno Setup checksum mismatch' }
-          $tools = Join-Path $env:SPOTYGRAM_STATE 'desktop/tools/inno-6.4.3'
-          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOICONS', "/DIR=`"$tools`"") -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Inno Setup preparation failed: $($process.ExitCode)" }
-          "INNO_SETUP_COMPILER=$tools\ISCC.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Build and sign
-        run: python tools/build-desktop.py
+          import ctypes, os, platform, subprocess
+          from pathlib import Path
+          root=Path(os.environ['SPOTYGRAM_STATE'])/'rust/images'/'${{ matrix.target }}'
+          system=platform.system()
+          binary=root/'bin' if system=='Linux' else root/'spotygram rust.app/Contents/MacOS' if system=='Darwin' else root
+          executable=binary/('spotygram-rust.exe' if system=='Windows' else 'spotygram-rust')
+          subprocess.run([executable,'--version'],check=True)
+          native=binary/'native'
+          if system=='Windows':
+              with os.add_dll_directory(str(native)):
+                  td=ctypes.WinDLL(str(native/'tdjson.dll')); mpv=ctypes.WinDLL(str(native/'libmpv-2.dll'))
+          else:
+              extension='dylib' if system=='Darwin' else 'so'
+              if system=='Linux':
+                  environment=dict(os.environ,LD_LIBRARY_PATH=str(native))
+                  subprocess.run(['python','-c',f'import ctypes; ctypes.CDLL({str(native/"libtdjson.so")!r}); ctypes.CDLL({str(native/"libmpv.so")!r})'],env=environment,check=True)
+              else:
+                  td=ctypes.CDLL(str(native/f'libtdjson.{extension}')); mpv=ctypes.CDLL(str(native/f'libmpv.{extension}'))
+      - name: Open the packaged desktop interface
+        if: runner.os != 'Linux'
+        shell: python
+        run: |
+          import json, os, shutil, subprocess, time, urllib.request
+          from pathlib import Path
+          state=Path(os.environ['SPOTYGRAM_STATE'])/'rust'
+          root=state/'images'/'${{ matrix.target }}'
+          binary=root/'spotygram rust.app/Contents/MacOS/spotygram-rust' if os.name!='nt' else root/'spotygram-rust.exe'
+          evidence=state/'verification'; evidence.mkdir()
+          environment=dict(os.environ,MAKEPAD_HIDE_WINDOWS='1',SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'))
+          with (evidence/'launch.log').open('wb') as log:
+              app=subprocess.Popen([str(binary),'--remote=46871'],env=environment,stdout=log,stderr=log)
+              try:
+                  deadline=time.monotonic()+45
+                  while True:
+                      try:
+                          with urllib.request.urlopen('http://127.0.0.1:46871/snap?q=heading',timeout=2) as response:
+                              snapshot=json.load(response)
+                          if snapshot.get('s'): break
+                      except OSError: pass
+                      if app.poll() is not None or time.monotonic()>deadline: raise RuntimeError('Packaged interface did not open')
+                      time.sleep(0.5)
+                  with urllib.request.urlopen('http://127.0.0.1:46871/g',timeout=15) as response: grab=json.load(response)
+                  shutil.copy2(grab['png'],evidence/'interface.png')
+                  with urllib.request.urlopen('http://127.0.0.1:46871/quit',timeout=5) as response: response.read()
+                  app.wait(timeout=15)
+                  if app.returncode: raise RuntimeError(f'Interface exit code: {app.returncode}')
+              finally:
+                  if app.poll() is None: app.terminate(); app.wait(timeout=10)
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: spotygram-${{ matrix.target }}
-          path: ${{ env.SPOTYGRAM_STATE }}/releases/*/*
+          name: spotygram-rust-${{ matrix.target }}
+          path: |
+            ${{ env.SPOTYGRAM_STATE }}/rust/releases/*/*
+            ${{ env.SPOTYGRAM_STATE }}/rust/verification/*
           if-no-files-found: error
           retention-days: 7
