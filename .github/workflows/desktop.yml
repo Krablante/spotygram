@@ -119,20 +119,31 @@ jobs:
           evidence=state/'verification'; evidence.mkdir()
           subprocess.run([str(binary),'--version'],check=True)
           if os.name=='nt':
-              import ctypes
+              import ctypes, uuid
+              class GUID(ctypes.Structure):
+                  _fields_=[('Data1',ctypes.c_uint32),('Data2',ctypes.c_uint16),('Data3',ctypes.c_uint16),('Data4',ctypes.c_ubyte*8)]
+              factory=ctypes.c_void_p(); adapter=ctypes.c_void_p()
+              iid=GUID.from_buffer_copy(uuid.UUID('50c83a1c-e072-4c48-87b0-3630fa36a6d0').bytes_le)
+              create=ctypes.WinDLL('dxgi').CreateDXGIFactory2
+              create.argtypes=[ctypes.c_uint,ctypes.POINTER(GUID),ctypes.POINTER(ctypes.c_void_p)]; create.restype=ctypes.c_long
+              if create(0,ctypes.byref(iid),ctypes.byref(factory)): raise RuntimeError('DXGI factory probe failed')
+              enum_address=ctypes.cast(factory,ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents[7]
+              enum_adapter=ctypes.WINFUNCTYPE(ctypes.c_long,ctypes.c_void_p,ctypes.c_uint,ctypes.POINTER(ctypes.c_void_p))(enum_address)
+              if enum_adapter(factory,0,ctypes.byref(adapter)): raise RuntimeError('DXGI first-adapter probe failed')
               device=ctypes.c_void_p(); context=ctypes.c_void_p(); level=ctypes.c_uint(0xb000)
               probe=ctypes.WinDLL('d3d11').D3D11CreateDevice
               probe.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_void_p,ctypes.c_uint,ctypes.POINTER(ctypes.c_uint),ctypes.c_uint,ctypes.c_uint,ctypes.POINTER(ctypes.c_void_p),ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)]
               probe.restype=ctypes.c_long
-              result=probe(None,1,None,0x820,ctypes.byref(level),1,7,ctypes.byref(device),None,ctypes.byref(context))&0xffffffff
-              (evidence/'graphics.json').write_text(json.dumps({'D3D11_hardware_video_BGRA_level11':hex(result)}))
+              result=probe(adapter,0,None,0x820,ctypes.byref(level),1,7,ctypes.byref(device),None,ctypes.byref(context))&0xffffffff
+              for pointer in (context,device,adapter,factory):
+                  if pointer.value:
+                      release=ctypes.cast(pointer,ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents[2]
+                      ctypes.WINFUNCTYPE(ctypes.c_ulong,ctypes.c_void_p)(release)(pointer)
+              (evidence/'graphics.json').write_text(json.dumps({'D3D11_first_adapter_video_BGRA_level11':hex(result)}))
               if result==0x887a0004:
                   print('::notice::Native Windows rendering is blocked: this runner lacks the required Direct3D adapter. Package/native-engine checks passed; this is not a visual pass.')
                   raise SystemExit(0)
               if result: raise RuntimeError(f'D3D11 graphics probe failed: {result:#x}')
-              for pointer in (context,device):
-                  release=ctypes.cast(pointer,ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents[2]
-                  ctypes.WINFUNCTYPE(ctypes.c_ulong,ctypes.c_void_p)(release)(pointer)
           environment=dict(os.environ,SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'))
           with (evidence/'launch.log').open('wb') as log:
               app=subprocess.Popen([str(binary),'--remote=46871'],env=environment,stdout=log,stderr=log)
