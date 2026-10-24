@@ -8,9 +8,14 @@ on:
         type: choice
         default: all
         options: [all, linux-x64, windows-x64, macos-x64, macos-arm64]
+      recheck_run:
+        description: Recheck an existing artifact run instead of rebuilding (optional)
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   desktop:
@@ -18,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         target: ${{ inputs.target != 'all' && fromJSON(format('["{0}"]', inputs.target)) || fromJSON('["linux-x64","windows-x64","macos-x64","macos-arm64"]') }}
-    runs-on: ${{ fromJSON('{"linux-x64":"ubuntu-24.04","windows-x64":"windows-2025","macos-x64":"macos-15-intel","macos-arm64":"macos-15"}')[matrix.target] }}
+    runs-on: ${{ inputs.recheck_run && matrix.target == 'macos-x64' && 'macos-15' || fromJSON('{"linux-x64":"ubuntu-24.04","windows-x64":"windows-2025","macos-x64":"macos-15-intel","macos-arm64":"macos-15"}')[matrix.target] }}
     timeout-minutes: 45
     env:
       TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -38,16 +43,50 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as environment:
               environment.write('SPOTYGRAM_STATE=' + str(Path(os.environ['RUNNER_TEMP']) / 'spotygram-state') + '\n')
       - name: Install Rust
+        if: ${{ !inputs.recheck_run }}
         shell: bash
         run: rustup toolchain install 1.97.0 --profile minimal && rustup default 1.97.0
       - name: Prepare Linux graphics and media integration
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !inputs.recheck_run
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxinerama-dev libxkbcommon-dev libwayland-dev libasound2-dev libpulse-dev libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libdbus-1-dev
       - name: Prepare app icon tools
+        if: ${{ !inputs.recheck_run }}
         run: python -m pip install Pillow==12.0.0
       - name: Build portable preview
+        if: ${{ !inputs.recheck_run }}
         run: python -B tools/build-rust.py
+      - uses: actions/download-artifact@v7
+        if: inputs.recheck_run
+        with:
+          name: spotygram-rust-${{ matrix.target }}
+          run-id: ${{ inputs.recheck_run }}
+          github-token: ${{ github.token }}
+          path: ${{ env.SPOTYGRAM_STATE }}/rust/recheck
+      - name: Prepare existing package
+        if: inputs.recheck_run
+        shell: python
+        run: |
+          import hashlib, os, shutil, subprocess, tarfile, zipfile
+          from pathlib import Path
+          state=Path(os.environ['SPOTYGRAM_STATE'])/'rust'
+          target='${{ matrix.target }}'; extension='.tar.gz' if target.startswith('linux') else '.zip'
+          archive=next((state/'recheck').rglob('*-'+target+extension))
+          assert hashlib.file_digest(archive.open('rb'),'sha256').hexdigest()==archive.with_name(archive.name+'.sha256').read_text().split()[0]
+          image=state/'images'/target; image.parent.mkdir(parents=True)
+          if target.startswith('macos'):
+              image.mkdir(); subprocess.run(['ditto','-x','-k',archive,image],check=True)
+          else:
+              unpack=state/'unpack'; unpack.mkdir()
+              if target.startswith('linux'):
+                  with tarfile.open(archive) as package: package.extractall(unpack,filter='data')
+              else:
+                  with zipfile.ZipFile(archive) as package: package.extractall(unpack)
+              shutil.move(unpack/'spotygram-rust',image)
+      - name: Prepare Rosetta for Intel package verification
+        if: inputs.recheck_run && matrix.target == 'macos-x64'
+        run: /usr/bin/arch -x86_64 /usr/bin/true || sudo softwareupdate --install-rosetta --agree-to-license
       - name: Verify packaged native engines
+        if: ${{ !(inputs.recheck_run && matrix.target == 'macos-x64') }}
         shell: python
         run: |
           import ctypes, os, platform, subprocess
@@ -78,6 +117,22 @@ jobs:
           root=state/'images'/'${{ matrix.target }}'
           binary=root/'spotygram rust.app/Contents/MacOS/spotygram-rust' if os.name!='nt' else root/'spotygram-rust.exe'
           evidence=state/'verification'; evidence.mkdir()
+          subprocess.run([str(binary),'--version'],check=True)
+          if os.name=='nt':
+              import ctypes
+              device=ctypes.c_void_p(); context=ctypes.c_void_p(); level=ctypes.c_uint(0xb000)
+              probe=ctypes.WinDLL('d3d11').D3D11CreateDevice
+              probe.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_void_p,ctypes.c_uint,ctypes.POINTER(ctypes.c_uint),ctypes.c_uint,ctypes.c_uint,ctypes.POINTER(ctypes.c_void_p),ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)]
+              probe.restype=ctypes.c_long
+              result=probe(None,1,None,0x820,ctypes.byref(level),1,7,ctypes.byref(device),None,ctypes.byref(context))&0xffffffff
+              (evidence/'graphics.json').write_text(json.dumps({'D3D11_hardware_video_BGRA_level11':hex(result)}))
+              if result==0x887a0004:
+                  print('::notice::Native Windows rendering is blocked: this runner lacks the required Direct3D adapter. Package/native-engine checks passed; this is not a visual pass.')
+                  raise SystemExit(0)
+              if result: raise RuntimeError(f'D3D11 graphics probe failed: {result:#x}')
+              for pointer in (context,device):
+                  release=ctypes.cast(pointer,ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents[2]
+                  ctypes.WINFUNCTYPE(ctypes.c_ulong,ctypes.c_void_p)(release)(pointer)
           environment=dict(os.environ,SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'))
           with (evidence/'launch.log').open('wb') as log:
               app=subprocess.Popen([str(binary),'--remote=46871'],env=environment,stdout=log,stderr=log)

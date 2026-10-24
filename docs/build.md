@@ -117,6 +117,10 @@ The manual **Rust preview desktop builds** GitHub workflow builds all four
 desktop targets from the selected ref. It uses existing Telegram application
 secrets and uploads archives with hashes. It does not publish them automatically.
 Choose `target` to rebuild one platform; `all` remains the default.
+For an existing package, set `recheck_run` to its artifact run ID. This downloads
+and checks that archive without compiling again. Intel macOS rechecks use
+Rosetta on the Apple Silicon runner. Windows records a blocked graphics check
+when the runner cannot create the required Direct3D device; this is not a visual pass.
 
 Create a draft release tagged `rust-v<version>` targeting `rust-rewrite`. Upload
 the signed APKs, desktop archives and matching hashes. Check the complete set,

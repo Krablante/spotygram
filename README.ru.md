@@ -26,7 +26,7 @@ Kotlin-версия остаётся в [`main`](https://github.com/Krablante/sp
 | --- | --- | --- |
 | Android ARM64 | `spotygram-rust-…-arm64.apk` | Android 8.0+, 64-битный ARM, OpenGL ES 3 |
 | Android x86-64 | `spotygram-rust-…-x86_64.apk` | Android 8.0+, x86-64, OpenGL ES 3 |
-| Windows | `spotygram-rust-…-windows-x64.zip` | Windows 10+, x86-64 |
+| Windows | `spotygram-rust-…-windows-x64.zip` | Windows 10+, x86-64, GPU с Direct3D 11 (feature level 11.0) |
 | Linux | `spotygram-rust-…-linux-x64.tar.gz` | Ubuntu 24.04+ или совместимое графическое Linux-окружение, x86-64 |
 | macOS Apple Silicon | `spotygram-rust-…-macos-arm64.zip` | macOS 14+ |
 | macOS Intel | `spotygram-rust-…-macos-x64.zip` | macOS 14+ |
