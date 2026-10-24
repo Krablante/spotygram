@@ -63,6 +63,8 @@ or open Queue. Queue entries can be played, moved and removed independently,
 including repeated occurrences of the same song. Available orders are forward,
 reverse, shuffle without repeats within a pass, and independent random draws.
 
+<img src="screenshots/rust-desktop-player-dark.png" alt="The shared desktop player in dark appearance" width="860">
+
 Playback state is saved locally and never starts automatically after launch.
 Long recordings can resume from bookmarks; Settings controls the duration
 threshold. Android uses a media notification/service; desktop exposes operating

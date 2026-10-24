@@ -35,6 +35,30 @@ Null audio output verifies decoding and playback control, not physical speakers,
 Bluetooth routing or audio focus. Synthetic metadata verifies catalog behavior,
 not Telegram authorization or remote availability.
 
+## Desktop packages
+
+All four desktop targets were built with their packaged native engines. Both
+macOS app bundles passed ad hoc signing and strict signature verification.
+
+| Package | Runtime evidence |
+| --- | --- |
+| Linux x64 | Native Radeon/Vulkan UI, catalog and local playback checks above. |
+| Windows x64 | MSVC package and native DLL loading passed on Windows CI. The exact archive rendered correctly under Wine 9, native D3DCompiler 47 and DXVK 2.4.1 on Radeon; Ogg drag/drop, libmpv null-output playback, seeking to 1:27 and pause passed. |
+| macOS ARM64 | Packaged app opened on the Apple Silicon runner; native Metal frames were visually inspected. |
+| macOS x64 | Intel compilation, signing and native library loading passed. The exact Intel archive rendered correctly through Rosetta on Apple Silicon. |
+
+The Windows CI runner's first DXGI adapter could not create Makepad's required
+Direct3D 11 device (`0x887a0004`); an independent probe with the same adapter,
+feature level and flags records that coverage as blocked. It is not a native
+Windows visual pass. Wine's built-in shader compiler/renderer were insufficient;
+the additional components above belonged only to the owned verification prefix,
+not the released package. WinRT media controls were unavailable in Wine.
+
+The Intel macOS CI runner returned blank frames without a rendering error. The
+Rosetta check establishes that the packaged x64 application can render, but does
+not establish physical Intel GPU behavior. Captures from the runtime checks were
+inspected as pixels rather than treating a successful process launch as visual proof.
+
 ## Device and account limits
 
 The signed x86-64 APK was installed on an owned Android 16 / API 36 emulator,
@@ -73,7 +97,7 @@ No live Odnal session was reused. The implementation retains format 3, its marke
 account scoping, immutable file references, confirmed-send handling and tombstones;
 compatibility does not make this preview a backup.
 
-Physical Android battery use, hardware Windows/macOS rendering, lock-screen
+Physical Android battery use, owner Windows/macOS devices, lock-screen
 behavior on a phone, Bluetooth changes and interrupted network recovery need
 device checks. A cross-platform build alone cannot establish these properties.
 The Makepad visual is an adaptation: it does not reproduce every Compose/Haze
