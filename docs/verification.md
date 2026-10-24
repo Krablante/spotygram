@@ -91,3 +91,20 @@ These implementation choices are not a claim of universal speedup. Earlier stabl
 0.28.0 observations of roughly 383–396 MiB RSS came from a different verification
 setup and cannot serve as a controlled comparison. Reported memory must distinguish
 catalog-only startup, initialized audio/Telegram engines and the graphics driver.
+
+On 2026-10-24, the packaged Rust 0.1.0 and packaged stable 0.28.0 were launched
+one at a time on toma with the same offline 10,001-track catalog, Russian/light
+appearance and 1040×760 window. No compiler or emulator was running. Both were
+limited to two CPU cores, with no account, playback or inspection bridge. After
+initial rendering settled, `/proc` samples over 20 seconds showed:
+
+| Stack | RSS | PSS | Swap | Idle CPU, one core = 100% |
+| --- | --- | --- | --- | --- |
+| Rust / Makepad | 210.4 MiB | 179.2 MiB | 0 | 0.94% |
+| Stable JVM / Compose | 367.3–367.6 MiB | 315.2–315.5 MiB | 0 | 0.30% |
+
+RSS was about 43% lower in this catalog-only case. Idle CPU was not lower.
+Rust used native Wayland/Vulkan; stable used Xwayland/OpenGL on the same Radeon.
+The figures exclude the separate compositor and do not account for all GPU/kernel
+allocations. This is one short controlled observation, not a startup, battery or
+frame-pacing benchmark. No multiplicative playback or Android speedup is claimed.

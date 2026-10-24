@@ -80,7 +80,7 @@ jobs:
           root=state/'images'/'${{ matrix.target }}'
           binary=root/'spotygram rust.app/Contents/MacOS/spotygram-rust' if os.name!='nt' else root/'spotygram-rust.exe'
           evidence=state/'verification'; evidence.mkdir()
-          environment=dict(os.environ,MAKEPAD_HIDE_WINDOWS='1',SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'))
+          environment=dict(os.environ,SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'))
           with (evidence/'launch.log').open('wb') as log:
               app=subprocess.Popen([str(binary),'--remote=46871'],env=environment,stdout=log,stderr=log)
               try:
@@ -93,8 +93,14 @@ jobs:
                       except OSError: pass
                       if app.poll() is not None or time.monotonic()>deadline: raise RuntimeError('Packaged interface did not open')
                       time.sleep(0.5)
-                  with urllib.request.urlopen('http://127.0.0.1:46871/g',timeout=15) as response: grab=json.load(response)
-                  shutil.copy2(grab['png'],evidence/'interface.png')
+                  for index in range(3):
+                      time.sleep(1)
+                      with urllib.request.urlopen('http://127.0.0.1:46871/g',timeout=15) as response: grab=json.load(response)
+                      shutil.copy2(grab['png'],evidence/f'interface-{index}.png')
+                  shutil.copy2(evidence/'interface-2.png',evidence/'interface.png')
+                  for endpoint in ('snap','log'):
+                      with urllib.request.urlopen('http://127.0.0.1:46871/'+endpoint,timeout=5) as response:
+                          (evidence/(endpoint+'.json')).write_bytes(response.read())
                   with urllib.request.urlopen('http://127.0.0.1:46871/quit',timeout=5) as response: response.read()
                   app.wait(timeout=15)
                   if app.returncode: raise RuntimeError(f'Interface exit code: {app.returncode}')
