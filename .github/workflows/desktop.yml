@@ -2,6 +2,12 @@ name: Rust preview desktop builds
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Platform to build
+        type: choice
+        default: all
+        options: [all, linux-x64, windows-x64, macos-x64, macos-arm64]
 
 permissions:
   contents: read
@@ -11,16 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-24.04
-            target: linux-x64
-          - os: windows-2025
-            target: windows-x64
-          - os: macos-15-intel
-            target: macos-x64
-          - os: macos-15
-            target: macos-arm64
-    runs-on: ${{ matrix.os }}
+        target: ${{ inputs.target != 'all' && fromJSON(format('["{0}"]', inputs.target)) || fromJSON('["linux-x64","windows-x64","macos-x64","macos-arm64"]') }}
+    runs-on: ${{ fromJSON('{"linux-x64":"ubuntu-24.04","windows-x64":"windows-2025","macos-x64":"macos-15-intel","macos-arm64":"macos-15"}')[matrix.target] }}
     timeout-minutes: 45
     env:
       TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}

@@ -227,7 +227,7 @@ def desktop(state, output, env, image_only):
         if system == "macos":
             run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", image / "spotygram rust.app", artifact])
         else:
-            with zipfile.ZipFile(artifact, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+            with zipfile.ZipFile(artifact, "w", zipfile.ZIP_DEFLATED, compresslevel=6, strict_timestamps=False) as archive:
                 for file in sorted(image.rglob("*")):
                     if file.is_file():
                         archive.write(file, Path("spotygram-rust") / file.relative_to(image))
