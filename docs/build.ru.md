@@ -40,6 +40,8 @@ python -B tools/build-rust.py
 закреплённые библиотеки TDLib/libmpv и локально подписывает macOS-приложение.
 Приватные аудиозависимости Linux не включают libstdc++ и libgcc, чтобы графический
 драйвер использовал C++ runtime системы.
+В macOS нативные библиотеки лежат в `Contents/Frameworks`, а ресурсы Makepad и
+лицензии — в `Contents/Resources`, чтобы подпись bundle корректно их обрабатывала.
 
 Каталог приложения появляется в `SPOTYGRAM_STATE/rust/images/<target>`, архивы
 и SHA-256 — в `SPOTYGRAM_STATE/rust/releases/<version>`. Desktop-пакеты переносимы;

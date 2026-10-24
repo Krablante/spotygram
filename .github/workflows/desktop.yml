@@ -59,7 +59,7 @@ jobs:
           binary=root/'bin' if system=='Linux' else root/'spotygram rust.app/Contents/MacOS' if system=='Darwin' else root
           executable=binary/('spotygram-rust.exe' if system=='Windows' else 'spotygram-rust')
           subprocess.run([executable,'--version'],check=True)
-          native=binary/'native'
+          native=binary.parent/'Frameworks' if system=='Darwin' else binary/'native'
           if system=='Windows':
               with os.add_dll_directory(str(native)):
                   td=ctypes.WinDLL(str(native/'tdjson.dll')); mpv=ctypes.WinDLL(str(native/'libmpv-2.dll'))

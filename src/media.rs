@@ -160,7 +160,7 @@ fn window_handle() -> Option<*mut std::ffi::c_void> {
         }
         1
     }
-    let mut window = std::ptr::null_mut();
+    let mut window: HWND = std::ptr::null_mut();
     unsafe {
         EnumWindows(Some(own), &mut window as *mut _ as isize);
     }

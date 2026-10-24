@@ -152,7 +152,7 @@ def desktop(state, output, env, image_only):
     target = f"{system}-{arch}"
     native = native_dependencies(target, state)
     upstream = makepad_source(env)
-    env["MAKEPAD_PACKAGE_DIR"] = "makepad"
+    env["MAKEPAD_PACKAGE_DIR"] = "../Resources/makepad" if system == "macos" else "makepad"
     if system == "windows":
         from PIL import Image
         icons = output / "icons"
@@ -182,10 +182,16 @@ def desktop(state, output, env, image_only):
     else:
         binary = image
     shutil.copy2(output / "target/release" / executable, binary / executable)
-    copy_tree(native, binary / "native")
-    resources(binary / "makepad", upstream)
-    licenses = binary / "licenses"
+    resource_root = bundle_resources if system == "macos" else binary
+    if system == "macos":
+        copy_tree(native, app / "Frameworks", ignore=shutil.ignore_patterns("licenses", ".complete"))
+    else:
+        copy_tree(native, binary / "native")
+    resources(resource_root / "makepad", upstream)
+    licenses = resource_root / "licenses"
     licenses.mkdir(exist_ok=True)
+    if system == "macos" and (native / "licenses").is_dir():
+        copy_tree(native / "licenses", licenses / "native")
     shutil.copy2(ROOT / "LICENSE", licenses / "Spotygram-LICENSE")
     for name in ("LICENSE", "LICENSE-MIT", "LICENSE-APACHE"):
         if (upstream / name).is_file():

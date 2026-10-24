@@ -40,6 +40,8 @@ packager creates the app icon, builds the native executable, bundles Makepad
 resources and pinned TDLib/libmpv libraries, and ad hoc signs the macOS app.
 Linux's private audio dependencies exclude libstdc++ and libgcc so the graphics
 driver uses the host's C++ runtime.
+The macOS app keeps native libraries in `Contents/Frameworks` and Makepad
+resources/licenses in `Contents/Resources`, so bundle signing treats them correctly.
 
 The resulting image is under `SPOTYGRAM_STATE/rust/images/<target>`. Archives
 and SHA-256 files are under `SPOTYGRAM_STATE/rust/releases/<version>`. Extracted
