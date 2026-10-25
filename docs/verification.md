@@ -22,6 +22,10 @@ with a genuine Ogg advancing from 0:08 to 0:25 at 1.05× through libmpv with nul
 output. Pause and explicit Quit completed cleanly. The same archive also rendered
 and completed Sources → Music → Back through Wayland/Vulkan. Actual frames were
 inspected, including the nested Music heading at 280 px.
+At 390×812, a playlist's Back restored the two-result search; switching away and
+back or tapping Playlists again retained it. Bookmark threshold and sign-in Back
+returned to the originating Player and Telegram settings sections. Leaving
+Settings then restored the searched playlist list.
 
 The final x86-64 APK updated the API-36 profile without clearing its 10,007
 recordings, favorite or playlists. Android reported 0.2.8-rust / 1010. Actual
@@ -47,6 +51,21 @@ no account session or media fixture is included in the application.
 
 Formatting, Cargo checks and Android release lint pass. Both final APKs pass
 signature verification with the existing certificate and 16-KiB ZIP alignment.
+
+All four desktop builds and native-engine checks passed in
+[CI](https://github.com/Krablante/spotygram/actions/runs/40239268077). Both macOS
+bundles passed strict ad hoc signature verification. Apple Silicon Metal frames
+of the library and Settings were inspected. Hosted Intel library frames omitted
+several text labels while Settings rendered; the exact x64 archive rendered both
+screens completely in the [Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40239989325).
+
+The Windows runner's native graphics probe remained blocked with `0x887a0004`.
+Its exact archive passed SHA-256 before extraction and rendered both themes
+through Wine/DXVK on Radeon. Sources → chat → Back restored the scrolled list;
+opening the current cached profile from the full player returned to that player.
+A genuine Ogg advanced from 0:00 to 0:27 at 1.05× with null output. Pause and
+explicit Quit completed cleanly. These checks do not establish native Windows
+or physical Intel GPU behavior, Windows system-media controls or speaker output.
 
 Physical phones and authenticated Telegram directory, folder, topic and profile
 requests were not exercised by this offline navigation audit.
