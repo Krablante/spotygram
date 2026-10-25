@@ -39,6 +39,19 @@ its state. No Makepad script/shader error or application crash appeared.
 Both ABIs pass application lint, signature verification and 16-KiB ZIP alignment;
 the signing certificate matches 0.2.1.
 
+Desktop packages and native-engine loading passed in [CI](https://github.com/Krablante/spotygram/actions/runs/40174812426)
+and the [Intel retry](https://github.com/Krablante/spotygram/actions/runs/40175008276).
+The first Intel build hit a rustc SIGSEGV while optimizing unchanged Makepad code;
+a clean retry succeeded. Both macOS bundles passed strict ad hoc signature checks.
+Apple Silicon Metal frames of the library and settings were visually inspected.
+Hosted Intel captures remained blank; the exact x64 archive also produced inspected
+frames in the [Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40175667150).
+The Windows first-adapter probe remained blocked with `0x887a0004`. The exact
+Windows archive rendered through Wine/DXVK on Radeon: light/dark player and
+settings, the speed panel, genuine Ogg import, libmpv null-output playback and
+pause passed. These compatibility checks do not establish physical Windows/Intel
+GPU behavior or speaker output.
+
 These are rendering and interaction checks. The account and physical-device
 coverage limits below still apply.
 
