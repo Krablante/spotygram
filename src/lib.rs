@@ -13,6 +13,7 @@ pub mod platform;
 pub mod player;
 pub mod reader;
 pub mod runtime;
+pub mod settings;
 pub mod store;
 pub mod sync;
 pub mod telegram;

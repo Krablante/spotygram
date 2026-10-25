@@ -132,6 +132,40 @@ pub fn tr<'a>(language: &str, text: &'a str) -> Cow<'a, str> {
         "Me" => "Я",
         " · In library" => " · В медиатеке",
         "Settings" => "Настройки",
+        "General" => "Общее",
+        "Cancel" => "Отмена",
+        "Player" => "Плеер",
+        "Storage" => "Память",
+        "Library" => "Медиатека",
+        "Application" => "Приложение",
+        "Playback" => "Воспроизведение",
+        "Saved music" => "Сохранённая музыка",
+        "Downloads" => "Загрузки",
+        "Account" => "Аккаунт",
+        "Library sync" => "Синхронизация медиатеки",
+        "Check for updates" => "Проверить обновления",
+        "Quit" => "Выйти",
+        "One entry per recording. Files stay on this device." => {
+            "Одна строка на запись. Файлы остаются на устройстве."
+        }
+        "Continue long recordings where you stopped." => {
+            "Продолжать длинные записи с места остановки."
+        }
+        "Also keeps the original caption." => "Также сохраняет исходную подпись.",
+        "Streaming can use mobile data." => "Прослушивание может использовать мобильный интернет.",
+        "Saved downloads and imports stay." => {
+            "Скачанные вручную и импортированные файлы остаются."
+        }
+        "No active downloads" => "Нет активных загрузок",
+        "Telegram audio. Imported files stay." => "Аудио Telegram. Импортированные файлы остаются.",
+        "Connect Telegram to manage its downloaded audio." => {
+            "Подключи Telegram для управления скачанным аудио."
+        }
+        "Not connected" => "Не подключён",
+        "Connect Telegram to sync your library." => {
+            "Подключи Telegram для синхронизации медиатеки."
+        }
+        "Refresh library" => "Обновить медиатеку",
         "Queue" => "Очередь",
         "On device" => "На устройстве",
         "Download" => "Скачать",
@@ -160,6 +194,7 @@ pub fn tr<'a>(language: &str, text: &'a str) -> Cow<'a, str> {
         "Resume long recordings" => "Запоминать позицию",
         "Remember audio positions" => "Запоминать позицию",
         "Audio duration threshold" => "Порог длительности",
+        "Duration in minutes (1 or more)" => "Длительность в минутах, не меньше 1",
         "Hide duplicates" => "Скрывать дубли",
         "Do not keep played tracks" => "Не сохранять прослушанное",
         "Downloads over Wi-Fi only" => "Скачивать только по Wi-Fi",

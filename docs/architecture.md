@@ -39,6 +39,25 @@ gesture helper for forms. Touch swipes may start over a button; crossing touch
 slop cancels that button's press. Claimed slider drags and nested catalog scrolling
 retain their own gesture. Closing a panel stops its remaining momentum.
 
+Settings is a separate opaque workspace in the same palette. `settings.rs` owns
+its four sections, labels and responsive layout; `ui.rs` composes the controls,
+and `app.rs` routes actions and returns to the originating library context.
+Each section owns a scroll view, with fixed navigation above it on narrow screens
+or beside it in wide windows. Switching sections or opening a child dialog stops
+the old gesture without resetting its position. Settings clamps both the visible
+scroll position and the touch helper at its bounds, avoiding hidden overscroll
+and a dead zone when reversing direction.
+
+The hidden library, dock and player do not draw behind Settings, and the playback
+UI clock is not observed there. Cache usage is requested when entering Storage
+or explicitly refreshing, without a polling timer. Android text scaling is read
+through the existing Java bridge and applied to settings typography and layout.
+Configuration changes wake the UI once to apply a new text size without reopening
+the workspace. Its own draw list bounds the existing Makepad Tab navigation;
+it adds no offscreen texture or capture pass.
+Boolean toggles carry intent to the worker, which reads the current value;
+dependent sender/caption preferences commit in the same SQLite transaction.
+
 The UI sends bounded, non-blocking commands to `runtime.rs`. One Tokio worker
 with a local task set owns the main SQLite connection, playback intent and job
 handles. File import and blocking file waits use a pool limited to two threads.
@@ -134,6 +153,9 @@ library loading and links. Desktop Telegram database keys use the OS key store;
 Android wraps its key with Android Keystore. Missing keys do not cause database
 replacement. The Android Java layer also owns the activity, content picker,
 network notifications and system media session.
+Explicit Android Quit reaches Java after the worker saves playback and stops its
+native jobs. Java stops both services, finishes the task and exits the process;
+relaunching must initialize fresh native singletons rather than reuse a closed client.
 
 Makepad's Android Java/resources compile as the `makepad-platform` dependency
 from its pinned checkout, outside the source tree. Staging adds one version guard

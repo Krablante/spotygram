@@ -61,16 +61,28 @@ public final class PlatformBridge extends Application {
                 case "databaseKey" -> databaseKey();
                 case "wifi" -> Boolean.toString(wifi());
                 case "language" -> java.util.Locale.getDefault().getLanguage();
+                case "fontScale" -> Float.toString(app.getResources().getConfiguration().fontScale);
                 case "player" -> { JSONObject action = new JSONObject(value); main.post(() -> player(action)); yield ""; }
                 case "pickFiles" -> { main.post(() -> { MainActivity owner = activity.get(); if (owner != null) owner.pickFiles(); }); yield ""; }
                 case "openUrl" -> { app.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(value)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); yield ""; }
                 case "visible" -> { visible = Boolean.parseBoolean(value); yield ""; }
                 case "transfer" -> { main.post(() -> { try { if (Boolean.parseBoolean(value)) app.startForegroundService(new Intent(app, TransferService.class)); else app.stopService(new Intent(app, TransferService.class)); } catch (RuntimeException error) { android.util.Log.e("spotygram", "Cannot keep transfer in foreground", error); } }); yield ""; }
-                case "shutdown" -> { main.post(() -> { pending.clear(); app.stopService(new Intent(app, PlaybackService.class)); app.stopService(new Intent(app, TransferService.class)); }); yield ""; }
+                case "shutdown" -> { main.post(PlatformBridge::shutdown); yield ""; }
                 case "checkUpdate" -> checkUpdate(value);
                 default -> throw new IllegalArgumentException("Unknown Android facility");
             };
         } catch (Exception error) { return "!error:" + error.getMessage(); }
+    }
+
+    static void shutdown() {
+        // Rust requests this after saving playback and stopping native jobs.
+        pending.clear();
+        app.stopService(new Intent(app, PlaybackService.class));
+        app.stopService(new Intent(app, TransferService.class));
+        MainActivity owner = activity.get();
+        if (owner != null) owner.finishAndRemoveTask();
+        // A fresh process is needed for the closed native runtime's singletons.
+        System.exit(0);
     }
 
     static String checkUpdate(String current) throws Exception {

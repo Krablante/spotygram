@@ -15,7 +15,7 @@ Android also accepts audio shared from another app; desktop accepts dropped file
 launcher arguments and Ctrl/⌘+O. Importing
 copies the recording into app-owned storage and reads its tags and cover.
 
-**Settings → Connect Telegram** offers phone and QR sign-in. Enter a number with
+**Settings → Telegram → Connect Telegram** offers phone and QR sign-in. Enter a number with
 its country code. Telegram chooses code delivery and may require a password or
 email. Resend availability comes from Telegram. Use Change phone number to return
 to the number screen, or close the panel to use local music.
@@ -78,7 +78,7 @@ speed button is tinted whenever playback differs from 1×; the 1× preset resets
 <img src="screenshots/rust-android-dark.png" alt="The same player on Android in dark appearance" width="300">
 
 Playback state is saved locally and never starts automatically after launch.
-Long recordings can resume from bookmarks; Settings controls the duration
+Long recordings can resume from bookmarks; Settings → Player controls the duration
 threshold. Android uses a media notification/service; desktop exposes operating
 system media controls. Desktop Esc closes panels, Ctrl/⌘+Q quits. Closing the
 window during an active job minimizes it; quitting explicitly cancels that job.
@@ -92,8 +92,8 @@ Removing a downloaded copy affects local storage only. Deleting an imported
 recording requires confirmation: it removes this application's imported copy and
 its cloud favorite/playlist membership. Original external files and other
 devices' physical copies remain. Clear music cache keeps imported audio and
-requires confirmation. **Settings → Clear music cache** opens the audio/document
-usage page before deletion. Cloud sync is not a backup or an edit history.
+requires confirmation. **Settings → Storage** shows downloaded audio/document
+usage alongside its refresh and clear controls. Cloud sync is not a backup or an edit history.
 
 ## Sending and updates
 
@@ -109,9 +109,31 @@ The chooser's gear opens the sender/caption settings. The pin button adds or
 removes the selected chat from Quick access. Recent recipients appear only after
 a confirmed send. Pins and recent recipients are local to this Telegram account.
 
-Settings offers dark/light appearance, a system/Russian/English language chooser,
-cache controls and
-**Check Rust preview updates**. Preview updates open a newer `rust-v` prerelease for manual
+## Settings
+
+Settings has four sections: **General**, **Player**, **Storage** and **Telegram**.
+On a phone it fills the screen; a wide window places the same navigation at the
+left. The header and section buttons stay visible while the selected section
+scrolls. Each section retains its position until the app exits. Back/Escape or
+the header arrow returns to where you opened Settings; closing a confirmation or
+duration editor returns to the same settings section. Returning from **On device**
+also restores the original library query and scroll position.
+On desktop, Tab/Shift+Tab moves between controls; Enter or Space activates the
+focused control, including in the duration editor.
+
+**General** contains appearance, system/Russian/English language, duplicate hiding
+and **Check for updates**. **Player** contains position bookmarks, their duration
+threshold and sender/caption preferences. **Storage** groups imported/saved music,
+download policy and progress, and Telegram cache usage. **Telegram** groups the
+account connection and library synchronization. Changes apply immediately.
+The duration editor accepts a positive whole number of minutes and disables Save
+while the value is empty or invalid.
+
+Keeping the original sender also enables the original caption; turning that
+caption off turns sender preservation off. Android's system text size applies
+to this settings workspace, with controls rearranged when space is limited.
+
+Preview updates open a newer `rust-v` prerelease for manual
 installation. The stable automatic installer is not used by this branch.
 
 This is a personal test channel. Read [verification](verification.md) for the

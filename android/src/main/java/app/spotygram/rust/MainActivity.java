@@ -21,6 +21,7 @@ public final class MainActivity extends MakepadActivity {
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); acceptShared(intent); }
     @Override public void onStart() { super.onStart(); PlatformBridge.visible = true; PlatformBridge.command("visible", 1); }
     @Override public void onStop() { PlatformBridge.visible = false; PlatformBridge.command("visible", 0); super.onStop(); }
+    @Override public void onConfigurationChanged(android.content.res.Configuration configuration) { super.onConfigurationChanged(configuration); PlatformBridge.command("configuration", 0); }
 
     void pickFiles() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*")

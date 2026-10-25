@@ -1,6 +1,8 @@
+use crate::settings::Section as SettingsSection;
 use crate::ui::{MediaSliderWidgetRefExt, TouchScrollWidgetRefExt};
-use crate::{model as data, runtime, ui};
+use crate::{model as data, runtime, settings, ui};
 use makepad_widgets::makepad_platform::event::finger::TouchState;
+use makepad_widgets::nav_control::NavControl;
 use makepad_widgets::*;
 use serde_json::json;
 use std::{
@@ -14,6 +16,7 @@ script_mod! {
     use mod.prelude.widgets.*
     use mod.spotygram.*
     startup() do #(App::script_component(vm)) {
+        settings_nav_control: mod.widgets.NavControl{}
         ui: Root {
             main_window := Window {
                 window.title: "spotygram rust"
@@ -31,7 +34,6 @@ enum Dialog {
     #[default]
     None,
     Settings,
-    Language,
     Auth,
     Track,
     Chats,
@@ -54,7 +56,6 @@ enum Dialog {
     BookmarkThreshold,
     RemoveSource(i64, bool),
     Sharing,
-    Cache,
     AddSource,
     Queue,
     DiscardEditor,
@@ -70,8 +71,19 @@ struct PlaylistEditor {
     selection_revision: u64,
 }
 
+struct SettingsLibraryReturn {
+    query: data::Query,
+    page: usize,
+    first: usize,
+    scroll: f64,
+    full_player: bool,
+    restoring: bool,
+}
+
 #[derive(Script, ScriptHook)]
 pub struct App {
+    #[live]
+    settings_nav_control: NavControl,
     #[live]
     ui: WidgetRef,
     #[rust]
@@ -82,6 +94,12 @@ pub struct App {
     pending: VecDeque<data::Command>,
     #[rust]
     dialog: Dialog,
+    #[rust]
+    settings_open: bool,
+    #[rust]
+    settings_section: SettingsSection,
+    #[rust]
+    settings_library_return: Option<SettingsLibraryReturn>,
     #[rust]
     full_player: bool,
     #[rust]
@@ -434,6 +452,7 @@ impl App {
     }
 
     fn navigate(&mut self, cx: &mut Cx, screen: data::Screen) {
+        self.settings_library_return = None;
         self.queue_return = None;
         self.queue_restore = None;
         self.selection.clear();
@@ -457,9 +476,15 @@ impl App {
         self.ui.touch_scroll(cx, ids!(panel_scroll)).stop_motion();
         cx.set_key_focus(Area::Empty);
         cx.text_ime_was_dismissed();
-        if matches!(self.dialog, Dialog::Language | Dialog::BookmarkThreshold) {
+        if self.settings_open && self.dialog != Dialog::Settings {
             self.open(cx, Dialog::Settings);
             return;
+        }
+        let settings_closed = self.settings_open;
+        if settings_closed {
+            self.settings_open = false;
+            settings::stop(&self.ui, cx);
+            self.visible(cx, ids!(settings_page), false);
         }
         if self.queue_return.is_some()
             && self.dialog != Dialog::Queue
@@ -490,6 +515,10 @@ impl App {
         self.ui.text_input(cx, ids!(panel_input)).set_text(cx, "");
         self.ui.image(cx, ids!(auth_qrcode)).set_texture(cx, None);
         self.qr_url.clear();
+        if settings_closed {
+            self.sync_ui(cx);
+            self.send(cx, data::Command::ObserveClock(self.full_player));
+        }
     }
 
     fn selection_ui(&self, cx: &mut Cx) {
@@ -707,6 +736,25 @@ impl App {
     fn open(&mut self, cx: &mut Cx, dialog: Dialog) {
         cx.set_key_focus(Area::Empty);
         cx.text_ime_was_dismissed();
+        if dialog == Dialog::Settings {
+            let entering = !self.settings_open;
+            self.settings_open = true;
+            self.dialog = dialog;
+            self.panel_wide = None;
+            self.panel_anchor = None;
+            self.sheet_drag = None;
+            self.sheet_offset = 0.;
+            self.sync_ui(cx);
+            self.configure_dialog(cx);
+            if entering {
+                self.send(cx, data::Command::ObserveClock(false));
+                self.refresh_settings_cache(cx);
+            }
+            return;
+        }
+        if self.settings_open {
+            settings::stop(&self.ui, cx);
+        }
         self.panel_wide.get_or_insert(self.size.x >= 600.);
         self.panel_anchor = match &dialog {
             Dialog::Track | Dialog::PlaylistActions(_) => self.panel_anchor,
@@ -755,9 +803,26 @@ impl App {
         self.configure_dialog(cx);
     }
 
+    fn refresh_settings_cache(&mut self, cx: &mut Cx) {
+        let state = self.snapshot();
+        if self.settings_section == settings::Section::Storage
+            && state.auth.kind == "authorizationStateReady"
+            && !state.cache_loading
+        {
+            self.send(cx, data::Command::CacheInfo);
+        }
+    }
+
     fn configure_dialog(&mut self, cx: &mut Cx) {
         let state = self.snapshot();
         let dialog = self.dialog.clone();
+        if dialog == Dialog::Settings {
+            self.visible(cx, ids!(overlay), false);
+            settings::select(&self.ui, cx, self.settings_section);
+            settings::refresh(&self.ui, cx, &state);
+            self.layout(cx);
+            return;
+        }
         self.visible(cx, ids!(overlay), dialog != Dialog::None);
         self.visible(cx, ids!(auth_background), dialog == Dialog::Auth);
         self.visible(cx, ids!(scrim), dialog != Dialog::Auth);
@@ -776,9 +841,7 @@ impl App {
             },
         );
         for path in [
-            ids!(settings_body),
             ids!(sharing_body),
-            ids!(cache_body),
             ids!(panel_cancel),
             ids!(track_body),
             ids!(choices_body),
@@ -804,10 +867,16 @@ impl App {
         self.ui
             .text_input(cx, ids!(panel_input))
             .set_is_password(cx, false);
+        self.ui
+            .text_input(cx, ids!(panel_input))
+            .set_is_numeric_only(cx, dialog == Dialog::BookmarkThreshold);
         self.choices.clear();
         self.ui
             .widget(cx, ids!(panel_confirm))
             .set_disabled(cx, false);
+        self.ui
+            .button(cx, ids!(panel_confirm))
+            .set_enabled(cx, true);
         let search = matches!(dialog, Dialog::Filter | Dialog::Chats | Dialog::Recipients);
         self.visible(cx, ids!(panel_search_icon), search);
         let mut input_wrap = self.ui.widget(cx, ids!(panel_input_wrap));
@@ -817,19 +886,12 @@ impl App {
             ..Default::default()
         };
         script_apply_eval!(cx,input_wrap,{padding:#(padding)});
-        self.visible(
-            cx,
-            ids!(panel_back),
-            matches!(dialog, Dialog::Sharing | Dialog::Cache),
-        );
-        self.visible(cx, ids!(cache_refresh), dialog == Dialog::Cache);
+        self.visible(cx, ids!(panel_back), dialog == Dialog::Sharing);
         self.visible(cx, ids!(panel_header), dialog != Dialog::Track);
         let title = match &dialog {
             Dialog::None => "",
             Dialog::Settings => "Settings",
-            Dialog::Language => "Language",
             Dialog::Sharing => "Sharing audio",
-            Dialog::Cache => "Music cache",
             Dialog::AddSource => "Add source",
             Dialog::Queue => "Queue",
             Dialog::DiscardEditor => "Discard playlist changes?",
@@ -857,63 +919,9 @@ impl App {
         };
         self.text(cx, ids!(panel_title), title);
         match &dialog {
-            Dialog::Settings | Dialog::Sharing => {
-                self.visible(cx, ids!(settings_body), dialog == Dialog::Settings);
-                self.visible(cx, ids!(sharing_body), dialog == Dialog::Sharing);
-                self.text(
-                    cx,
-                    ids!(settings_account),
-                    if state.auth.kind == "authorizationStateReady" {
-                        "Sign out of Telegram"
-                    } else {
-                        "Connect Telegram"
-                    },
-                );
-                for (path, selected) in [
-                    (ids!(theme_light), state.settings["theme"] == "light"),
-                    (ids!(theme_dark), state.settings["theme"] != "light"),
-                ] {
-                    let active = if selected { 1.0 } else { 0.0 };
-                    let mut widget = self.ui.widget(cx, path);
-                    script_apply_eval!(cx,widget,{draw_bg.active:#(active)});
-                }
-                self.text(cx, ids!(settings_language), "Language");
-                self.text(
-                    cx,
-                    ids!(settings_language.detail),
-                    match state.settings["language"].as_str().unwrap_or("system") {
-                        "ru" => "Русский",
-                        "en" => "English",
-                        _ => {
-                            if state.language == "ru" {
-                                "Системный"
-                            } else {
-                                "System"
-                            }
-                        }
-                    },
-                );
+            Dialog::Sharing => {
+                self.visible(cx, ids!(sharing_body), true);
                 for (id, key, label) in [
-                    (
-                        ids!(settings_duplicates),
-                        "hide_duplicates",
-                        "Hide duplicates",
-                    ),
-                    (
-                        ids!(settings_bookmarks),
-                        "resume_long_audio",
-                        "Remember audio positions",
-                    ),
-                    (
-                        ids!(settings_wifi),
-                        "wifi_only",
-                        "Downloads over Wi-Fi only",
-                    ),
-                    (
-                        ids!(settings_discard),
-                        "discard_listened",
-                        "Do not keep played tracks",
-                    ),
                     (
                         ids!(settings_sharing_sender),
                         "sharing_sender",
@@ -934,77 +942,6 @@ impl App {
                     let mut toggle = self.ui.widget(cx, id).widget(cx, ids!(toggle));
                     script_apply_eval!(cx,toggle,{draw_bg.checked:#(checked)});
                 }
-                self.text(cx, ids!(settings_minutes), "Audio duration threshold");
-                let minutes = state.settings["resume_minutes"].as_u64().unwrap_or(30);
-                self.text(
-                    cx,
-                    ids!(settings_minutes.detail),
-                    &if state.language == "ru" {
-                        format!("От {minutes} мин")
-                    } else {
-                        format!("{minutes} min and longer")
-                    },
-                );
-                self.text(cx, ids!(settings_storage), "On device");
-                self.text(
-                    cx,
-                    ids!(settings_storage.detail),
-                    &format!(
-                        "{} · {}",
-                        crate::i18n::tracks(&state.language, state.storage_count),
-                        crate::i18n::bytes(&state.language, state.storage_bytes.max(0) as u64)
-                    ),
-                );
-                self.text(
-                    cx,
-                    ids!(settings_transfers),
-                    &format!(
-                        "{} · {} · {:.0}%",
-                        crate::i18n::tr(&state.language, "Cancel downloads"),
-                        state.downloads,
-                        state.transfer_progress * 100.
-                    ),
-                );
-                self.text(cx, ids!(settings_sync), &state.sync);
-            }
-            Dialog::Cache => {
-                self.visible(cx, ids!(cache_body), true);
-                self.text(
-                    cx,
-                    ids!(cache_size),
-                    &state
-                        .cache_size
-                        .map(|(bytes, _)| crate::i18n::bytes(&state.language, bytes))
-                        .unwrap_or_else(|| "—".into()),
-                );
-                self.text(
-                    cx,
-                    ids!(cache_count),
-                    &state
-                        .cache_size
-                        .map(|(_, files)| crate::i18n::files(&state.language, files))
-                        .unwrap_or_default(),
-                );
-                self.visible(cx, ids!(cache_loading), state.cache_loading);
-                self.visible(
-                    cx,
-                    ids!(cache_connect),
-                    state.auth.kind != "authorizationStateReady",
-                );
-                self.visible(
-                    cx,
-                    ids!(cache_clear),
-                    state.auth.kind == "authorizationStateReady",
-                );
-                self.ui.widget(cx, ids!(cache_clear)).set_disabled(
-                    cx,
-                    state.cache_loading
-                        || state.cache_size.is_none_or(|(bytes, _)| bytes == 0)
-                        || !state.cache_error.is_empty(),
-                );
-                self.ui
-                    .widget(cx, ids!(cache_refresh))
-                    .set_disabled(cx, state.cache_loading);
             }
             Dialog::Auth => {
                 self.visible(cx, ids!(auth_actions), true);
@@ -1499,13 +1436,6 @@ impl App {
                 self.visible(cx, ids!(manage_sources), true);
                 self.text(cx, ids!(manage_sources), "Manage sources");
             }
-            Dialog::Language => {
-                self.choices = vec![
-                    (0, "System".into()),
-                    (1, "English".into()),
-                    (2, "Русский".into()),
-                ];
-            }
             Dialog::Sort => {
                 self.choices = [
                     "Newest first",
@@ -1619,10 +1549,19 @@ impl App {
             }
             Dialog::BookmarkThreshold => {
                 self.visible(cx, ids!(panel_input_wrap), true);
+                self.visible(cx, ids!(panel_message), true);
+                self.text(cx, ids!(panel_message), "Duration in minutes (1 or more)");
                 self.ui
                     .text_input(cx, ids!(panel_input))
-                    .set_empty_text(cx, "Minutes".into());
+                    .set_empty_text(cx, crate::i18n::tr(&state.language, "Minutes").into_owned());
                 self.confirm_button(cx, "Save threshold");
+                let valid = self.threshold_minutes(cx).is_some();
+                self.ui
+                    .button(cx, ids!(panel_confirm))
+                    .set_enabled(cx, valid);
+                self.ui
+                    .widget(cx, ids!(panel_confirm))
+                    .set_disabled(cx, !valid);
             }
             Dialog::RemoveSource(..) => {
                 self.visible(cx, ids!(panel_message), true);
@@ -1661,16 +1600,11 @@ impl App {
                 );
                 self.confirm_button(cx, "Discard");
             }
-            Dialog::None => {}
+            Dialog::None | Dialog::Settings => {}
         }
         let choices = self.ui.widget(cx, ids!(choices_body));
         if let Some(mut widget) = choices.borrow_mut::<ui::Choices>() {
             let selected = match dialog {
-                Dialog::Language => Some(match state.settings["language"].as_str() {
-                    Some("en") => 1,
-                    Some("ru") => 2,
-                    _ => 0,
-                }),
                 Dialog::Sort => Some(match state.page.query.sort {
                     data::Sort::Newest => 0,
                     data::Sort::Oldest => 1,
@@ -1725,7 +1659,6 @@ impl App {
                     let title = if matches!(
                         dialog,
                         Dialog::Sort
-                            | Dialog::Language
                             | Dialog::Order
                             | Dialog::Repeat
                             | Dialog::PlaylistActions(_)
@@ -1756,10 +1689,7 @@ impl App {
                         checked: selected == Some(index)
                             || dialog == Dialog::Chats && source.is_some_and(|s| s.selected),
                         glass: dialog == Dialog::Filter,
-                        radio: matches!(
-                            dialog,
-                            Dialog::Language | Dialog::Recipients | Dialog::Topics(..)
-                        ),
+                        radio: matches!(dialog, Dialog::Recipients | Dialog::Topics(..)),
                     }
                 })
                 .collect();
@@ -1774,11 +1704,7 @@ impl App {
                 crate::i18n::tr(&state.language, &placeholder).into_owned(),
             );
         }
-        let error = if dialog == Dialog::Cache && !state.cache_error.is_empty() {
-            &state.cache_error
-        } else {
-            &state.error
-        };
+        let error = &state.error;
         self.visible(cx, ids!(panel_error), !error.is_empty());
         self.text(cx, ids!(panel_error), error);
         if dialog == Dialog::Auth {
@@ -1803,6 +1729,16 @@ impl App {
         self.visible(cx, ids!(panel_cancel), true);
         self.visible(cx, ids!(panel_confirm), true);
         self.text(cx, ids!(panel_confirm), text);
+    }
+
+    fn threshold_minutes(&self, cx: &mut Cx) -> Option<i32> {
+        self.ui
+            .text_input(cx, ids!(panel_input))
+            .text()
+            .trim()
+            .parse::<i32>()
+            .ok()
+            .filter(|minutes| *minutes > 0)
     }
 
     fn select_recipient(&mut self, cx: &mut Cx, source: &data::Source) {
@@ -1927,6 +1863,20 @@ impl App {
                 .widget(cx, ids!(catalog))
                 .portal_list(cx, ids!(list))
                 .set_first_id_and_scroll(0, 0.);
+        }
+        if let Some(saved) = self.settings_library_return.as_ref()
+            && saved.restoring
+            && saved.query == state.page.query
+        {
+            self.ui
+                .widget(cx, ids!(catalog))
+                .portal_list(cx, ids!(list))
+                .set_first_id_and_scroll(saved.first, saved.scroll);
+            self.ui
+                .text_input(cx, ids!(search))
+                .set_text(cx, &saved.query.search);
+            self.full_player = saved.full_player;
+            self.settings_library_return = None;
         }
         let lists_changed = old.as_ref().is_none_or(|old| {
             !Arc::ptr_eq(&old.sources, &state.sources)
@@ -2126,21 +2076,26 @@ impl App {
         self.text(cx, ids!(notice), notice);
         let playback = &state.playback;
         let active = playback.track.is_some();
-        self.visible(cx, ids!(player_dock), active);
+        self.visible(cx, ids!(settings_page), self.settings_open);
+        self.visible(cx, ids!(player_dock), active && !self.settings_open);
         self.visible(
             cx,
             ids!(full_player),
-            self.editor.is_none() && self.full_player && active,
+            !self.settings_open && self.editor.is_none() && self.full_player && active,
         );
-        if self.editor.is_some() || !self.full_player || !active {
+        if self.settings_open || self.editor.is_some() || !self.full_player || !active {
             self.ui.touch_scroll(cx, ids!(player_columns)).stop_motion();
         }
         self.visible(
             cx,
             ids!(main),
-            self.editor.is_none() && (!self.full_player || !active),
+            !self.settings_open && self.editor.is_none() && (!self.full_player || !active),
         );
-        self.visible(cx, ids!(playlist_editor), self.editor.is_some());
+        self.visible(
+            cx,
+            ids!(playlist_editor),
+            !self.settings_open && self.editor.is_some(),
+        );
         for path in [ids!(mini_play), ids!(previous), ids!(next)] {
             self.visible(cx, path, active);
         }
@@ -2418,19 +2373,7 @@ impl App {
         }
         if self.dialog != Dialog::None {
             let reconfigure = old.as_ref().is_none_or(|s| match self.dialog {
-                Dialog::Settings | Dialog::Sharing => {
-                    s.settings != state.settings
-                        || s.storage_bytes != state.storage_bytes
-                        || s.downloads != state.downloads
-                        || s.transfer_progress != state.transfer_progress
-                        || s.sync != state.sync
-                }
-                Dialog::Cache => {
-                    s.cache_size != state.cache_size
-                        || s.cache_loading != state.cache_loading
-                        || s.cache_error != state.cache_error
-                        || s.auth != state.auth
-                }
+                Dialog::Sharing => s.settings != state.settings,
                 Dialog::Auth => s.auth != state.auth || s.error != state.error,
                 Dialog::Track => {
                     selected_changed
@@ -2465,56 +2408,31 @@ impl App {
                 self.close_dialog(cx);
             }
         }
+        if self.settings_open
+            && old.as_ref().is_none_or(|s| {
+                s.settings != state.settings
+                    || s.language != state.language
+                    || s.auth != state.auth
+                    || s.storage_bytes != state.storage_bytes
+                    || s.storage_count != state.storage_count
+                    || s.downloads != state.downloads
+                    || s.transfer_progress != state.transfer_progress
+                    || s.sync != state.sync
+                    || s.cache_size != state.cache_size
+                    || s.cache_loading != state.cache_loading
+                    || s.cache_error != state.cache_error
+                    || s.error != state.error
+                    || s.status != state.status
+            })
+        {
+            settings::refresh(&self.ui, cx, &state);
+        }
     }
 
     fn localize(&self, cx: &mut Cx) {
         for (path, text) in [
             (ids!(panel_cancel).as_slice(), "Cancel"),
-            (ids!(settings_sharing), "Sharing audio"),
-            (ids!(settings_sharing.detail), "Sender and original caption"),
             (ids!(sharing_help), "Sender and original caption"),
-            (
-                ids!(settings_language_help),
-                "Choose English, Russian or your device language.",
-            ),
-            (ids!(cache_loading), "Calculating…"),
-            (
-                ids!(cache_description),
-                "Downloaded Telegram audio and documents, including saved recordings, will be removed from this device.",
-            ),
-            (
-                ids!(cache_preserved),
-                "Imported files, favorites, playlists and sign-in stay intact.",
-            ),
-            (ids!(cache_clear), "Clear music cache"),
-            (ids!(cache_connect), "Connect Telegram"),
-            (ids!(appearance_label).as_slice(), "Appearance"),
-            (ids!(theme_light), "Light"),
-            (ids!(theme_dark), "Dark"),
-            (
-                ids!(settings_bookmarks.detail),
-                "Resume long recordings where you left off.",
-            ),
-            (
-                ids!(settings_duplicates.detail),
-                "Show one entry per recording in Music, Favorites and On device. Nothing is deleted. Existing playlists and the current queue stay unchanged.",
-            ),
-            (
-                ids!(settings_storage.detail),
-                "Saved music and imported recordings.",
-            ),
-            (
-                ids!(settings_discard.detail),
-                "Keep a temporary playback buffer instead of adding every song to On device. Previously stored files, explicit downloads and imports stay.",
-            ),
-            (
-                ids!(settings_clear.detail),
-                "Manage downloaded music on this device.",
-            ),
-            (
-                ids!(settings_wifi.detail),
-                "Applies to downloads, not streaming playback",
-            ),
             (ids!(playing_label), "PLAYING FROM"),
             (ids!(rail_music), "Music"),
             (ids!(nav_music), "Music"),
@@ -2538,11 +2456,6 @@ impl App {
             (ids!(auth_qr), "Sign in with QR code"),
             (ids!(auth_phone), "Use another phone number"),
             (ids!(auth_resend), "Resend code"),
-            (ids!(settings_import), "Import audio files"),
-            (ids!(settings_clear), "Clear music cache"),
-            (ids!(settings_transfers), "Cancel downloads"),
-            (ids!(settings_update), "Check Rust preview updates"),
-            (ids!(settings_quit), "Quit spotygram rust"),
             (ids!(track_playlist), "Add to playlist"),
             (ids!(track_queue), "Add to queue"),
             (ids!(track_download), "Save on device"),
@@ -2556,18 +2469,6 @@ impl App {
         ] {
             self.text(cx, path, text);
         }
-        self.text(
-            cx,
-            ids!(settings_about),
-            &format!(
-                "spotygram rust · {}\n{}",
-                env!("CARGO_PKG_VERSION"),
-                crate::i18n::tr(
-                    &self.snapshot().language,
-                    "A personal testing build. Local data is separate from the stable app."
-                )
-            ),
-        );
         self.ui.text_input(cx, ids!(search)).set_empty_text(
             cx,
             crate::i18n::tr(&self.snapshot().language, "Search music").into_owned(),
@@ -2601,6 +2502,14 @@ impl App {
             }
         };
         let width = (self.size.x - self.safe.left - self.safe.right).max(280.);
+        if self.settings_open {
+            settings::layout(
+                &self.ui,
+                cx,
+                width,
+                self.size.y - self.safe.top - self.safe.bottom,
+            );
+        }
         let height = (self.size.y
             - bounds.pos.y
             - self.safe.top
@@ -2637,15 +2546,13 @@ impl App {
                 | Dialog::DiscardEditor
                 | Dialog::RenamePlaylist(_)
                 | Dialog::BookmarkThreshold
-                | Dialog::Language
         );
         let wide_panel = alert || self.panel_wide.unwrap_or(width >= 600.);
         let auth = self.dialog == Dialog::Auth;
         let maximum = match self.dialog {
-            Dialog::Settings | Dialog::Sharing | Dialog::Cache | Dialog::Queue => 640.0,
+            Dialog::Settings | Dialog::Sharing | Dialog::Queue => 640.0,
             Dialog::Track => 380.0,
             Dialog::Speed => 360.0,
-            Dialog::Language => 360.0,
             Dialog::Sort | Dialog::Order | Dialog::Repeat => 320.0,
             Dialog::Filter | Dialog::Chats | Dialog::Recipients | Dialog::Playlists => 440.0,
             _ => 520.0,
@@ -2769,7 +2676,7 @@ impl App {
         }
         let available = (height - if wide_panel { 48.0 } else { 0.0 } - chrome).max(56.);
         let mut available = match self.dialog {
-            Dialog::Settings | Dialog::Sharing | Dialog::Cache | Dialog::Track => {
+            Dialog::Settings | Dialog::Sharing | Dialog::Track => {
                 if wide_panel {
                     available.min(580.)
                 } else {
@@ -2880,14 +2787,13 @@ impl App {
             Dialog::ClearCache => self.send(cx, data::Command::ClearCache),
             Dialog::Logout => self.send(cx, data::Command::Logout),
             Dialog::BookmarkThreshold => {
-                if let Ok(minutes) = input.trim().parse::<u64>() {
-                    if minutes > 0 {
-                        self.send(
-                            cx,
-                            data::Command::Setting("resume_minutes".into(), json!(minutes)),
-                        );
-                    }
-                }
+                let Some(minutes) = self.threshold_minutes(cx) else {
+                    return;
+                };
+                self.send(
+                    cx,
+                    data::Command::Setting("resume_minutes".into(), json!(minutes)),
+                );
             }
             Dialog::RemoveSource(id, profile) => {
                 if let Some(source) = state
@@ -2900,11 +2806,7 @@ impl App {
             }
             _ => {}
         }
-        if self.dialog == Dialog::ClearCache {
-            self.open(cx, Dialog::Cache);
-        } else {
-            self.close_dialog(cx);
-        }
+        self.close_dialog(cx);
     }
 
     fn choose(&mut self, cx: &mut Cx, index: usize) {
@@ -3000,21 +2902,6 @@ impl App {
                 self.text(cx, ids!(source_filter), &title);
                 self.send(cx, data::Command::Query(query, 0));
             }
-            Dialog::Language => {
-                self.send(
-                    cx,
-                    data::Command::Setting(
-                        "language".into(),
-                        json!(match id {
-                            1 => "en",
-                            2 => "ru",
-                            _ => "system",
-                        }),
-                    ),
-                );
-                self.open(cx, Dialog::Settings);
-                return;
-            }
             Dialog::Sort => {
                 let mut query = self.browsing_query();
                 query.sort = match id {
@@ -3088,6 +2975,11 @@ impl MatchEvent for App {
     }
     fn handle_signal(&mut self, cx: &mut Cx) {
         self.sync_ui(cx);
+        #[cfg(target_os = "android")]
+        if crate::android::take_configuration_change() && self.settings_open {
+            self.layout(cx);
+            self.ui.redraw(cx);
+        }
     }
     fn handle_shutdown(&mut self, cx: &mut Cx) {
         self.send(cx, data::Command::Quit);
@@ -3179,9 +3071,7 @@ impl MatchEvent for App {
         if self.dialog != Dialog::None {
             match self.dialog {
                 Dialog::Sharing if self.sharing_return => self.open(cx, Dialog::Recipients),
-                Dialog::Cache | Dialog::Sharing | Dialog::Language => {
-                    self.open(cx, Dialog::Settings)
-                }
+                Dialog::Sharing => self.open(cx, Dialog::Settings),
                 Dialog::Topics(..) => {
                     self.open(cx, Dialog::Recipients);
                     self.send(
@@ -3193,9 +3083,20 @@ impl MatchEvent for App {
                         ),
                     );
                 }
-                Dialog::ClearCache => self.open(cx, Dialog::Cache),
                 _ => self.close_dialog(cx),
             }
+            true
+        } else if self.snapshot().page.query.screen == data::Screen::OnDevice
+            && self
+                .settings_library_return
+                .as_ref()
+                .is_some_and(|saved| !saved.restoring)
+        {
+            let saved = self.settings_library_return.as_mut().unwrap();
+            saved.restoring = true;
+            let command = data::Command::Query(saved.query.clone(), saved.page);
+            self.send(cx, command);
+            self.open(cx, Dialog::Settings);
             true
         } else if self.editor.is_some() {
             self.leave_editor(cx);
@@ -3332,6 +3233,16 @@ impl MatchEvent for App {
         if self.click(cx, actions, ids!(settings)) {
             self.open(cx, Dialog::Settings);
         }
+        if self.click(cx, actions, ids!(settings_done)) {
+            self.close_dialog(cx);
+        }
+        for (section, tab, _) in settings::sections() {
+            if self.click(cx, actions, tab) && self.settings_section != section {
+                self.settings_section = section;
+                settings::select(&self.ui, cx, section);
+                self.refresh_settings_cache(cx);
+            }
+        }
         if self.click(cx, actions, ids!(panel_close)) {
             self.close_dialog(cx);
         }
@@ -3342,11 +3253,7 @@ impl MatchEvent for App {
             self.handle_back_pressed(cx);
         }
         if self.click(cx, actions, ids!(panel_cancel)) {
-            if self.dialog == Dialog::ClearCache {
-                self.open(cx, Dialog::Cache);
-            } else {
-                self.close_dialog(cx);
-            }
+            self.close_dialog(cx);
         }
         if self.click(cx, actions, ids!(player_close)) {
             self.full_player = false;
@@ -3445,8 +3352,30 @@ impl MatchEvent for App {
                 self.send(cx, C::Setting("theme".into(), json!(value)));
             }
         }
+        for (path, value) in [
+            (ids!(language_system), "system"),
+            (ids!(language_en), "en"),
+            (ids!(language_ru), "ru"),
+        ] {
+            if self.click(cx, actions, path) {
+                self.send(cx, C::Setting("language".into(), json!(value)));
+            }
+        }
         if self.click(cx, actions, ids!(settings_storage)) {
+            let list = self
+                .ui
+                .widget(cx, ids!(catalog))
+                .portal_list(cx, ids!(list));
+            let saved = SettingsLibraryReturn {
+                query: self.browsing_query(),
+                page: state.page.offset,
+                first: list.first_id(),
+                scroll: list.scroll_position(),
+                full_player: self.full_player,
+                restoring: false,
+            };
             self.navigate(cx, data::Screen::OnDevice);
+            self.settings_library_return = Some(saved);
         }
         if let Some(value) = self.ui.media_slider(cx, ids!(seek)).slided(actions) {
             self.text(
@@ -3500,7 +3429,7 @@ impl MatchEvent for App {
             cx.stop_timer(self.directory_timer);
             self.directory_timer = cx.start_timeout(0.25);
         }
-        if self.dialog == Dialog::Filter
+        if matches!(self.dialog, Dialog::Filter | Dialog::BookmarkThreshold)
             && self
                 .ui
                 .text_input(cx, ids!(panel_input))
@@ -3573,42 +3502,17 @@ impl MatchEvent for App {
             (ids!(settings_bookmarks), "resume_long_audio"),
             (ids!(settings_wifi), "wifi_only"),
             (ids!(settings_discard), "discard_listened"),
+            (ids!(settings_sender), "sharing_sender"),
+            (ids!(settings_caption), "sharing_caption"),
             (ids!(settings_sharing_sender), "sharing_sender"),
             (ids!(settings_sharing_caption), "sharing_caption"),
         ] {
             if self.click(cx, actions, id) {
-                self.send(
-                    cx,
-                    C::Setting(key.into(), json!(state.settings[key] != true)),
-                );
+                self.send(cx, C::ToggleSetting(key.into()));
             }
-        }
-        if self.click(cx, actions, ids!(settings_theme)) {
-            self.send(
-                cx,
-                C::Setting(
-                    "theme".into(),
-                    json!(if state.settings["theme"] == "light" {
-                        "dark"
-                    } else {
-                        "light"
-                    }),
-                ),
-            );
-        }
-        if self.click(cx, actions, ids!(settings_language)) {
-            self.open(cx, Dialog::Language);
         }
         if self.click(cx, actions, ids!(settings_minutes)) {
             self.open(cx, Dialog::BookmarkThreshold);
-        }
-        if self.click(cx, actions, ids!(settings_clear)) {
-            self.send(cx, C::CacheInfo);
-            self.open(cx, Dialog::Cache);
-        }
-        if self.click(cx, actions, ids!(settings_sharing)) {
-            self.sharing_return = false;
-            self.open(cx, Dialog::Sharing);
         }
         if self.click(cx, actions, ids!(cache_refresh)) {
             self.send(cx, C::CacheInfo);
@@ -3616,9 +3520,12 @@ impl MatchEvent for App {
         if self.click(cx, actions, ids!(cache_clear)) {
             self.open(cx, Dialog::ClearCache);
         }
-        if self.click(cx, actions, ids!(cache_connect)) {
-            self.send(cx, C::StartTelegram);
-            self.open(cx, Dialog::Auth);
+        if self.click(cx, actions, ids!(settings_cache_connect)) {
+            self.settings_section = settings::Section::Telegram;
+            settings::select(&self.ui, cx, self.settings_section);
+        }
+        if self.click(cx, actions, ids!(settings_sync_refresh)) {
+            self.send(cx, C::Refresh);
         }
         if self.click(cx, actions, ids!(settings_transfers)) {
             self.send(cx, C::CancelDownloads);
@@ -4110,12 +4017,24 @@ impl AppMain for App {
             _ => None,
         };
         if let Some(pointer) = pointer {
-            if self.dialog != Dialog::None {
+            if self.dialog == Dialog::Settings {
+                cx.set_key_focus(Area::Empty);
+            } else if self.dialog != Dialog::None {
                 let area = self.ui.widget(cx, ids!(panel)).area();
                 if area.is_valid(cx) && !area.rect(cx).contains(pointer) {
                     self.close_dialog(cx);
                     return;
                 }
+            }
+        }
+        if self.settings_open {
+            let path = if self.dialog == Dialog::Settings {
+                ids!(settings_page).as_slice()
+            } else {
+                ids!(panel).as_slice()
+            };
+            if let Some(root) = self.ui.widget(cx, path).area().draw_list_id() {
+                self.settings_nav_control.handle_event(cx, event, root);
             }
         }
         self.match_event(cx, event);
@@ -4160,7 +4079,7 @@ impl AppMain for App {
             self.layout(cx);
             self.selection_ui(cx);
         }
-        if self.dialog != Dialog::None
+        if !matches!(self.dialog, Dialog::None | Dialog::Settings)
             && matches!(
                 event,
                 Event::MouseDown(_)

@@ -680,6 +680,23 @@ impl Core {
         self.store.save_queue(&self.queue, false)
     }
 
+    fn set_setting(&mut self, key: &str, value: Value) -> Result<()> {
+        self.store.set_preference(key, value.clone())?;
+        self.state.settings = self.store.settings()?;
+        self.state.language =
+            crate::i18n::language(self.state.settings["language"].as_str().unwrap_or("system"));
+        if key == "hide_duplicates" {
+            self.query.duplicates = value != false;
+        }
+        if key == "discard_listened" && value == false {
+            self.store.db.execute("DELETE FROM temporary_audio", [])?;
+        }
+        if key == "discard_listened" {
+            self.cleanup();
+        }
+        Ok(())
+    }
+
     async fn command(&mut self, command: Command) -> Result<()> {
         if !matches!(
             &command,
@@ -705,9 +722,9 @@ impl Core {
                 | Command::Delete(..)
         );
         let sync_changed = library_changed
-            || matches!(&command,Command::Setting(key,_) if crate::sync::SETTINGS.contains(&key.as_str()));
+            || matches!(&command,Command::Setting(key,_) | Command::ToggleSetting(key) if crate::sync::SETTINGS.contains(&key.as_str()));
         let catalog_changed = library_changed
-            || matches!(&command,Command::Setting(key,_) if key=="hide_duplicates")
+            || matches!(&command,Command::Setting(key,_) | Command::ToggleSetting(key) if key=="hide_duplicates")
             || matches!(
                 &command,
                 Command::Logout
@@ -1274,20 +1291,11 @@ impl Core {
                 }
             }
             Command::Setting(key, value) => {
-                self.store.set_preference(&key, value.clone())?;
-                self.state.settings = self.store.settings()?;
-                self.state.language = crate::i18n::language(
-                    self.state.settings["language"].as_str().unwrap_or("system"),
-                );
-                if key == "hide_duplicates" {
-                    self.query.duplicates = value != false;
-                }
-                if key == "discard_listened" && value == false {
-                    self.store.db.execute("DELETE FROM temporary_audio", [])?;
-                }
-                if key == "discard_listened" {
-                    self.cleanup();
-                }
+                self.set_setting(&key, value)?;
+            }
+            Command::ToggleSetting(key) => {
+                let value = json!(self.state.settings[&key] != true);
+                self.set_setting(&key, value)?;
             }
             Command::Send {
                 track,

@@ -167,6 +167,13 @@ impl Store {
             sync::validate(&format!("setting/{key}"), &value)?;
         }
         tx.execute("INSERT INTO local_settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![key, value.to_string()])?;
+        // Telegram cannot preserve a sender while replacing the caption.
+        // Commit both dependent preferences together, including rapid toggles.
+        if key == "sharing_sender" && value == true {
+            tx.execute("INSERT INTO local_settings VALUES('sharing_caption','true') ON CONFLICT(key) DO UPDATE SET value='true'", [])?;
+        } else if key == "sharing_caption" && value == false {
+            tx.execute("INSERT INTO local_settings VALUES('sharing_sender','false') ON CONFLICT(key) DO UPDATE SET value='false'", [])?;
+        }
         if sync::SETTINGS.contains(&key) {
             sync::edit(&tx, self.account, [(format!("setting/{key}"), value)])?;
         }

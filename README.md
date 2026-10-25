@@ -13,7 +13,7 @@ app remains on [`main`](https://github.com/Krablante/spotygram/tree/main).
 Rust previews use `rust-v…` prerelease tags and never become GitHub's latest stable
 release. Desktop packages contain no Java runtime.
 
-[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.3)
+[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.4)
 · [User guide](docs/usage.md) · [Build from source](docs/build.md)
 · [Verification and limits](docs/verification.md)
 
@@ -39,9 +39,9 @@ Windows previews have no Authenticode publisher certificate. macOS previews are
 ad hoc signed without notarization; the first launch may require **System
 Settings → Privacy & Security → Open Anyway**.
 
-Open **Settings → Import audio files** to listen without an account. Desktop
+Open **Settings → Storage → Import audio files** to listen without an account. Desktop
 also accepts dropped files and **Ctrl/⌘+O**. For Telegram music, connect your
-account in Settings, then choose chats or profiles under **Sources**. Published
+account in **Settings → Telegram**, then choose chats or profiles under **Sources**. Published
 packages already include the Telegram application API configuration.
 
 The preview has a separate Telegram session, database and import directory.
@@ -59,6 +59,11 @@ displayed size. The 0.2 interface follows the Kotlin layouts: compact rows,
 Roboto typography, original header stickers, vector icons, a shared glass
 navigation capsule and moving tab lens. English and Russian and both light and
 dark appearances are available.
+
+Settings uses a dedicated screen with General, Player, Storage and Telegram
+sections, fixed navigation and independent scroll positions. Wide windows place
+the sections at the left. Theme, language and common preferences change directly
+in the selected section.
 
 The small player opens the full player and queue. Playback supports normal,
 reverse, shuffle and random order, three repeat modes, and speed from **0.3× to

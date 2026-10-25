@@ -404,6 +404,55 @@ script_mod! {
         hit := ButtonFlatter{width:Fill height:Fill margin:0 text:""}
     }
     mod.spotygram.TogglePreference = mod.spotygram.Preference{row.leading.visible:false row.arrow.visible:false row.toggle.visible:true}
+    mod.spotygram.SettingsCard = RoundedView {
+        width:Fill height:Fit flow:Down padding:16 spacing:8
+        draw_bg +:{color:mix(#xffffff,#x11191d,theme.spotygram_dark) border_color:mix(#xdce5e6,#x29353b,theme.spotygram_dark) border_size:0.7 border_radius:8.0}
+    }
+    mod.spotygram.SettingsChoice = ButtonFlat {
+        width:Fill height:48 margin:0 padding:6 spacing:5 align:Center grab_key_focus:false
+        label_walk:Walk{width:Fit height:Fit}
+        icon_walk:Walk{width:14 height:14}
+        draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/check.svg")}
+        draw_text +:{color:theme.color_text color_hover:theme.color_text color_focus:theme.color_text color_down:theme.color_text text_style:theme.font_bold{font_size:10.5}}
+        draw_bg +:{
+            active:uniform(0.0) ink:uniform(theme.color_primary) dark:uniform(theme.spotygram_dark) corner_radius:uniform(5.0)
+            pixel:fn(){
+                let sdf=Sdf2d.viewport(self.pos*self.rect_size);
+                sdf.box(0.7,0.7,self.rect_size.x-1.4,self.rect_size.y-1.4,self.corner_radius);
+                sdf.fill_keep(vec4(self.ink.rgb,self.active*mix(0.10,0.17,self.dark)+self.hover*0.035+self.down*0.04));
+                sdf.stroke(vec4(self.ink.rgb,max(self.focus*0.8,self.active*0.28)),mix(0.7,1.4,self.focus));
+                return sdf.result;
+            }
+        }
+        animator +:{open:{
+            default:@off
+            off:AnimatorState{from:{all:Forward{duration:0.0}} apply:{draw_bg:{active:0.0}}}
+            on:AnimatorState{from:{all:Forward{duration:0.0}} apply:{draw_bg:{active:1.0}}}
+        }}
+    }
+    mod.spotygram.SettingsRow = mod.spotygram.Preference {
+        row.padding:Inset{top:4 bottom:4}
+        row.leading.visible:false
+        row.labels.spacing:4
+        row.labels.detail.max_lines:6
+        hit.draw_bg:mod.spotygram.SettingsChoice.draw_bg{}
+        hit.grab_key_focus:false
+    }
+    mod.spotygram.SettingsToggle = mod.spotygram.SettingsRow {row.arrow.visible:false row.toggle.visible:true}
+    mod.spotygram.SettingsAction = mod.spotygram.SettingsRow {
+        clip_x:false clip_y:false show_bg:true
+        draw_bg:mod.spotygram.Surface.draw_bg{}
+        row.min_height:48
+        row.padding:12 row.spacing:8
+        row.leading.visible:false
+        row.leading.width:20 row.leading.height:20
+        row.leading.mark.draw_icon.color:theme.color_text
+        row.labels.detail.visible:false
+        row.labels.title.align:Center
+        row.labels.title.draw_text.text_style:theme.font_bold{font_size:10.5}
+        row.arrow.visible:false
+        hit.draw_bg.corner_radius:12.0
+    }
 }
 
 #[derive(Script, ScriptHook)]

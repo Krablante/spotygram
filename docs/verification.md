@@ -6,6 +6,48 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.4 settings
+
+The old settings panel reproduced two concrete problems: returning from a child
+page reset its scroll, and clamped touch drawing hid the gesture helper's extra
+overscroll range. Reversing direction at the edge could therefore do nothing
+until that invisible distance was crossed.
+
+Settings now has fixed navigation and separate scroll positions for General,
+Player, Storage and Telegram. The opaque workspace hides the library/player and
+does not observe the playback UI clock. Storage requests cache usage on entry or
+explicit refresh; it has no polling timer. Action labels wrap independently of
+their leading icons.
+
+Linux release checks cover both languages, light/dark rendering, wide and narrow
+windows down to 280 px, section changes, child dialogs and disabled controls.
+The 10,007-row offline catalog restores exactly the same visible recordings and
+pixel offsets after Settings → Storage → On device → Back → closing Settings,
+including beyond the first 128 rows. Section switches and the duration editor
+retain their scroll position. A swipe beginning over a toggle scrolls without
+changing its value. At the lower edge, reversing a held touch by 20 px moves the
+content by 20 px immediately.
+
+Five rapid preference taps retain their odd/even result. Sender preservation
+enables the caption in the same transaction; disabling the caption disables the
+sender. The duration editor rejects zero/empty/invalid values, including Enter,
+and saves a positive value. Tab/Shift+Tab, Enter and editing/saving through the
+keyboard were exercised. The update check displays its result in General.
+
+The signed x86-64 APK updated 0.2.3 in place on the Android 16 / API-36 emulator;
+rebuilt candidates were reinstalled without clearing data. Version 0.2.4-rust /
+1006 retains the 10,007-row catalog, favorite, Russian/dark preferences and paused
+1.05× playback. Actual frames cover 100%, 130% and 200% system text sizes, live
+font-size changes, portrait/landscape layout, wrapped Russian action labels,
+numeric input with the field and Save above the keyboard, and returning to Player
+with the old threshold after invalid input. System Back and cancelling the native
+file picker return to their source context. Quit exposed an older Android bug:
+the worker stopped but the activity remained. The corrected Quit removes the
+task and exits after worker cleanup; relaunch restores the same library and
+preferences in a fresh process. These are offline verification
+profiles; physical phones, production-account operations and battery life remain
+outside these checks.
+
 ## 0.2.3 player controls
 
 The lower player row follows the stable Compose reference: a 48-dp circular

@@ -29,6 +29,11 @@ static NOTICES: OnceLock<mpsc::Sender<Notice>> = OnceLock::new();
 static MEDIA: ArcSwapOption<Media> = ArcSwapOption::const_empty();
 static READERS: OnceLock<Mutex<HashMap<u64, Arc<NativeReader>>>> = OnceLock::new();
 static READER_ID: AtomicU64 = AtomicU64::new(1);
+static CONFIGURATION_CHANGED: AtomicBool = AtomicBool::new(false);
+
+pub fn take_configuration_change() -> bool {
+    CONFIGURATION_CHANGED.swap(false, Ordering::AcqRel)
+}
 struct ReadBuffer {
     reader: Reader,
     buffer: Vec<u8>,
@@ -122,6 +127,11 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_command(
     let Ok(action) = env.get_string(&action) else {
         return 0;
     };
+    if action.to_str().unwrap_or_default() == "configuration" {
+        CONFIGURATION_CHANGED.store(true, Ordering::Release);
+        makepad_widgets::SignalToUI::set_ui_signal();
+        return 1;
+    }
     let command = match action.to_str().unwrap_or_default() {
         "play" => Command::Resume,
         "pause" => Command::Pause,

@@ -352,6 +352,7 @@ pub enum Command {
     Delete(Vec<String>),
     ClearCache,
     Setting(String, Value),
+    ToggleSetting(String),
     ShareRecipients(String, i32, bool),
     ShareTopics(i64),
     Send {

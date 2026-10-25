@@ -413,6 +413,107 @@ script_mod! {
                 editor_save := mod.spotygram.Glass{width:Fill height:48 margin:16 text:"Create playlist" draw_bg +:{accent:1.0 accent_color:mix(#x785a1a,#xe9d96c,theme.spotygram_dark)}}
             }
         }
+        settings_page := SolidView{visible:false new_batch:true width:Fill height:Fill flow:Down align:Align{x:0.5} draw_bg.color:theme.color_bg_app
+            settings_shell := View{width:Fill max_width:960 height:Fill padding:Inset{left:16 right:16 top:8 bottom:16} flow:Down spacing:16
+                settings_header := View{width:Fill height:48 flow:Right spacing:8 align:Align{y:0.5}
+                    settings_done := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/back.svg")}
+                    settings_title := mod.spotygram.Title{height:Fill align:Align{x:0.0 y:0.5} text:"Settings" draw_text.text_style.font_size:18}
+                }
+                settings_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
+                settings_layout := View{width:Fill height:Fill flow:Right spacing:24
+                    settings_nav := View{width:176 height:Fit flow:Down spacing:4
+                        settings_general_tab := mod.spotygram.SettingsChoice{text:"General"}
+                        settings_player_tab := mod.spotygram.SettingsChoice{text:"Player"}
+                        settings_storage_tab := mod.spotygram.SettingsChoice{text:"Storage"}
+                        settings_telegram_tab := mod.spotygram.SettingsChoice{text:"Telegram"}
+                    }
+                    View{width:Fill height:Fill flow:Overlay
+                        settings_general_page := mod.spotygram.TouchScroll{width:Fill height:Fill constrain_touch:true flow:Down spacing:12 padding:Inset{right:4 bottom:8}
+                            mod.spotygram.SettingsCard{
+                                settings_appearance := mod.spotygram.Section{text:"Appearance"}
+                                settings_theme_choices := View{width:Fill height:48 flow:Right spacing:4
+                                    theme_light := mod.spotygram.SettingsChoice{text:"Light"}
+                                    theme_dark := mod.spotygram.SettingsChoice{text:"Dark"}
+                                }
+                                settings_language_label := mod.spotygram.Section{text:"Language" margin:Inset{top:8}}
+                                language_choices := View{width:Fill height:48 flow:Right spacing:4
+                                    language_system := mod.spotygram.SettingsChoice{text:"System" padding:2}
+                                    language_en := mod.spotygram.SettingsChoice{text:"English" padding:2}
+                                    language_ru := mod.spotygram.SettingsChoice{text:"Русский" padding:2}
+                                }
+                            }
+                            mod.spotygram.SettingsCard{
+                                settings_library_label := mod.spotygram.Section{text:"Library"}
+                                settings_duplicates := mod.spotygram.SettingsToggle{row.labels.title.text:"Hide duplicates" row.labels.detail.text:"One entry per recording. Files stay on this device."}
+                            }
+                            mod.spotygram.SettingsCard{
+                                settings_application_label := mod.spotygram.Section{text:"Application"}
+                                settings_about := mod.spotygram.Caption{height:Fit max_lines:2}
+                                settings_app_actions := View{width:Fill height:Fit flow:Right spacing:8
+                                    settings_update := mod.spotygram.SettingsAction{width:220 row.labels.title.text:"Check for updates"}
+                                    settings_quit := mod.spotygram.SettingsAction{width:80 row.labels.title.text:"Quit"}
+                                }
+                                settings_update_result := mod.spotygram.Caption{visible:false height:Fit max_lines:3}
+                            }
+                        }
+                        settings_player_page := mod.spotygram.TouchScroll{visible:false width:Fill height:Fill constrain_touch:true flow:Down spacing:12 padding:Inset{right:4 bottom:8}
+                            mod.spotygram.SettingsCard{
+                                settings_playback_label := mod.spotygram.Section{text:"Playback"}
+                                settings_bookmarks := mod.spotygram.SettingsToggle{row.labels.title.text:"Remember audio positions" row.labels.detail.text:"Continue long recordings where you stopped."}
+                                settings_minutes := mod.spotygram.SettingsRow{row.labels.title.text:"Audio duration threshold"}
+                            }
+                            mod.spotygram.SettingsCard{
+                                settings_sharing_label := mod.spotygram.Section{text:"Sharing audio"}
+                                settings_caption := mod.spotygram.SettingsToggle{row.labels.title.text:"Keep original caption"}
+                                settings_sender := mod.spotygram.SettingsToggle{row.labels.title.text:"Keep original sender" row.labels.detail.text:"Also keeps the original caption."}
+                            }
+                        }
+                        settings_storage_page := mod.spotygram.TouchScroll{visible:false width:Fill height:Fill constrain_touch:true flow:Down spacing:12 padding:Inset{right:4 bottom:8}
+                            mod.spotygram.SettingsCard{
+                                settings_saved_label := mod.spotygram.Section{text:"Saved music"}
+                                settings_storage := mod.spotygram.SettingsRow{row.labels.title.text:"On device"}
+                                settings_import := mod.spotygram.SettingsAction{row.labels.title.text:"Import audio files" row.leading.visible:true row.leading.mark.draw_icon.svg:crate_resource("self:resources/add.svg")}
+                            }
+                            mod.spotygram.SettingsCard{
+                                settings_downloads_label := mod.spotygram.Section{text:"Downloads"}
+                                settings_wifi := mod.spotygram.SettingsToggle{row.labels.title.text:"Downloads over Wi-Fi only" row.labels.detail.text:"Streaming can use mobile data."}
+                                settings_discard := mod.spotygram.SettingsToggle{row.labels.title.text:"Do not keep played tracks" row.labels.detail.text:"Saved downloads and imports stay."}
+                                settings_transfer_row := View{width:Fill height:48 flow:Right spacing:8 align:Align{y:0.5}
+                                    settings_transfers_status := mod.spotygram.Caption{height:Fit max_lines:3}
+                                    settings_transfers := mod.spotygram.Glass{width:Fit padding:12 text:"Cancel"}
+                                }
+                            }
+                            mod.spotygram.SettingsCard{
+                                settings_cache_label := mod.spotygram.Section{text:"Music cache"}
+                                settings_cache_stats := View{width:Fill height:48 flow:Right spacing:8 align:Align{y:0.5}
+                                    View{width:Fill height:Fit flow:Down spacing:4
+                                        cache_size := mod.spotygram.Body{height:Fit text:"—" draw_text.text_style:theme.font_bold{font_size:15}}
+                                        cache_count := mod.spotygram.Caption{height:Fit max_lines:2}
+                                    }
+                                    cache_loading := SpinnerFlat{visible:false size:20 text:""}
+                                    cache_refresh := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                                }
+                                settings_cache_help := mod.spotygram.Caption{height:Fit max_lines:3 text:"Telegram audio. Imported files stay."}
+                                cache_clear := mod.spotygram.SettingsAction{row.labels.title.text:"Clear music cache" row.leading.visible:true row.leading.mark.draw_icon.svg:crate_resource("self:resources/delete.svg")}
+                                settings_cache_connect := mod.spotygram.SettingsAction{visible:false row.labels.title.text:"Connect Telegram" row.leading.visible:true row.leading.mark.draw_icon.svg:crate_resource("self:resources/telegram.svg")}
+                            }
+                        }
+                        settings_telegram_page := mod.spotygram.TouchScroll{visible:false width:Fill height:Fill constrain_touch:true flow:Down spacing:12 padding:Inset{right:4 bottom:8}
+                            mod.spotygram.SettingsCard{
+                                settings_account_label := mod.spotygram.Section{text:"Account"}
+                                settings_connection := mod.spotygram.Body{height:Fit max_lines:2}
+                                settings_account := mod.spotygram.SettingsAction{row.labels.title.text:"Connect Telegram" row.leading.visible:true row.leading.mark.draw_icon.svg:crate_resource("self:resources/telegram.svg")}
+                            }
+                            mod.spotygram.SettingsCard{
+                                settings_sync_label := mod.spotygram.Section{text:"Library sync"}
+                                settings_sync := mod.spotygram.Body{height:Fit max_lines:5}
+                                settings_sync_refresh := mod.spotygram.SettingsAction{row.labels.title.text:"Refresh library" row.leading.visible:true row.leading.mark.draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                            }
+                        }
+                    }
+                }
+            }
+        }
         overlay := View{visible:false width:Fill height:Fill flow:Overlay align:Center
             auth_background := mod.spotygram.Prism{visible:false}
             scrim := SolidView{width:Fill height:Fill draw_bg.color:#x00000022}
@@ -427,7 +528,6 @@ script_mod! {
                         auth_back := mod.spotygram.Icon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
                         panel_back := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
                     panel_title := mod.spotygram.Title{height:Fill align:Align{x:0.0 y:0.5} max_lines:2 draw_text.text_style.font_size:15 text:"Settings"}
-                        cache_refresh := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/refresh.svg")}
                         panel_close := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/close.svg")}
                     }
                     panel_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
@@ -466,49 +566,10 @@ script_mod! {
                             auth_phone := mod.spotygram.Flat{text:"Use another phone number"}
                             auth_resend := mod.spotygram.Flat{text:"Resend code"}
                         }
-                        settings_body := View{visible:false width:Fill height:Fit flow:Down spacing:0
-                            appearance_label := mod.spotygram.Section{text:"Appearance"}
-                            mod.spotygram.Surface{width:Fill height:56 flow:Right padding:4
-                                theme_light := mod.spotygram.Nav{height:48 flow:Right padding:0 text:"Light" icon_walk:Walk{width:0 height:0} draw_text.text_style.font_size:12}
-                                theme_dark := mod.spotygram.Nav{height:48 flow:Right padding:0 text:"Dark" icon_walk:Walk{width:0 height:0} draw_text.text_style.font_size:12}
-                            }
-                            settings_language := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/language.svg") row.labels.title.text:"Language"}
-                            settings_language_help := mod.spotygram.Caption{height:Fit max_lines:4 margin:Inset{left:6 right:6} text:"Choose English, Russian or your device language."}
-                            mod.spotygram.Divider{}
-                            settings_sharing := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/share.svg") row.labels.title.text:"Sharing audio" row.labels.detail.text:"Sender and original caption"}
-                            settings_bookmarks := mod.spotygram.TogglePreference{row.labels.title.text:"Resume long recordings" row.labels.detail.text:"Continue from where you stopped."}
-                            settings_minutes := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/history.svg") row.labels.title.text:"Bookmark threshold"}
-                            mod.spotygram.Divider{}
-                            settings_duplicates := mod.spotygram.TogglePreference{row.labels.title.text:"Hide duplicates" row.labels.detail.text:"Show one copy of the same recording."}
-                            settings_storage := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/offline.svg") row.labels.title.text:"On device" row.labels.detail.text:"Saved music and imported recordings."}
-                            settings_import := mod.spotygram.Flat{text:"Import audio files" draw_icon.svg:crate_resource("self:resources/add.svg")}
-                            settings_discard := mod.spotygram.TogglePreference{row.labels.title.text:"Do not keep played tracks" row.labels.detail.text:"Keep saved recordings; remove old temporary listening copies."}
-                            settings_clear := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/delete.svg") row.labels.title.text:"Clear music cache" row.labels.detail.text:"Manage downloaded music on this device."}
-                            mod.spotygram.Divider{}
-                            settings_wifi := mod.spotygram.TogglePreference{row.labels.title.text:"Downloads over Wi-Fi only" row.labels.detail.text:"Mobile data is still used for playback."}
-                            settings_transfers := mod.spotygram.Flat{text:"Cancel downloads" draw_icon.svg:crate_resource("self:resources/download.svg")}
-                            mod.spotygram.Divider{}
-                            settings_account := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/telegram.svg") row.labels.title.text:"Connect Telegram"}
-                            settings_sync := mod.spotygram.Caption{height:Fit max_lines:3 margin:6 text:"Library sync"}
-                            settings_update := mod.spotygram.Flat{text:"Check Rust preview updates" draw_icon.svg:crate_resource("self:resources/refresh.svg")}
-                            settings_about := mod.spotygram.Caption{height:Fit max_lines:3 text:""}
-                            settings_quit := mod.spotygram.Flat{text:"Quit spotygram rust" draw_icon.svg:crate_resource("self:resources/logout.svg")}
-                        }
                         sharing_body := View{visible:false width:Fill height:Fit flow:Down spacing:12
                             sharing_help := mod.spotygram.Body{height:Fit max_lines:4 text:"Sender and original caption"}
                             settings_sharing_sender := mod.spotygram.TogglePreference{row.labels.title.text:"Keep original sender"}
                             settings_sharing_caption := mod.spotygram.TogglePreference{row.labels.title.text:"Keep original caption"}
-                        }
-                        cache_body := View{visible:false width:Fill height:Fit flow:Down spacing:20 padding:Inset{top:24 bottom:24}
-                            cache_loading := SpinnerFlat{visible:false size:20 text:"Calculating…" draw_text.text_style.font_size:12}
-                            View{width:Fill height:Fit flow:Down padding:20 spacing:8
-                                cache_size := mod.spotygram.Title{height:48 draw_text.text_style.font_size:27 text:"—"}
-                                cache_count := mod.spotygram.Body{draw_text.color:theme.color_text_meta text:""}
-                            }
-                            cache_description := mod.spotygram.Body{height:Fit max_lines:8 text:"Downloaded Telegram audio and documents, including saved recordings, will be removed from this device."}
-                            cache_preserved := mod.spotygram.Body{height:Fit max_lines:6 draw_text.color:theme.color_text_meta text:"Imported files, favorites, playlists and sign-in stay intact."}
-                            cache_clear := mod.spotygram.InlineGlass{width:Fill text:"Clear music cache" draw_icon.svg:crate_resource("self:resources/delete.svg")}
-                            cache_connect := mod.spotygram.InlineGlass{visible:false width:Fill text:"Connect Telegram" draw_icon.svg:crate_resource("self:resources/telegram.svg")}
                         }
                         track_body := View{visible:false width:Fill height:Fit flow:Down spacing:0
                             track_header := View{width:Fill height:76 flow:Right spacing:16 align:Align{y:0.5}
@@ -588,6 +649,8 @@ pub struct DrawMediaBar {
 pub struct TouchScroll {
     #[deref]
     view: View,
+    #[live]
+    constrain_touch: bool,
     #[rust]
     touch: Option<TouchGesture>,
     #[rust]
@@ -601,6 +664,10 @@ impl TouchScroll {
         let Some(extent) = self.view.scroll_extent() else {
             return;
         };
+        if self.constrain_touch && extent.max().y <= 0.0 {
+            self.touch = None;
+            return;
+        }
         if start {
             let mut touch = TouchGesture::new();
             touch.set_mode(ScrollMode::Swipe);
@@ -612,10 +679,16 @@ impl TouchScroll {
             if touch.handle_event(cx, event, self.view.area())
                 == TouchMotionChange::ScrolledAtChanged
             {
-                self.view.set_scroll_pos(
-                    cx,
-                    dvec2(extent.pos.x, touch.scrolled_at.clamp(0., extent.max().y)),
-                );
+                let position = touch.scrolled_at.clamp(0., extent.max().y);
+                self.view.set_scroll_pos(cx, dvec2(extent.pos.x, position));
+                if self.constrain_touch {
+                    // The visible viewport is clamped: keep the gesture in the
+                    // same range so reversing at an edge has no hidden dead zone.
+                    touch.scrolled_at = position;
+                    if !touch.is_dragging() && (position <= 0.0 || position >= extent.max().y) {
+                        self.touch = None;
+                    }
+                }
             }
         }
     }
