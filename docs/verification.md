@@ -82,6 +82,24 @@ toggle: taps still activate them, swipes do not navigate or change the toggle,
 and the lower settings remain reachable. Native Linux touch injection and wheel
 scrolling passed the same container checks, including clearing the row's focus.
 
+All four 0.2.0 desktop packages were built in [one CI run](https://github.com/Krablante/spotygram/actions/runs/40149534585).
+Packaged TDLib/libmpv loading and strict ad hoc signature verification of both
+macOS bundles passed. The release uses the locally exercised Linux archive above.
+
+| Package | 0.2.0 interface evidence |
+| --- | --- |
+| Linux x64 | Native OpenGL and Vulkan, the 10,007-row library and the scenarios above. |
+| Windows x64 | The exact CI archive ran through Wine 9 / DXVK 2.4.1, native D3DCompiler 47 and Radeon. Both themes, settings, track menu, Ogg import, libmpv null-output playback, seeking to 1:27 and pause passed. |
+| macOS ARM64 | The packaged app rendered through Metal on the Apple Silicon runner; actual frames were visually inspected. |
+| macOS x64 | The same Intel archive, checked against its SHA-256, rendered through Rosetta on Apple Silicon; the [recheck](https://github.com/Krablante/spotygram/actions/runs/40150751632) and visual inspection of its actual frame passed. |
+
+The Windows runner's independent probe of Makepad's required Direct3D adapter
+returned `0x887a0004`, leaving native graphics coverage blocked. The Intel macOS
+runner returned blank frames without an application error. Wine and Rosetta
+establish rendering of the packaged archives, not physical Windows or Intel GPU
+behavior. WinRT media controls were unavailable in Wine, and null output does not
+verify speakers or Bluetooth.
+
 Authenticated Telegram history, incomplete remote-file seeking, confirmed sends,
 profile uploads and two-device synchronization remain unverified for 0.2.0.
 Synthetic catalogs and recipient layouts do not prove those account operations.
