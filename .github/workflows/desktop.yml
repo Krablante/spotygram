@@ -172,7 +172,7 @@ jobs:
                               time.sleep(1)
                       shutil.copy2(grab['png'],evidence/f'interface-{index}.png')
                   shutil.copy2(evidence/'interface-2.png',evidence/'interface.png')
-                  # Exercise the captured glass shader as well as stationary controls.
+                  # Exercise the shared settings workspace as well as the library.
                   with urllib.request.urlopen('http://127.0.0.1:46871/snap?q=settings',timeout=5) as response:
                       settings=[node for node in json.load(response)['s'] if node['i']=='settings']
                   if len(settings)!=1: raise RuntimeError('Settings control is unavailable')

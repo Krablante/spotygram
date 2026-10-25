@@ -48,6 +48,24 @@ preferences in a fresh process. These are offline verification
 profiles; physical phones, production-account operations and battery life remain
 outside these checks.
 
+Formatting and `cargo check --locked -j2` pass. Both APKs pass application lint,
+signature verification and 16-KiB ZIP alignment with the existing certificate.
+All four desktop packages and native-engine checks passed in
+[CI](https://github.com/Krablante/spotygram/actions/runs/40191338978); both macOS
+bundles passed strict ad hoc signature verification. Apple Silicon Metal library
+and Settings frames were inspected. Hosted Intel frames remained blank; the exact
+x64 archive rendered both scenes in the [Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40192245340).
+
+The downloaded Linux archive was launched on Radeon 680M through Xwayland/OpenGL:
+section keyboard navigation, duration editing/validation, On device → Back,
+both themes/languages, a 320-px window and explicit Quit passed. The Windows
+runner's graphics probe remained blocked with `0x887a0004`. Its exact archive
+passed Wine/DXVK checks on Radeon: all four sections, keyboard navigation,
+duration saving, account-dialog return, light/dark appearance, a 390-px Russian
+layout and Quit. These compatibility checks do not establish physical
+Windows/Intel GPU behavior. The published desktop and Android
+[screenshots](usage.md#settings) come from these final packages.
+
 ## 0.2.3 player controls
 
 The lower player row follows the stable Compose reference: a 48-dp circular

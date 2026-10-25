@@ -121,6 +121,10 @@ also restores the original library query and scroll position.
 On desktop, Tab/Shift+Tab moves between controls; Enter or Space activates the
 focused control, including in the duration editor.
 
+<img src="screenshots/rust-settings-desktop.png" alt="Settings with fixed navigation at the left on desktop" width="860">
+
+<img src="screenshots/rust-settings-android.png" alt="Settings on Android in Russian, dark appearance and 130% system text size" width="300">
+
 **General** contains appearance, system/Russian/English language, duplicate hiding
 and **Check for updates**. **Player** contains position bookmarks, their duration
 threshold and sender/caption preferences. **Storage** groups imported/saved music,
