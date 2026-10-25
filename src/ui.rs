@@ -787,6 +787,11 @@ impl Widget for TouchScroll {
 }
 
 impl TouchScrollRef {
+    pub fn scroll_pos(&self) -> Vec2d {
+        self.borrow()
+            .and_then(|scroll| scroll.view.scroll_extent().map(|extent| extent.pos))
+            .unwrap_or_default()
+    }
     pub fn stop_motion(&self) {
         if let Some(mut scroll) = self.borrow_mut() {
             scroll.touch = None;

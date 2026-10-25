@@ -7,6 +7,19 @@ Android uses `app.spotygram.rust` and can coexist with stable Spotygram. Desktop
 packages are portable; extract the whole archive and keep its resources and native
 libraries beside the executable. See [installation](../README.md).
 
+## Navigation
+
+Back returns to where you opened a screen, keeping its search, source filter and
+list position. For example, **Sources → a chat → Back** returns to the same place
+in Sources. A playlist returns to its previous playlist search, and On device
+opened from Settings returns to that Settings section.
+
+Back first dismisses the keyboard or the current layer. Nested menus return one
+level; an unsaved playlist editor asks before discarding changes. Repeatedly
+tapping the current main tab keeps its browsing state. At the Android root, Back
+sends the app to the background and leaves playback running. Desktop Esc uses
+the same return sequence.
+
 ## Your library
 
 The preview starts with its own local library and Telegram session. You can use
@@ -86,7 +99,7 @@ keys change one step, and Home/End select the minimum/maximum.
 Playback state is saved locally and never starts automatically after launch.
 Long recordings can resume from bookmarks; Settings → Player controls the duration
 threshold. Android uses a media notification/service; desktop exposes operating
-system media controls. Desktop Esc closes panels, Ctrl/⌘+Q quits. Closing the
+system media controls. Desktop Ctrl/⌘+Q quits. Closing the
 window during an active job minimizes it; quitting explicitly cancels that job.
 
 Play/Pause remains available while audio is loading. Pausing during preparation

@@ -6,6 +6,51 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.8 navigation context
+
+The installed 0.2.7 APK reproduced Sources → chat → filtered Music followed by
+system Back remaining in Music. Navigation now retains the originating query,
+list position and workspace. Nested menus retain their parent, and catalog and
+profile replies carry request identities so an old reply cannot undo Back.
+
+The final Linux archive passed its SHA-256 check before extraction. Its Radeon
+OpenGL frames cover the 390×640 and 280×640 layouts: scrolled Sources → chat →
+Music → Back, including an immediate Back; a source chooser retaining its typed
+search through Manage Sources; and Add recordings returning to the playlist menu.
+Opening the current cached profile from the full player returned to that player,
+with a genuine Ogg advancing from 0:08 to 0:25 at 1.05× through libmpv with null
+output. Pause and explicit Quit completed cleanly. The same archive also rendered
+and completed Sources → Music → Back through Wayland/Vulkan. Actual frames were
+inspected, including the nested Music heading at 280 px.
+
+The final x86-64 APK updated the API-36 profile without clearing its 10,007
+recordings, favorite or playlists. Android reported 0.2.8-rust / 1010. Actual
+portrait and landscape frames were inspected in both themes and languages at the
+profile's 130% system font size. The system edge gesture returned from a chat's
+Music view to Sources at the same scrolled position. Managing Sources from the
+source chooser returned to that chooser; two rapid Back presses dismissed the
+pending chooser return without reopening it or backgrounding Music.
+
+Gboard input in the playlist editor survived keyboard dismissal and cancelling
+the discard prompt. Confirming discard returned to Playlists. Cancelling Add
+recordings returned to the originating playlist menu, and Rename retained its
+prefilled name. On device returned to the same Storage settings section. An
+offline cached profile opened and returned correctly after a fresh process.
+
+At the root, a system Back gesture showed the Android launcher while retaining
+the same app process and a PLAYING Media3 session. Genuine Ogg playback advanced
+from 0:40 to 1:04 at 1.05× while backgrounded. Returning to the task and pausing
+at 1:41, explicit Quit and a fresh process retained the position and speed without
+autoplay. The final fresh-process log contained no application panic, fatal Java
+exception or missing-method error. Verification used a separate offline profile;
+no account session or media fixture is included in the application.
+
+Formatting, Cargo checks and Android release lint pass. Both final APKs pass
+signature verification with the existing certificate and 16-KiB ZIP alignment.
+
+Physical phones and authenticated Telegram directory, folder, topic and profile
+requests were not exercised by this offline navigation audit.
+
 ## 0.2.7 layout and surface audit
 
 The 0.2.6 Playlists header reproduced touching Settings/Add circles with different

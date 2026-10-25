@@ -66,6 +66,29 @@ gesture helper for forms. Touch swipes may start over a button; crossing touch
 slop cancels that button's press. Claimed slider drags and nested catalog scrolling
 retain their own gesture. Closing a panel stops its remaining momentum.
 
+Library navigation belongs to `app.rs`. A bounded history keeps queries, page
+offsets and list coordinates, together with the player or Settings context to
+restore. It retains no catalog pages. Nested screens push their origin; search,
+sorting and source filtering change the current screen. Root tabs remember their
+browsing state and a repeated tap does not clear it. Back consumes the keyboard,
+current dialog, editor, player or selection before returning through this history.
+At the Android root it backgrounds the task while leaving playback alive.
+Catalog replies carry their UI request identity. Intermediate publications keep
+the last presented page and cannot consume a newer return's saved position.
+
+Nested dialogs retain their parent's input and scroll position. Back, Cancel,
+outside clicks and sheet dismissal return one level; completing an action finishes
+its flow. Leaving the source chooser for Manage sources and cancelling a playlist
+editor opened from its actions menu restore the originating panel too. Search
+debounces stop when leaving their screen. Confirmed account changes clear saved
+account navigation; deleted playlists and expired profiles are not restored.
+
+Profile loading returns a request-tagged result to the UI instead of changing the
+worker's query. Only the current UI request can navigate to that profile. Back or
+a new catalog query cancels the job, and late results cannot redirect the user.
+The existing immutable snapshots carry the result; this adds no database schema,
+polling loop or separate navigation service.
+
 Settings is a separate opaque workspace in the same palette. `settings.rs` owns
 its four sections, labels and responsive layout; `ui.rs` composes the controls,
 and `app.rs` routes actions and returns to the originating library context.

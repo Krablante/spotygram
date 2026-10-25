@@ -260,6 +260,7 @@ pub struct Playback {
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
     pub revision: u64,
+    pub query_request: u64,
     pub auth: Auth,
     pub me: i64,
     pub page: TrackPage,
@@ -291,12 +292,13 @@ pub struct Snapshot {
     pub storage_count: usize,
     pub profile_member: Option<bool>,
     pub profile_member_id: String,
+    pub profile_open: Option<(u64, Result<i64, String>)>,
     pub closed: bool,
 }
 
 #[derive(Debug)]
 pub enum Command {
-    Query(Query, usize),
+    Query(Query, usize, u64),
     Page(usize),
     Artwork(Vec<String>),
     SourcePhotos(Vec<(i64, bool)>),
@@ -316,7 +318,8 @@ pub enum Command {
     Discover(String, i32),
     ConnectSource(Source, bool),
     Refresh,
-    OpenProfile(String),
+    OpenProfile(String, u64),
+    CancelProfile,
     Play(String),
     PlayQueue(usize),
     PlayAll,
@@ -385,7 +388,7 @@ pub enum Notice {
         sources_changed: bool,
     },
     Choices(u64, Vec<Source>),
-    Profile(i64),
+    Profile(u64, Result<i64, String>),
     ProfileMember(String, bool),
     Transfer(usize, f64),
     Sent,

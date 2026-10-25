@@ -76,7 +76,7 @@ enum Dialog {
 
 struct PlaylistEditor {
     playlist: Option<i64>,
-    previous: data::Query,
+    previous: LibraryLocation,
     ids: Vec<String>,
     pending: Option<(data::Query, bool)>,
     all_selected: Option<data::Query>,
@@ -84,13 +84,29 @@ struct PlaylistEditor {
     selection_revision: u64,
 }
 
-struct SettingsLibraryReturn {
+#[derive(Clone)]
+struct LibraryLocation {
     query: data::Query,
     page: usize,
     first: usize,
     scroll: f64,
     full_player: bool,
-    restoring: bool,
+    nested: bool,
+    settings: Option<SettingsSection>,
+    queue: bool,
+    panel: Option<DialogLocation>,
+}
+
+#[derive(Clone)]
+struct DialogLocation {
+    dialog: Dialog,
+    input: String,
+    folder: i32,
+    first: usize,
+    scroll: f64,
+    panel_scroll: Vec2d,
+    anchor: Option<Rect>,
+    wide: Option<bool>,
 }
 
 #[derive(Script, ScriptHook)]
@@ -112,9 +128,27 @@ pub struct App {
     #[rust]
     settings_section: SettingsSection,
     #[rust]
-    settings_library_return: Option<SettingsLibraryReturn>,
+    navigation: Vec<LibraryLocation>,
+    #[rust]
+    tab_locations: [Option<LibraryLocation>; 4],
+    #[rust]
+    requested_query: Option<(u64, data::Query)>,
+    #[rust]
+    query_request: u64,
+    #[rust]
+    navigation_restore: Option<LibraryLocation>,
+    #[rust]
+    dialog_history: Vec<DialogLocation>,
+    #[rust]
+    dialog_restore: Option<(Dialog, usize, f64)>,
+    #[rust]
+    profile_request: u64,
+    #[rust]
+    pending_profile: Option<(u64, LibraryLocation)>,
     #[rust]
     full_player: bool,
+    #[rust]
+    nested: bool,
     #[rust]
     selected: Option<data::Track>,
     #[rust]
@@ -166,13 +200,9 @@ pub struct App {
     #[rust]
     send_target: Option<(i64, i64, String)>,
     #[rust]
-    sharing_return: bool,
-    #[rust]
     quick_recipients: Vec<data::Source>,
     #[rust]
-    queue_return: Option<data::Query>,
-    #[rust]
-    queue_restore: Option<data::Query>,
+    queue_return: Option<LibraryLocation>,
     #[rust]
     keyboard_height: f64,
     #[rust]
@@ -221,6 +251,7 @@ impl App {
             cx,
             ids!(count),
             !self.selecting
+                && !(self.nested && self.size.x - self.safe.left - self.safe.right < 360.)
                 && !matches!(
                     screen,
                     data::Screen::Sources | data::Screen::Playlists | data::Screen::Profile(_)
@@ -245,6 +276,7 @@ impl App {
             cx,
             ids!(back),
             self.selecting
+                || self.nested
                 || matches!(
                     screen,
                     data::Screen::Playlist(_)
@@ -326,7 +358,7 @@ impl App {
             if phase == 2 {
                 self.sheet_drag = None;
                 if self.sheet_offset >= 80. {
-                    self.close_dialog(cx);
+                    self.back_dialog(cx);
                 } else {
                     self.sheet_offset = 0.;
                     self.layout(cx);
@@ -443,15 +475,235 @@ impl App {
         self.state.clone().unwrap_or_default()
     }
     fn browsing_query(&self) -> data::Query {
-        let state = self.snapshot();
-        // Closing the queue restores the worker's catalog asynchronously. A
-        // search typed in that interval still belongs to the previous library.
-        if state.page.query.screen == data::Screen::Queue && self.queue_return.is_none() {
-            if let Some(query) = &self.queue_restore {
-                return query.clone();
-            }
+        self.requested_query
+            .as_ref()
+            .map(|(_, query)| query.clone())
+            .unwrap_or_else(|| self.snapshot().page.query.clone())
+    }
+
+    fn same_query(a: &data::Query, b: &data::Query) -> bool {
+        a.screen == b.screen && a.search == b.search && a.source == b.source && a.sort == b.sort
+    }
+
+    fn query(&mut self, cx: &mut Cx, query: data::Query, page: usize) {
+        self.cancel_profile(cx);
+        if self
+            .navigation_restore
+            .as_ref()
+            .is_some_and(|saved| !Self::same_query(&saved.query, &query))
+        {
+            self.navigation_restore = None;
         }
-        state.page.query.clone()
+        self.query_request = self.query_request.max(self.snapshot().query_request) + 1;
+        self.requested_query = Some((self.query_request, query.clone()));
+        for path in [ids!(catalog), ids!(editor_catalog), ids!(queue_catalog)] {
+            self.visible(cx, path, false);
+        }
+        self.send(cx, data::Command::Query(query, page, self.query_request));
+    }
+
+    fn library_location(&self, cx: &mut Cx) -> LibraryLocation {
+        if let Some(saved) = &self.queue_return {
+            let mut location = saved.clone();
+            location.full_player = self.full_player;
+            location.queue = true;
+            return location;
+        }
+        if let Some(saved) = &self.navigation_restore {
+            let mut location = saved.clone();
+            location.full_player = self.full_player;
+            location.settings = self.settings_open.then_some(self.settings_section);
+            return location;
+        }
+        let state = self.snapshot();
+        let mut query = self.browsing_query();
+        if self.editor.is_none() && self.queue_return.is_none() {
+            query.search = self.ui.text_input(cx, ids!(search)).text();
+        }
+        let ready = Self::same_query(&query, &state.page.query);
+        let list = self
+            .ui
+            .widget(cx, ids!(catalog))
+            .portal_list(cx, ids!(list));
+        LibraryLocation {
+            query,
+            page: if ready { state.page.offset } else { 0 },
+            first: if ready { list.first_id() } else { 0 },
+            scroll: if ready { list.scroll_position() } else { 0.0 },
+            full_player: self.full_player,
+            nested: self.nested,
+            settings: self.settings_open.then_some(self.settings_section),
+            queue: false,
+            panel: (self.dialog == Dialog::Filter).then(|| self.dialog_location(cx)),
+        }
+    }
+
+    fn tab(screen: &data::Screen) -> Option<usize> {
+        match screen {
+            data::Screen::Music => Some(0),
+            data::Screen::Favorites => Some(1),
+            data::Screen::Playlists => Some(2),
+            data::Screen::Sources => Some(3),
+            _ => None,
+        }
+    }
+
+    fn remember_location(&mut self, location: &LibraryLocation) {
+        if !location.nested
+            && let Some(tab) = Self::tab(&location.query.screen)
+        {
+            let mut saved = location.clone();
+            saved.full_player = false;
+            saved.settings = None;
+            saved.queue = false;
+            saved.panel = None;
+            saved.nested = false;
+            self.tab_locations[tab] = Some(saved);
+        }
+    }
+
+    fn push_location(&mut self, location: LibraryLocation) {
+        self.remember_location(&location);
+        // Navigation retains small view coordinates, never catalog pages.
+        if self.navigation.len() == 32 {
+            self.navigation.remove(0);
+        }
+        self.navigation.push(location);
+    }
+
+    fn cancel_profile(&mut self, cx: &mut Cx) {
+        if self.pending_profile.take().is_some() {
+            self.send(cx, data::Command::CancelProfile);
+        }
+    }
+
+    fn show_location(&mut self, cx: &mut Cx, mut location: LibraryLocation) {
+        if !location.query.source.is_empty()
+            && !self.snapshot().sources.iter().any(|source| {
+                location.query.source
+                    == format!(
+                        "{}:{}",
+                        if source.profile { "profile" } else { "chat" },
+                        source.id
+                    )
+            })
+        {
+            location.query.source.clear();
+            location.page = 0;
+            location.first = 0;
+            location.scroll = 0.0;
+        }
+        self.cancel_profile(cx);
+        cx.stop_timer(self.search_timer);
+        self.queue_return = None;
+        self.settings_open = false;
+        settings::stop(&self.ui, cx);
+        self.close_dialog(cx);
+        self.selection.clear();
+        self.selecting = false;
+        self.pending_selection = None;
+        self.all_selected_query = None;
+        self.send(cx, data::Command::ClearSelection);
+        self.full_player = location.full_player;
+        self.nested = location.nested;
+        self.ui
+            .text_input(cx, ids!(search))
+            .set_text(cx, &location.query.search);
+        self.navigation_restore = Some(location.clone());
+        self.query(cx, location.query.clone(), location.page);
+        self.send(
+            cx,
+            data::Command::ObserveClock(location.full_player && location.settings.is_none()),
+        );
+        self.selection_ui(cx);
+        self.update_workspace_visibility(cx, self.snapshot().playback.track.is_some());
+        if let Some(section) = location.settings {
+            self.settings_section = section;
+            self.open(cx, Dialog::Settings);
+        }
+    }
+
+    fn destination(&self, query: data::Query) -> LibraryLocation {
+        LibraryLocation {
+            query,
+            page: 0,
+            first: 0,
+            scroll: 0.0,
+            full_player: false,
+            nested: true,
+            settings: None,
+            queue: false,
+            panel: None,
+        }
+    }
+
+    fn navigate_query(&mut self, cx: &mut Cx, query: data::Query) {
+        let previous = self.library_location(cx);
+        if !Self::same_query(&previous.query, &query)
+            || previous.full_player
+            || previous.settings.is_some()
+            || previous.queue
+        {
+            self.push_location(previous);
+        }
+        self.show_location(cx, self.destination(query));
+    }
+
+    fn switch_tab(&mut self, cx: &mut Cx, screen: data::Screen) {
+        let previous = self.library_location(cx);
+        if previous.query.screen == screen && !previous.full_player && previous.settings.is_none() {
+            return;
+        }
+        self.remember_location(&previous);
+        let mut location = if let Some(index) = self.navigation.iter().rposition(|location| {
+            location.query.screen == screen && !location.nested && location.settings.is_none()
+        }) {
+            let saved = self.navigation[index].clone();
+            self.navigation.truncate(index);
+            saved
+        } else {
+            self.push_location(previous);
+            Self::tab(&screen)
+                .and_then(|tab| self.tab_locations[tab].clone())
+                .unwrap_or_else(|| {
+                    let mut query = self.browsing_query();
+                    query.screen = screen;
+                    query.search.clear();
+                    query.source.clear();
+                    self.destination(query)
+                })
+        };
+        location.nested = false;
+        location.full_player = false;
+        location.settings = None;
+        location.queue = false;
+        location.panel = None;
+        self.show_location(cx, location);
+    }
+
+    fn open_queue(&mut self, cx: &mut Cx) {
+        let mut saved = self.library_location(cx);
+        saved.queue = false;
+        let mut query = saved.query.clone();
+        self.queue_return = Some(saved);
+        query.screen = data::Screen::Queue;
+        query.search.clear();
+        query.source.clear();
+        self.query(cx, query, 0);
+        self.open(cx, Dialog::Queue);
+    }
+
+    fn open_profile(&mut self, cx: &mut Cx, input: String) {
+        self.profile_request = self.profile_request.max(
+            self.snapshot()
+                .profile_open
+                .as_ref()
+                .map_or(0, |(request, _)| *request),
+        ) + 1;
+        let mut previous = self.library_location(cx);
+        previous.panel = None;
+        self.pending_profile = Some((self.profile_request, previous));
+        self.send(cx, data::Command::OpenProfile(input, self.profile_request));
     }
     fn ids(&self) -> Vec<String> {
         if self.selecting {
@@ -465,27 +717,17 @@ impl App {
     }
 
     fn navigate(&mut self, cx: &mut Cx, screen: data::Screen) {
-        self.settings_library_return = None;
-        self.queue_return = None;
-        self.queue_restore = None;
-        self.selection.clear();
-        self.selecting = false;
-        self.pending_selection = None;
-        self.all_selected_query = None;
-        self.send(cx, data::Command::ClearSelection);
-        self.full_player = false;
-        self.selection_ui(cx);
-        self.close_dialog(cx);
-        self.send(cx, data::Command::ObserveClock(false));
         let mut query = self.browsing_query();
         query.screen = screen;
         query.search.clear();
         query.source.clear();
-        self.ui.text_input(cx, ids!(search)).set_text(cx, "");
-        self.send(cx, data::Command::Query(query, 0));
+        self.navigate_query(cx, query);
     }
 
     fn close_dialog(&mut self, cx: &mut Cx) {
+        self.dialog_history.clear();
+        self.dialog_restore = None;
+        cx.stop_timer(self.directory_timer);
         self.ui.touch_scroll(cx, ids!(panel_scroll)).stop_motion();
         cx.set_key_focus(Area::Empty);
         cx.text_ime_was_dismissed();
@@ -506,10 +748,7 @@ impl App {
             self.open(cx, Dialog::Queue);
             return;
         }
-        if let Some(query) = self.queue_return.take() {
-            self.queue_restore = Some(query.clone());
-            self.send(cx, data::Command::Query(query, 0));
-        }
+        let queue_return = self.queue_return.take();
         self.sheet_drag = None;
         self.sheet_offset = 0.;
         self.dialog = Dialog::None;
@@ -532,6 +771,93 @@ impl App {
         if settings_closed {
             self.sync_ui(cx);
             self.send(cx, data::Command::ObserveClock(self.full_player));
+        }
+        if let Some(location) = queue_return {
+            self.show_location(cx, location);
+        }
+    }
+
+    fn dialog_child(&self, next: &Dialog) -> bool {
+        matches!(
+            (&self.dialog, next),
+            (
+                Dialog::Settings,
+                Dialog::BookmarkThreshold
+                    | Dialog::ClearCache
+                    | Dialog::Logout
+                    | Dialog::Auth
+                    | Dialog::Sharing
+            ) | (
+                Dialog::Track,
+                Dialog::Order | Dialog::Playlists | Dialog::Recipients | Dialog::Delete
+            ) | (
+                Dialog::PlaylistActions(_),
+                Dialog::RenamePlaylist(_) | Dialog::DeletePlaylist(_)
+            ) | (Dialog::AddSource, Dialog::Chats | Dialog::Profile)
+                | (Dialog::Chats, Dialog::Folders(false))
+                | (
+                    Dialog::Recipients,
+                    Dialog::Folders(true) | Dialog::Topics(..) | Dialog::Sharing
+                )
+                | (Dialog::Queue, Dialog::Track)
+        )
+    }
+
+    fn dialog_location(&self, cx: &mut Cx) -> DialogLocation {
+        let list = self
+            .ui
+            .widget(cx, ids!(choices_body))
+            .portal_list(cx, ids!(list));
+        DialogLocation {
+            dialog: self.dialog.clone(),
+            input: self.ui.text_input(cx, ids!(panel_input)).text(),
+            folder: self.folder,
+            first: list.first_id(),
+            scroll: list.scroll_position(),
+            panel_scroll: self.ui.touch_scroll(cx, ids!(panel_scroll)).scroll_pos(),
+            anchor: self.panel_anchor,
+            wide: self.panel_wide,
+        }
+    }
+
+    fn back_dialog(&mut self, cx: &mut Cx) {
+        self.cancel_profile(cx);
+        cx.stop_timer(self.directory_timer);
+        if let Some(saved) = self.dialog_history.pop() {
+            self.restore_dialog(cx, saved);
+        } else {
+            self.close_dialog(cx);
+        }
+    }
+
+    fn restore_dialog(&mut self, cx: &mut Cx, saved: DialogLocation) {
+        self.folder = saved.folder;
+        self.present_dialog(cx, saved.dialog.clone());
+        self.panel_anchor = saved.anchor;
+        self.panel_wide = saved.wide;
+        self.ui
+            .text_input(cx, ids!(panel_input))
+            .set_text(cx, &saved.input);
+        self.configure_dialog(cx);
+        self.ui
+            .touch_scroll(cx, ids!(panel_scroll))
+            .set_scroll_pos(cx, saved.panel_scroll);
+        self.ui
+            .widget(cx, ids!(choices_body))
+            .portal_list(cx, ids!(list))
+            .set_first_id_and_scroll(saved.first, saved.scroll);
+        if matches!(saved.dialog, Dialog::Chats | Dialog::Recipients) {
+            self.dialog_restore = Some((saved.dialog.clone(), saved.first, saved.scroll));
+            let command = if saved.dialog == Dialog::Recipients {
+                data::Command::ShareRecipients(
+                    saved.input,
+                    saved.folder,
+                    self.selected.as_ref().is_some_and(|t| t.document),
+                )
+            } else {
+                data::Command::Discover(saved.input, saved.folder)
+            };
+            self.send(cx, command);
         }
     }
 
@@ -569,7 +895,11 @@ impl App {
     }
 
     fn open_editor(&mut self, cx: &mut Cx, playlist: Option<i64>) {
-        let previous = self.browsing_query();
+        let mut previous = self.library_location(cx);
+        if matches!(self.dialog, Dialog::PlaylistActions(_)) {
+            previous.panel = Some(self.dialog_location(cx));
+        }
+        cx.stop_timer(self.search_timer);
         self.close_dialog(cx);
         self.editor = Some(PlaylistEditor {
             playlist,
@@ -591,7 +921,7 @@ impl App {
         query.search.clear();
         query.source.clear();
         self.send(cx, data::Command::ClearSelection);
-        self.send(cx, data::Command::Query(query, 0));
+        self.query(cx, query, 0);
         self.visible(cx, ids!(playlist_editor), true);
         self.visible(cx, ids!(main), false);
         self.visible(cx, ids!(full_player), false);
@@ -633,7 +963,8 @@ impl App {
         };
         self.visible(cx, ids!(editor_error), !error.is_empty());
         self.text(cx, ids!(editor_error), error);
-        let ready = matches!(state.page.query.screen, data::Screen::PlaylistEditor(_));
+        let ready = self.requested_query.is_none()
+            && matches!(state.page.query.screen, data::Screen::PlaylistEditor(_));
         self.visible(cx, ids!(editor_catalog), ready);
         self.text(
             cx,
@@ -712,17 +1043,21 @@ impl App {
         cx.stop_timer(self.search_timer);
         self.visible(cx, ids!(playlist_editor), false);
         self.visible(cx, ids!(main), true);
-        let mut query = editor.previous;
-        if let Some(id) = saved {
+        let mut location = editor.previous;
+        if saved.is_some() {
+            location.panel = None;
+        }
+        if let Some(id) = saved
+            && location.query.screen != data::Screen::Playlist(id)
+        {
+            let mut query = location.query.clone();
             query.screen = data::Screen::Playlist(id);
             query.search.clear();
             query.source.clear();
+            self.push_location(location);
+            location = self.destination(query);
         }
-        self.ui
-            .text_input(cx, ids!(search))
-            .set_text(cx, &query.search);
-        self.send(cx, data::Command::ClearSelection);
-        self.send(cx, data::Command::Query(query, 0));
+        self.show_location(cx, location);
         self.ui.redraw(cx);
     }
 
@@ -748,6 +1083,21 @@ impl App {
     }
 
     fn open(&mut self, cx: &mut Cx, dialog: Dialog) {
+        if self.dialog_child(&dialog) {
+            let saved = self.dialog_location(cx);
+            if self.dialog_history.len() == 8 {
+                self.dialog_history.remove(0);
+            }
+            self.dialog_history.push(saved);
+        } else {
+            self.dialog_history.clear();
+        }
+        self.dialog_restore = None;
+        cx.stop_timer(self.directory_timer);
+        self.present_dialog(cx, dialog);
+    }
+
+    fn present_dialog(&mut self, cx: &mut Cx, dialog: Dialog) {
         cx.set_key_focus(Area::Empty);
         cx.text_ime_was_dismissed();
         if dialog == Dialog::Settings {
@@ -807,6 +1157,17 @@ impl App {
                     .to_string(),
             );
         }
+        if let Dialog::RenamePlaylist(id) = self.dialog
+            && let Some(playlist) = self
+                .snapshot()
+                .playlists
+                .iter()
+                .find(|playlist| playlist.id == id)
+        {
+            self.ui
+                .text_input(cx, ids!(panel_input))
+                .set_text(cx, &playlist.name);
+        }
         self.ui
             .touch_scroll(cx, ids!(panel_scroll))
             .set_scroll_pos(cx, Vec2d::default());
@@ -844,7 +1205,11 @@ impl App {
         self.visible(cx, ids!(panel_title), dialog != Dialog::Auth);
         self.visible(cx, ids!(auth_heading), dialog == Dialog::Auth);
         self.visible(cx, ids!(auth_back), dialog == Dialog::Auth);
-        self.visible(cx, ids!(panel_close), dialog != Dialog::Auth);
+        self.visible(
+            cx,
+            ids!(panel_close),
+            dialog != Dialog::Auth && self.dialog_history.is_empty(),
+        );
         ui::set_icon(
             &self.ui,
             cx,
@@ -884,6 +1249,9 @@ impl App {
             .set_is_password(cx, false);
         self.ui
             .text_input(cx, ids!(panel_input))
+            .set_is_read_only(cx, false);
+        self.ui
+            .text_input(cx, ids!(panel_input))
             .set_is_numeric_only(cx, dialog == Dialog::BookmarkThreshold);
         self.choices.clear();
         self.ui
@@ -901,7 +1269,11 @@ impl App {
             ..Default::default()
         };
         script_apply_eval!(cx,input_wrap,{padding:#(padding)});
-        self.visible(cx, ids!(panel_back), dialog == Dialog::Sharing);
+        self.visible(
+            cx,
+            ids!(panel_back),
+            dialog != Dialog::Auth && !self.dialog_history.is_empty(),
+        );
         self.visible(cx, ids!(panel_header), dialog != Dialog::Track);
         let title = match &dialog {
             Dialog::None => "",
@@ -1591,7 +1963,12 @@ impl App {
                 self.choices = vec![(0, "Add chats".into()), (1, "Add profile".into())];
             }
             Dialog::Queue => {
-                self.visible(cx, ids!(queue_catalog), true);
+                self.visible(
+                    cx,
+                    ids!(queue_catalog),
+                    self.requested_query.is_none()
+                        && state.page.query.screen == data::Screen::Queue,
+                );
                 self.visible(cx, ids!(queue_summary), true);
                 let count = crate::i18n::tracks(&state.language, state.playback.queue_count);
                 let mode = match state.playback.order {
@@ -1739,6 +2116,36 @@ impl App {
                     Dialog::Chats | Dialog::Recipients | Dialog::Topics(..)
                 ),
         );
+        let loading_profile = dialog == Dialog::Profile && self.pending_profile.is_some();
+        self.ui
+            .button(cx, ids!(panel_confirm))
+            .set_loading(cx, loading_profile);
+        if loading_profile {
+            self.ui
+                .widget(cx, ids!(panel_confirm))
+                .set_disabled(cx, true);
+        }
+        if dialog == Dialog::Profile {
+            self.ui
+                .text_input(cx, ids!(panel_input))
+                .set_is_read_only(cx, loading_profile);
+        }
+        if let Some((parent, first, scroll)) = &self.dialog_restore
+            && *parent == dialog
+            && !state.choices.is_empty()
+            && state.choices_scope
+                == if dialog == Dialog::Recipients {
+                    "recipients"
+                } else {
+                    "chats"
+                }
+        {
+            self.ui
+                .widget(cx, ids!(choices_body))
+                .portal_list(cx, ids!(list))
+                .set_first_id_and_scroll(*first, *scroll);
+            self.dialog_restore = None;
+        }
         self.layout(cx);
     }
 
@@ -1773,14 +2180,84 @@ impl App {
         let Some(client) = &self.client else {
             return;
         };
-        let state = client.snapshot.load_full();
+        let incoming = client.snapshot.load_full();
+        let state = if self
+            .requested_query
+            .as_ref()
+            .is_some_and(|(request, _)| *request != incoming.query_request)
+        {
+            // Other commands can publish the old page before the requested
+            // query runs. Keep the last presented page until its own reply.
+            let mut state = (*incoming).clone();
+            if let Some(previous) = &self.state {
+                state.page = previous.page.clone();
+                state.query_request = previous.query_request;
+            }
+            Arc::new(state)
+        } else {
+            incoming
+        };
         if state.closed {
             self.closed = true;
             cx.quit();
             return;
         }
         let old = self.state.replace(state.clone());
+        if old
+            .as_ref()
+            .is_some_and(|old| old.me != 0 && old.me != state.me)
+        {
+            // Account-scoped pages must not survive a confirmed sign-out/switch.
+            self.navigation.clear();
+            self.tab_locations = Default::default();
+            let mut query = state.page.query.clone();
+            query.screen = data::Screen::Music;
+            query.search.clear();
+            query.source.clear();
+            let mut location = self.destination(query);
+            location.nested = false;
+            location.settings = self.settings_open.then_some(self.settings_section);
+            self.show_location(cx, location);
+            return;
+        }
+        if self
+            .requested_query
+            .as_ref()
+            .is_some_and(|(request, _)| *request == state.query_request)
+        {
+            let (_, query) = self.requested_query.take().unwrap();
+            if !Self::same_query(&query, &state.page.query) {
+                self.navigation_restore = None;
+            }
+        }
+        if let Some((request, result)) = &state.profile_open
+            && self
+                .pending_profile
+                .as_ref()
+                .is_some_and(|(pending, _)| pending == request)
+        {
+            let (_, previous) = self.pending_profile.take().unwrap();
+            if let Ok(user) = result {
+                let mut query = previous.query.clone();
+                query.screen = data::Screen::Profile(*user);
+                query.search.clear();
+                query.source.clear();
+                if !Self::same_query(&previous.query, &query)
+                    || previous.full_player
+                    || previous.settings.is_some()
+                    || previous.queue
+                {
+                    self.push_location(previous);
+                }
+                self.show_location(cx, self.destination(query));
+                return;
+            }
+            self.configure_dialog(cx);
+        }
         if self.queue_return.is_some() && state.playback.queue_count == 0 {
+            if let Some(saved) = &mut self.queue_return {
+                saved.full_player = false;
+            }
             self.full_player = false;
             self.close_dialog(cx);
             self.send(cx, data::Command::ObserveClock(false));
@@ -1856,21 +2333,25 @@ impl App {
             self.editor_ui(cx);
         }
         let page_changed = old.as_ref().is_none_or(|old| {
-            old.page.revision != state.page.revision
+            old.query_request != state.query_request
+                || old.page.revision != state.page.revision
                 || old.page.offset != state.page.offset
                 || old.page.query != state.page.query
         });
         let queue_transition = state.page.query.screen == data::Screen::Queue
             || old.as_ref().is_some_and(|old| {
                 old.page.query.screen == data::Screen::Queue
-                    && self.queue_restore.as_ref() == Some(&state.page.query)
+                    && self
+                        .navigation_restore
+                        .as_ref()
+                        .is_some_and(|saved| Self::same_query(&saved.query, &state.page.query))
             });
         // The overlay has its own list. Keep the library's scroll position,
         // including the brief interval before its restored page is published.
         self.visible(
             cx,
             ids!(catalog),
-            state.page.query.screen != data::Screen::Queue,
+            self.requested_query.is_none() && state.page.query.screen != data::Screen::Queue,
         );
         if !queue_transition
             && old
@@ -1882,10 +2363,13 @@ impl App {
                 .portal_list(cx, ids!(list))
                 .set_first_id_and_scroll(0, 0.);
         }
-        if let Some(saved) = self.settings_library_return.as_ref()
-            && saved.restoring
-            && saved.query == state.page.query
+        if self.requested_query.is_none()
+            && self
+                .navigation_restore
+                .as_ref()
+                .is_some_and(|saved| Self::same_query(&saved.query, &state.page.query))
         {
+            let saved = self.navigation_restore.take().unwrap();
             self.ui
                 .widget(cx, ids!(catalog))
                 .portal_list(cx, ids!(list))
@@ -1893,8 +2377,13 @@ impl App {
             self.ui
                 .text_input(cx, ids!(search))
                 .set_text(cx, &saved.query.search);
-            self.full_player = saved.full_player;
-            self.settings_library_return = None;
+            if saved.queue {
+                self.open_queue(cx);
+                return;
+            }
+            if let Some(panel) = saved.panel {
+                self.restore_dialog(cx, panel);
+            }
         }
         let lists_changed = old.as_ref().is_none_or(|old| {
             !Arc::ptr_eq(&old.sources, &state.sources)
@@ -2379,7 +2868,7 @@ impl App {
                         || s.choices_scope != state.choices_scope
                         || s.settings!=state.settings
                 }
-                Dialog::Queue => s.page.revision!=state.page.revision
+                Dialog::Queue => s.query_request!=state.query_request || s.page.revision!=state.page.revision
                     || s.page.total!=state.page.total
                     || s.playback.queue_count!=state.playback.queue_count
                     || s.playback.order!=state.playback.order,
@@ -2497,6 +2986,7 @@ impl App {
     }
 
     fn layout(&mut self, cx: &mut Cx) {
+        self.header_state(cx, &self.snapshot());
         let mut root_widget = self.ui.widget(cx, ids!(root));
         let padding = Inset {
             bottom: self.safe.bottom.max(self.keyboard_height),
@@ -2988,7 +3478,11 @@ impl App {
         let state = self.snapshot();
         let input = self.ui.text_input(cx, ids!(panel_input)).text();
         match self.dialog.clone() {
-            Dialog::Profile => self.send(cx, data::Command::OpenProfile(input)),
+            Dialog::Profile => {
+                self.open_profile(cx, input);
+                self.configure_dialog(cx);
+                return;
+            }
             Dialog::RenamePlaylist(id) => self.send(cx, data::Command::PlaylistRename(id, input)),
             Dialog::Recipients => {
                 let Some((recipient, topic, _)) = self.send_target.clone() else {
@@ -3009,7 +3503,16 @@ impl App {
             }
             Dialog::DiscardEditor => self.close_editor(cx, None),
             Dialog::Delete => self.send(cx, data::Command::Delete(self.ids())),
-            Dialog::DeletePlaylist(id) => self.send(cx, data::Command::PlaylistDelete(id)),
+            Dialog::DeletePlaylist(id) => {
+                self.send(cx, data::Command::PlaylistDelete(id));
+                self.navigation
+                    .retain(|location| location.query.screen != data::Screen::Playlist(id));
+                if self.browsing_query().screen == data::Screen::Playlist(id) {
+                    self.close_dialog(cx);
+                    self.handle_back_pressed(cx);
+                    return;
+                }
+            }
             Dialog::ClearCache => self.send(cx, data::Command::ClearCache),
             Dialog::Logout => self.send(cx, data::Command::Logout),
             Dialog::BookmarkThreshold => {
@@ -3076,39 +3579,17 @@ impl App {
             }
             Dialog::Topics(chat, name) => {
                 self.send_target = Some((chat, id, format!("{name} · {title}")));
-                self.open(cx, Dialog::Recipients);
-                self.send(
-                    cx,
-                    data::Command::ShareRecipients(
-                        String::new(),
-                        self.folder,
-                        self.selected.as_ref().is_some_and(|t| t.document),
-                    ),
-                );
+                self.back_dialog(cx);
                 return;
             }
-            Dialog::Folders(recipients) => {
+            Dialog::Folders(_) => {
                 self.folder = id as i32;
-                self.send(
-                    cx,
-                    if recipients {
-                        data::Command::ShareRecipients(
-                            String::new(),
-                            self.folder,
-                            self.selected.as_ref().is_some_and(|t| t.document),
-                        )
-                    } else {
-                        data::Command::Discover(String::new(), self.folder)
-                    },
-                );
-                self.open(
-                    cx,
-                    if recipients {
-                        Dialog::Recipients
-                    } else {
-                        Dialog::Chats
-                    },
-                );
+                if let Some(parent) = self.dialog_history.last_mut() {
+                    parent.folder = self.folder;
+                    parent.first = 0;
+                    parent.scroll = 0.0;
+                }
+                self.back_dialog(cx);
                 return;
             }
             Dialog::Playlists => self.send(cx, data::Command::PlaylistAdd(id, self.ids())),
@@ -3126,7 +3607,7 @@ impl App {
                         .unwrap_or_default()
                 };
                 self.text(cx, ids!(source_filter), &title);
-                self.send(cx, data::Command::Query(query, 0));
+                self.query(cx, query, 0);
             }
             Dialog::Sort => {
                 let mut query = self.browsing_query();
@@ -3137,7 +3618,7 @@ impl App {
                     4 => data::Sort::Duration,
                     _ => data::Sort::Newest,
                 };
-                self.send(cx, data::Command::Query(query, 0));
+                self.query(cx, query, 0);
             }
             Dialog::Order => self.send(
                 cx,
@@ -3268,7 +3749,7 @@ impl MatchEvent for App {
                     },
                 )
                 .text();
-            self.send(cx, data::Command::Query(query, 0));
+            self.query(cx, query, 0);
         }
         if event.timer_id == self.directory_timer.0
             && matches!(self.dialog, Dialog::Chats | Dialog::Recipients)
@@ -3294,38 +3775,28 @@ impl MatchEvent for App {
             cx.text_ime_was_dismissed();
             return true;
         }
-        if self.dialog != Dialog::None {
-            match self.dialog {
-                Dialog::Sharing if self.sharing_return => self.open(cx, Dialog::Recipients),
-                Dialog::Sharing => self.open(cx, Dialog::Settings),
-                Dialog::Topics(..) => {
-                    self.open(cx, Dialog::Recipients);
-                    self.send(
-                        cx,
-                        data::Command::ShareRecipients(
-                            String::new(),
-                            self.folder,
-                            self.selected.as_ref().is_some_and(|t| t.document),
-                        ),
-                    );
-                }
-                _ => self.close_dialog(cx),
+        if self.pending_profile.is_some() {
+            self.cancel_profile(cx);
+            if self.dialog == Dialog::None {
+                return true;
             }
-            true
-        } else if self.snapshot().page.query.screen == data::Screen::OnDevice
-            && self
-                .settings_library_return
-                .as_ref()
-                .is_some_and(|saved| !saved.restoring)
-        {
-            let saved = self.settings_library_return.as_mut().unwrap();
-            saved.restoring = true;
-            let command = data::Command::Query(saved.query.clone(), saved.page);
-            self.send(cx, command);
-            self.open(cx, Dialog::Settings);
+        }
+        if self.dialog != Dialog::None {
+            self.back_dialog(cx);
             true
         } else if self.editor.is_some() {
             self.leave_editor(cx);
+            true
+        } else if self.navigation_restore.as_mut().is_some_and(|location| {
+            // A second Back can arrive before the catalog needed to reopen
+            // this layer. Consume it now rather than reopening it afterwards.
+            if location.queue {
+                location.queue = false;
+                true
+            } else {
+                location.panel.take().is_some()
+            }
+        }) {
             true
         } else if self.full_player {
             self.full_player = false;
@@ -3341,22 +3812,49 @@ impl MatchEvent for App {
             self.send(cx, data::Command::ClearSelection);
             self.selection_ui(cx);
             true
-        } else if matches!(
-            self.snapshot().page.query.screen,
-            data::Screen::Profile(_)
-                | data::Screen::Playlist(_)
-                | data::Screen::Queue
-                | data::Screen::OnDevice
-        ) {
-            let destination = match self.snapshot().page.query.screen {
-                data::Screen::Profile(_) => data::Screen::Sources,
-                data::Screen::Playlist(_) => data::Screen::Playlists,
-                _ => data::Screen::Music,
-            };
-            self.navigate(cx, destination);
-            true
         } else {
-            false
+            let state = self.snapshot();
+            while let Some(previous) = self.navigation.pop() {
+                if matches!(previous.query.screen, data::Screen::Playlist(id) if !state.playlists.iter().any(|playlist| playlist.id == id))
+                {
+                    continue;
+                }
+                if matches!(previous.query.screen, data::Screen::Profile(id) if id != state.me && !state.sources.iter().any(|source| source.profile && source.id == id))
+                {
+                    continue;
+                }
+                let current = self.library_location(cx);
+                self.remember_location(&current);
+                self.show_location(cx, previous);
+                return true;
+            }
+            let parent = match self.browsing_query().screen {
+                data::Screen::Profile(_) => Some(data::Screen::Sources),
+                data::Screen::Playlist(_) => Some(data::Screen::Playlists),
+                data::Screen::Queue | data::Screen::OnDevice => Some(data::Screen::Music),
+                _ => None,
+            };
+            if let Some(parent) = parent {
+                let mut query = self.browsing_query();
+                query.screen = parent;
+                query.search.clear();
+                query.source.clear();
+                let mut location = self.destination(query);
+                location.nested = false;
+                self.show_location(cx, location);
+                return true;
+            }
+            #[cfg(target_os = "android")]
+            {
+                if let Err(error) = crate::android::call_string("background", "") {
+                    eprintln!("Android Back: {error}");
+                }
+                true
+            }
+            #[cfg(not(target_os = "android"))]
+            {
+                false
+            }
         }
     }
     fn handle_key_down(&mut self, cx: &mut Cx, event: &KeyEvent) {
@@ -3446,19 +3944,16 @@ impl MatchEvent for App {
             (ids!(on_device), data::Screen::OnDevice),
         ] {
             if self.click(cx, actions, path) {
-                self.navigate(cx, screen);
+                if Self::tab(&screen).is_some() {
+                    self.switch_tab(cx, screen);
+                } else {
+                    self.navigate(cx, screen);
+                }
                 return;
             }
         }
         if self.click(cx, actions, ids!(queue)) {
-            let mut query = self.browsing_query();
-            self.queue_return = Some(query.clone());
-            self.queue_restore = None;
-            query.screen = data::Screen::Queue;
-            query.search.clear();
-            query.source.clear();
-            self.send(cx, C::Query(query, 0));
-            self.open(cx, Dialog::Queue);
+            self.open_queue(cx);
         }
         if self.click(cx, actions, ids!(settings)) {
             self.open(cx, Dialog::Settings);
@@ -3474,16 +3969,16 @@ impl MatchEvent for App {
             }
         }
         if self.click(cx, actions, ids!(panel_close)) {
-            self.close_dialog(cx);
+            self.back_dialog(cx);
         }
         if self.click(cx, actions, ids!(auth_back)) {
-            self.close_dialog(cx);
+            self.back_dialog(cx);
         }
         if self.click(cx, actions, ids!(panel_back)) {
             self.handle_back_pressed(cx);
         }
         if self.click(cx, actions, ids!(panel_cancel)) {
-            self.close_dialog(cx);
+            self.back_dialog(cx);
         }
         if self.click(cx, actions, ids!(player_close)) {
             self.full_player = false;
@@ -3592,20 +4087,7 @@ impl MatchEvent for App {
             }
         }
         if self.click(cx, actions, ids!(settings_storage)) {
-            let list = self
-                .ui
-                .widget(cx, ids!(catalog))
-                .portal_list(cx, ids!(list));
-            let saved = SettingsLibraryReturn {
-                query: self.browsing_query(),
-                page: state.page.offset,
-                first: list.first_id(),
-                scroll: list.scroll_position(),
-                full_player: self.full_player,
-                restoring: false,
-            };
             self.navigate(cx, data::Screen::OnDevice);
-            self.settings_library_return = Some(saved);
         }
         if let Some(value) = self.ui.media_slider(cx, ids!(seek)).slided(actions) {
             self.text(
@@ -3861,8 +4343,7 @@ impl MatchEvent for App {
                 );
             }
             if self.click(cx, actions, ids!(track_profile)) {
-                self.send(cx, C::OpenProfile(track.profile.to_string()));
-                self.close_dialog(cx);
+                self.open_profile(cx, track.profile.to_string());
             }
             if self.click(cx, actions, ids!(track_original)) {
                 let link = format!(
@@ -3960,19 +4441,20 @@ impl MatchEvent for App {
                     {
                         if index == 0 {
                             if state.auth.kind == "authorizationStateReady" {
-                                self.send(cx, C::OpenProfile("me".into()));
+                                self.open_profile(cx, "me".into());
                             } else {
                                 self.send(cx, C::StartTelegram);
                                 self.open(cx, Dialog::Auth);
                             }
                         } else if let Some(source) = source {
                             if source.profile {
-                                self.send(cx, C::OpenProfile(source.id.to_string()));
+                                self.open_profile(cx, source.id.to_string());
                             } else {
                                 let mut query = state.page.query.clone();
                                 query.screen = data::Screen::Music;
                                 query.source = format!("chat:{}", source.id);
-                                self.send(cx, C::Query(query, 0));
+                                query.search.clear();
+                                self.navigate_query(cx, query);
                             }
                         }
                     }
@@ -3981,7 +4463,7 @@ impl MatchEvent for App {
                             self.open(cx, Dialog::RemoveSource(source.id, source.profile));
                         } else if index == 0 {
                             if state.auth.kind == "authorizationStateReady" {
-                                self.send(cx, C::OpenProfile("me".into()));
+                                self.open_profile(cx, "me".into());
                             } else {
                                 self.send(cx, C::StartTelegram);
                                 self.open(cx, Dialog::Auth);
@@ -4112,7 +4594,6 @@ impl MatchEvent for App {
             }
         }
         if self.click(cx, actions, ids!(send_settings)) {
-            self.sharing_return = true;
             self.open(cx, Dialog::Sharing);
         }
         if self.click(cx, actions, ids!(send_pin))
@@ -4246,7 +4727,7 @@ impl AppMain for App {
             } else if self.dialog != Dialog::None {
                 let area = self.ui.widget(cx, ids!(panel)).area();
                 if area.is_valid(cx) && !area.rect(cx).contains(pointer) {
-                    self.close_dialog(cx);
+                    self.back_dialog(cx);
                     return;
                 }
             }

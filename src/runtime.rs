@@ -106,6 +106,8 @@ struct Core {
     index_generation: u64,
     load_job: Option<JoinHandle<()>>,
     directory_job: Option<JoinHandle<()>>,
+    profile_job: Option<JoinHandle<()>>,
+    profile_request: Option<u64>,
     artwork_job: Option<JoinHandle<()>>,
     avatar_job: Option<JoinHandle<()>>,
     avatar_pending: Vec<(i64, bool)>,
@@ -169,6 +171,8 @@ impl Core {
             index_generation: 0,
             load_job: None,
             directory_job: None,
+            profile_job: None,
+            profile_request: None,
             artwork_job: None,
             avatar_job: None,
             avatar_pending: Vec::new(),
@@ -260,6 +264,7 @@ impl Core {
             &mut self.index_job,
             &mut self.load_job,
             &mut self.directory_job,
+            &mut self.profile_job,
             &mut self.artwork_job,
             &mut self.avatar_job,
             &mut self.cache_job,
@@ -374,7 +379,19 @@ impl Core {
             .context("Connect your Telegram account first")
     }
 
+    fn cancel_profile(&mut self) {
+        self.profile_request = None;
+        if let Some(job) = self.profile_job.take() {
+            job.abort();
+            if self.state.status.starts_with("Loading ") {
+                self.state.status.clear();
+                self.state.busy = self.index_job.is_some();
+            }
+        }
+    }
+
     fn stop_account_work(&mut self) {
+        self.profile_request = None;
         for job in [
             &mut self.auth_job,
             &mut self.sync_job,
@@ -384,6 +401,7 @@ impl Core {
             &mut self.load_job,
             &mut self.artwork_job,
             &mut self.directory_job,
+            &mut self.profile_job,
             &mut self.cleanup_job,
         ] {
             if let Some(job) = job.take() {
@@ -826,7 +844,9 @@ impl Core {
                     Command::QueueAdd(..) | Command::QueueRemove(..) | Command::QueueMove(..)
                 );
         match command {
-            Command::Query(mut query, offset) => {
+            Command::Query(mut query, offset, request) => {
+                self.cancel_profile();
+                self.state.query_request = request;
                 query.duplicates = self.state.settings["hide_duplicates"] != false;
                 self.query = query;
                 self.state.page = self.store.page(&self.query, offset)?;
@@ -1031,32 +1051,55 @@ impl Core {
                 }
                 self.signal_sync();
             }
-            Command::OpenProfile(input) => {
+            Command::CancelProfile => {
+                self.cancel_profile();
+                self.publish();
+                return Ok(());
+            }
+            Command::OpenProfile(input, request) => {
+                self.cancel_profile();
+                self.profile_request = Some(request);
+                self.state.profile_open = None;
                 if self.state.auth.kind != "authorizationStateReady" {
                     if let Ok(user) = input.trim().parse::<i64>() {
-                        if user > 0
-                            && self.store.db.query_row(
-                                "SELECT EXISTS(SELECT 1 FROM profiles WHERE id=?)",
-                                [user],
-                                |r| r.get::<_, bool>(0),
-                            )?
-                        {
-                            self.notice(Notice::Profile(user)).await?;
+                        let cached = match self.store.db.query_row(
+                            "SELECT EXISTS(SELECT 1 FROM profiles WHERE id=?)",
+                            [user],
+                            |r| r.get::<_, bool>(0),
+                        ) {
+                            Ok(cached) => cached,
+                            Err(error) => {
+                                self.notice(Notice::Profile(request, Err(error.to_string())))
+                                    .await?;
+                                return Ok(());
+                            }
+                        };
+                        if user > 0 && cached {
+                            self.notice(Notice::Profile(request, Ok(user))).await?;
                             return Ok(());
                         }
                     }
                 }
-                let td = self.telegram()?;
+                let td = match self.telegram() {
+                    Ok(td) => td,
+                    Err(error) => {
+                        self.notice(Notice::Profile(request, Err(error.to_string())))
+                            .await?;
+                        return Ok(());
+                    }
+                };
                 let paths = self.paths.clone();
                 let notices = self.notices.clone();
-                if let Some(job) = self.directory_job.take() {
-                    job.abort();
-                }
-                self.directory_job = Some(self.spawn(async move {
-                    let mut store = Store::connect(&paths.root.join("library.db"))?;
-                    let user = library::find_user(&td, &store, &input).await?;
-                    library::load_profile(&td, &mut store, user, &notices).await?;
-                    notices.send(Notice::Profile(user)).await?;
+                self.profile_job = Some(self.spawn(async move {
+                    let result = async {
+                        let mut store = Store::connect(&paths.root.join("library.db"))?;
+                        let user = library::find_user(&td, &store, &input).await?;
+                        library::load_profile(&td, &mut store, user, &notices).await?;
+                        Ok::<_, anyhow::Error>(user)
+                    }
+                    .await
+                    .map_err(|error| error.to_string());
+                    notices.send(Notice::Profile(request, result)).await?;
                     Ok(())
                 }));
             }
@@ -1620,12 +1663,27 @@ impl Core {
                     self.publish();
                 }
             }
-            Notice::Profile(user) => {
-                self.store.prune_profiles(user)?;
-                self.query.screen = Screen::Profile(user);
-                self.query.search.clear();
-                self.query.source.clear();
-                self.state.page.offset = 0;
+            Notice::Profile(request, result) => {
+                if self.profile_request != Some(request) {
+                    return Ok(());
+                }
+                self.profile_request = None;
+                self.profile_job = None;
+                if self.state.status.starts_with("Loading ") {
+                    self.state.status.clear();
+                    self.state.busy = self.index_job.is_some();
+                }
+                let result = result.and_then(|user| {
+                    self.store
+                        .prune_profiles(user)
+                        .map(|_| user)
+                        .map_err(|error| error.to_string())
+                });
+                match &result {
+                    Ok(_) => {}
+                    Err(error) => self.state.error = error.clone(),
+                }
+                self.state.profile_open = Some((request, result));
                 self.refresh()?;
                 self.publish();
             }

@@ -70,6 +70,7 @@ public final class PlatformBridge extends Application {
                 case "visible" -> { visible = Boolean.parseBoolean(value); yield ""; }
                 case "transfer" -> { main.post(() -> { try { if (Boolean.parseBoolean(value)) app.startForegroundService(new Intent(app, TransferService.class)); else app.stopService(new Intent(app, TransferService.class)); } catch (RuntimeException error) { android.util.Log.e("spotygram", "Cannot keep transfer in foreground", error); } }); yield ""; }
                 case "shutdown" -> { main.post(PlatformBridge::shutdown); yield ""; }
+                case "background" -> { main.post(() -> { MainActivity owner = activity.get(); if (owner != null) owner.moveTaskToBack(true); }); yield ""; }
                 case "checkUpdate" -> checkUpdate(value);
                 default -> throw new IllegalArgumentException("Unknown Android facility");
             };
