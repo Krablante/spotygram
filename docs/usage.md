@@ -29,18 +29,18 @@ running applications.
 
 ## Sources and collections
 
-**Sources → Add chats** searches your accessible chats and public usernames.
+**Sources → Add source → Add chats** searches your accessible chats and public usernames.
 The folder button switches between Telegram folders, the main list and archive.
 Selecting a chat connects it; the row's menu disconnects it. Indexing reads the
 available audio/document history progressively and resumes interrupted scans.
 Refresh updates connected sources. Library search filters the local catalog.
 
-**My profile** opens your own Telegram profile music. **Open a profile** accepts a
+**My profile** opens your own Telegram profile music. **Add source → Add profile** accepts a
 contact name, `@username` or `t.me` link. Opening a profile does not connect all its
 music to Music. Use Add to library for that, or save individual songs as favorites
 or playlist members. Telegram controls profile visibility.
 
-The recording menu's **To profile / Remove from profile** action changes your
+The recording menu's **To profile / Remove** action changes your
 Telegram profile directly. Imported audio is uploaded first, with an explanation
 before the action. Ordinary documents are excluded. This action requires a
 connection and preserves the local entry.
@@ -51,19 +51,28 @@ it does not compare audio waveforms. Favorites prefer a liked representative;
 removing a grouped favorite clears its marks. Existing queues and playlists keep
 their explicit entries.
 
-Playlists support creation, renaming, deletion, membership and ordering. Open the
-playlist or recording menu to edit it. Move up/down applies to the chosen entry.
+The **+** button in Playlists opens the editor: enter a name, search, select
+recordings and press **Create playlist**. Selection stays when searching; Save
+preserves the order in which recordings were selected. **Add recordings** in a
+playlist's menu opens the same editor and excludes its existing members. Leaving
+with unsaved changes asks whether to discard them. Creation and initial membership
+are saved in one transaction.
+
+Playlist menus also offer renaming and deletion. Recording menus support
+membership and Move up/down for the chosen entry.
 Search, source filtering and sorting apply before Play all creates a new queue.
 
 ## Playback and storage
 
 Tap a recording to play. The mini-player opens the full player. Tap or drag the
 seek bar, change speed or volume, toggle mute, choose playback order and repeat,
-or open Queue. Queue entries can be played, moved and removed independently,
+or open Queue over the player. Queue rows have direct play, move-up and remove controls,
 including repeated occurrences of the same song. Available orders are forward,
 reverse, shuffle without repeats within a pass, and independent random draws.
 
 <img src="screenshots/rust-desktop-player-dark.png" alt="The shared desktop player in dark appearance" width="860">
+
+<img src="screenshots/rust-android-dark.png" alt="The same player on Android in dark appearance" width="300">
 
 Playback state is saved locally and never starts automatically after launch.
 Long recordings can resume from bookmarks; Settings controls the duration
@@ -80,20 +89,26 @@ Removing a downloaded copy affects local storage only. Deleting an imported
 recording requires confirmation: it removes this application's imported copy and
 its cloud favorite/playlist membership. Original external files and other
 devices' physical copies remain. Clear music cache keeps imported audio and
-requires confirmation. Cloud sync is not a backup or an edit history.
+requires confirmation. **Settings → Clear music cache** opens the audio/document
+usage page before deletion. Cloud sync is not a backup or an edit history.
 
 ## Sending and updates
 
 Choose **Send audio** in a recording menu or the full player, choose a permitted
-recipient and, for forums, an open topic, then confirm. Selecting a recipient
+recipient and, for forums, an open topic, then press **Send to …**. Selecting a recipient
 alone sends nothing. Telegram rights and source protection are checked again
 before the send. Settings controls whether to keep the original caption and
 sender; preserving the sender also requires preserving an existing caption.
 Local imports upload without replacing the local entry. Success is shown after
 Telegram confirms the message.
 
-Settings offers dark/light appearance, Russian/English, cache controls and
-**Check for updates**. Preview updates open a newer `rust-v` prerelease for manual
+The chooser's gear opens the sender/caption settings. The pin button adds or
+removes the selected chat from Quick access. Recent recipients appear only after
+a confirmed send. Pins and recent recipients are local to this Telegram account.
+
+Settings offers dark/light appearance, a system/Russian/English language chooser,
+cache controls and
+**Check Rust preview updates**. Preview updates open a newer `rust-v` prerelease for manual
 installation. The stable automatic installer is not used by this branch.
 
 This is a personal test channel. Read [verification](verification.md) for the

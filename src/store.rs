@@ -5,7 +5,12 @@ use rusqlite::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
-use std::{collections::HashMap, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+    sync::Arc,
+    time::Duration,
+};
 use uuid::Uuid;
 
 pub struct Store {
@@ -80,6 +85,7 @@ impl Store {
                 PRAGMA user_version=9;")?;
         }
         tx.execute_batch("CREATE TABLE IF NOT EXISTS local_thumbnails(track TEXT PRIMARY KEY,file INTEGER NOT NULL);")?;
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS source_photos(account INTEGER NOT NULL,id INTEGER NOT NULL,path TEXT NOT NULL,PRIMARY KEY(account,id));")?;
         tx.execute("DELETE FROM sync_values WHERE key IN ('queue','setting/speed','setting/order','setting/repeat') OR key LIKE 'progress/%'", [])?;
         tx.commit()?;
         db.execute_batch("DROP INDEX IF EXISTS tracks_title; DROP INDEX IF EXISTS tracks_artist;
@@ -327,6 +333,7 @@ impl Store {
             Screen::Favorites => vec![format!("EXISTS(SELECT 1 FROM tracks f WHERE f.duplicate_group=t.duplicate_group AND f.liked=1) AND {library}")],
             Screen::OnDevice => vec!["t.path!='' AND NOT EXISTS(SELECT 1 FROM temporary_audio a WHERE a.file_key=t.file_key)".into()],
             Screen::Playlist(id) => { args.push(id.into()); vec![format!("EXISTS(SELECT 1 FROM playlist_tracks m JOIN playlists p ON p.id=m.playlist WHERE m.track=t.id AND m.playlist=? AND p.account={})",self.account)] },
+            Screen::PlaylistEditor(Some(id))=>{args.push(id.into());vec![library.to_string(),"NOT EXISTS(SELECT 1 FROM playlist_tracks m WHERE m.track=t.id AND m.playlist=?)".into()]},
             Screen::Profile(id) => { args.push(id.into()); vec!["t.profile_user=? AND t.profile_position>=0".into()] },
             Screen::Queue => vec!["1".into()],
             _ => vec![library.to_string()],
@@ -364,7 +371,10 @@ impl Store {
         let dedup = query.duplicates
             && !matches!(
                 query.screen,
-                Screen::Playlist(_) | Screen::Profile(_) | Screen::Queue
+                Screen::Playlist(_)
+                    | Screen::Profile(_)
+                    | Screen::Queue
+                    | Screen::PlaylistEditor(_)
             );
         let cte = if dedup {
             format!(
@@ -437,21 +447,22 @@ impl Store {
     }
 
     pub fn sources(&self) -> Result<Vec<Source>> {
-        let mut s = self.db.prepare("SELECT s.id,s.title,(SELECT COUNT(*) FROM tracks t WHERE t.chat=s.id AND t.profile_user=0),s.complete AND s.documents_complete FROM sources s ORDER BY s.title COLLATE NOCASE")?;
+        let mut s = self.db.prepare("SELECT s.id,s.title,(SELECT COUNT(*) FROM tracks t WHERE t.chat=s.id AND t.profile_user=0),s.complete AND s.documents_complete,COALESCE((SELECT path FROM source_photos p WHERE p.account=? AND p.id=s.id),'') FROM sources s ORDER BY s.title COLLATE NOCASE")?;
         let mut result = s
-            .query_map([], |r| {
+            .query_map([self.account], |r| {
                 Ok(Source {
                     id: r.get(0)?,
                     title: r.get(1)?,
                     count: r.get(2)?,
                     complete: r.get(3)?,
                     selected: true,
+                    photo: r.get(4)?,
                     ..Default::default()
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        let mut s = self.db.prepare("SELECT id,title,username,photo,selected,audio_count FROM profiles WHERE selected=1 OR opened_at>0 ORDER BY selected DESC,title COLLATE NOCASE")?;
-        for row in s.query_map([], |r| {
+        let mut s = self.db.prepare("SELECT id,title,username,photo,selected,audio_count FROM profiles WHERE selected=1 OR opened_at>0 OR id=? ORDER BY selected DESC,title COLLATE NOCASE")?;
+        for row in s.query_map([self.account], |r| {
             Ok(Source {
                 id: r.get(0)?,
                 title: r.get(1)?,
@@ -470,13 +481,14 @@ impl Store {
     }
 
     pub fn playlists(&self) -> Result<Vec<Playlist>> {
-        let mut s = self.db.prepare("SELECT p.id,p.sync_id,p.name,(SELECT COUNT(*) FROM playlist_tracks m JOIN tracks t ON t.id=m.track WHERE m.playlist=p.id) FROM playlists p WHERE p.account=? ORDER BY p.name COLLATE NOCASE")?;
+        let mut s = self.db.prepare("SELECT p.id,p.sync_id,p.name,(SELECT COUNT(*) FROM playlist_tracks m JOIN tracks t ON t.id=m.track WHERE m.playlist=p.id),(SELECT json_group_array(json_object('title',title,'path',art)) FROM (SELECT t.title,t.art FROM playlist_tracks m JOIN tracks t ON t.id=m.track WHERE m.playlist=p.id ORDER BY m.position LIMIT 4)) FROM playlists p WHERE p.account=? ORDER BY p.name COLLATE NOCASE")?;
         Ok(s.query_map([self.account], |r| {
             Ok(Playlist {
                 id: r.get(0)?,
                 uid: r.get(1)?,
                 name: r.get(2)?,
                 count: r.get(3)?,
+                covers: serde_json::from_str(&r.get::<_, String>(4)?).unwrap_or_default(),
             })
         })?
         .collect::<rusqlite::Result<_>>()?)
@@ -535,7 +547,7 @@ impl Store {
         Ok(())
     }
 
-    pub fn playlist_create(&mut self, name: &str) -> Result<i64> {
+    pub fn playlist_create(&mut self, name: &str, ids: &[String]) -> Result<i64> {
         ensure!(
             !name.trim().is_empty() && name.chars().count() <= 80,
             "Enter a playlist name of up to 80 characters"
@@ -547,14 +559,17 @@ impl Store {
             params![name.trim(), uid, self.account],
         )?;
         let id = tx.last_insert_rowid();
-        sync::edit(
-            &tx,
-            self.account,
-            [
-                (format!("playlist/{uid}/name"), json!(name.trim())),
-                (format!("playlist/{uid}/order"), json!([])),
-            ],
-        )?;
+        let mut edits = vec![
+            (format!("playlist/{uid}/name"), json!(name.trim())),
+            (format!("playlist/{uid}/order"), json!(ids)),
+        ];
+        for track in ids {
+            let track = self.track(track)?.context("Recording no longer exists")?;
+            edits.push((format!("track/{}", track.id), track.descriptor()));
+            edits.push((format!("playlist/{uid}/member/{}", track.id), json!(true)));
+        }
+        write_members(&tx, id, ids)?;
+        sync::edit(&tx, self.account, edits)?;
         tx.commit()?;
         self.revision += 1;
         Ok(id)
@@ -615,17 +630,24 @@ impl Store {
     pub fn playlist_edit(&mut self, id: i64, ids: &[String], add: bool) -> Result<()> {
         let uid = self.playlist_uid(id)?;
         let mut members = self.playlist_members(id)?;
+        let mut member_ids: HashSet<_> = if add {
+            members.iter().cloned().collect()
+        } else {
+            HashSet::new()
+        };
+        if !add {
+            let removed: HashSet<_> = ids.iter().collect();
+            members.retain(|id| !removed.contains(id));
+        }
         let tx = self.db.unchecked_transaction()?;
         let mut edits = Vec::new();
         for track in ids {
             if add {
                 let t = self.track(track)?.context("Recording no longer exists")?;
-                if !members.contains(track) {
+                if member_ids.insert(track.clone()) {
                     members.push(track.clone());
                 }
                 edits.push((format!("track/{track}"), t.descriptor()));
-            } else {
-                members.retain(|t| t != track);
             }
             edits.push((format!("playlist/{uid}/member/{track}"), json!(add)));
         }

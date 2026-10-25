@@ -104,6 +104,11 @@ struct Core {
     load_job: Option<JoinHandle<()>>,
     directory_job: Option<JoinHandle<()>>,
     artwork_job: Option<JoinHandle<()>>,
+    avatar_job: Option<JoinHandle<()>>,
+    avatar_pending: Vec<(i64, bool)>,
+    avatar_visible: HashSet<(i64, bool)>,
+    avatar_epoch: u64,
+    cache_job: Option<JoinHandle<()>>,
     downloads_job: Option<JoinHandle<()>>,
     transfer_job: Option<JoinHandle<()>>,
     cleanup_job: Option<JoinHandle<()>>,
@@ -158,6 +163,11 @@ impl Core {
             load_job: None,
             directory_job: None,
             artwork_job: None,
+            avatar_job: None,
+            avatar_pending: Vec::new(),
+            avatar_visible: HashSet::new(),
+            avatar_epoch: 0,
+            cache_job: None,
             downloads_job: None,
             transfer_job: None,
             cleanup_job: None,
@@ -226,6 +236,8 @@ impl Core {
             &mut self.load_job,
             &mut self.directory_job,
             &mut self.artwork_job,
+            &mut self.avatar_job,
+            &mut self.cache_job,
             &mut self.downloads_job,
             &mut self.transfer_job,
             &mut self.cleanup_job,
@@ -353,6 +365,13 @@ impl Core {
             }
         }
         self.index_pending = false;
+        self.avatar_pending.clear();
+        self.avatar_visible.clear();
+        self.state.avatar_paths = Arc::default();
+        self.avatar_epoch += 1;
+        self.state.cache_size = None;
+        self.state.cache_loading = false;
+        self.state.cache_error.clear();
         self.index_generation += 1;
         self.directory_generation += 1;
         self.sync_signal = None;
@@ -653,21 +672,33 @@ impl Core {
     }
 
     async fn command(&mut self, command: Command) -> Result<()> {
-        self.state.error.clear();
-        let sync_changed = matches!(
+        if !matches!(
+            &command,
+            Command::Artwork(..)
+                | Command::SourcePhotos(..)
+                | Command::Visible(..)
+                | Command::ObserveClock(..)
+                | Command::ClearSelection
+                | Command::Page(..)
+        ) {
+            self.state.error.clear();
+        }
+        let library_changed = matches!(
             &command,
             Command::ConnectSource(..)
                 | Command::Favorite(..)
-                | Command::PlaylistCreate(..)
+                | Command::PlaylistSave { .. }
                 | Command::PlaylistRename(..)
                 | Command::PlaylistDelete(..)
                 | Command::PlaylistAdd(..)
                 | Command::PlaylistRemove(..)
                 | Command::PlaylistMove(..)
                 | Command::Delete(..)
-                | Command::Setting(..)
         );
-        let catalog_changed = sync_changed
+        let sync_changed = library_changed
+            || matches!(&command,Command::Setting(key,_) if crate::sync::SETTINGS.contains(&key.as_str()));
+        let catalog_changed = library_changed
+            || matches!(&command,Command::Setting(key,_) if key=="hide_duplicates")
             || matches!(
                 &command,
                 Command::Logout
@@ -698,6 +729,56 @@ impl Core {
             }
             Command::Artwork(ids) => {
                 self.artwork(ids);
+                return Ok(());
+            }
+            Command::SelectAll(query) => {
+                self.state.selection_error.clear();
+                self.state.selection_ids = Arc::new(match self.store.query_ids(&query) {
+                    Ok(ids) => ids,
+                    Err(error) => {
+                        self.state.selection_error = error.to_string();
+                        self.state.error = self.state.selection_error.clone();
+                        Vec::new()
+                    }
+                });
+                self.state.selection_query = query;
+                self.state.selection_revision += 1;
+                self.publish();
+                return Ok(());
+            }
+            Command::ClearSelection => {
+                self.state.selection_ids = Arc::default();
+                self.state.selection_error.clear();
+                self.publish();
+                return Ok(());
+            }
+            Command::SourcePhotos(keys) => {
+                if keys.is_empty() {
+                    self.avatar_pending.clear();
+                    self.avatar_visible.clear();
+                    if let Some(job) = self.avatar_job.take() {
+                        job.abort();
+                    }
+                    self.avatar_epoch += 1;
+                    return Ok(());
+                }
+                if self.avatar_visible.len() > 64 {
+                    self.avatar_visible.clear();
+                }
+                for key in keys.into_iter().filter(|(id, _)| *id != 0).take(32) {
+                    self.avatar_visible.insert(key);
+                    if !self.avatar_pending.contains(&key) {
+                        self.avatar_pending.push(key);
+                    }
+                }
+                if self.avatar_pending.len() > 32 {
+                    self.avatar_pending.drain(..self.avatar_pending.len() - 32);
+                }
+                self.start_source_photos();
+                return Ok(());
+            }
+            Command::CacheInfo => {
+                self.start_cache_info();
                 return Ok(());
             }
             Command::StartTelegram => {
@@ -838,6 +919,20 @@ impl Core {
                 self.signal_sync();
             }
             Command::OpenProfile(input) => {
+                if self.state.auth.kind != "authorizationStateReady" {
+                    if let Ok(user) = input.trim().parse::<i64>() {
+                        if user > 0
+                            && self.store.db.query_row(
+                                "SELECT EXISTS(SELECT 1 FROM profiles WHERE id=?)",
+                                [user],
+                                |r| r.get::<_, bool>(0),
+                            )?
+                        {
+                            self.notice(Notice::Profile(user)).await?;
+                            return Ok(());
+                        }
+                    }
+                }
                 let td = self.telegram()?;
                 let paths = self.paths.clone();
                 let notices = self.notices.clone();
@@ -1024,8 +1119,19 @@ impl Core {
                 self.store.save_queue(&self.queue, true)?;
             }
             Command::Favorite(ids, liked) => self.store.favorite(&ids, liked)?,
-            Command::PlaylistCreate(name) => {
-                self.store.playlist_create(&name)?;
+            Command::PlaylistSave {
+                playlist,
+                name,
+                ids,
+            } => {
+                let id = if let Some(id) = playlist {
+                    self.store.playlist_edit(id, &ids, true)?;
+                    id
+                } else {
+                    self.store.playlist_create(&name, &ids)?
+                };
+                self.state.playlist_saved_id = id;
+                self.state.playlist_save_revision += 1;
             }
             Command::PlaylistRename(id, name) => self.store.playlist_rename(id, &name)?,
             Command::PlaylistDelete(id) => self.store.playlist_delete(id)?,
@@ -1151,17 +1257,30 @@ impl Core {
                 }
             }
             Command::ClearCache => {
-                self.clear_cache().await?;
+                self.state.cache_loading = true;
+                self.state.status = "Clearing music cache…".into();
+                self.publish();
+                if let Err(error) = self.clear_cache().await {
+                    self.state.cache_loading = false;
+                    self.state.status.clear();
+                    return Err(error);
+                }
             }
             Command::Setting(key, value) => {
                 self.store.set_preference(&key, value.clone())?;
+                self.state.settings = self.store.settings()?;
+                self.state.language = crate::i18n::language(
+                    self.state.settings["language"].as_str().unwrap_or("system"),
+                );
                 if key == "hide_duplicates" {
                     self.query.duplicates = value != false;
                 }
                 if key == "discard_listened" && value == false {
                     self.store.db.execute("DELETE FROM temporary_audio", [])?;
                 }
-                self.cleanup();
+                if key == "discard_listened" {
+                    self.cleanup();
+                }
             }
             Command::Send {
                 track,
@@ -1222,6 +1341,12 @@ impl Core {
                     if let Some(job) = self.artwork_job.take() {
                         job.abort();
                     }
+                    if let Some(job) = self.avatar_job.take() {
+                        job.abort();
+                    }
+                    self.avatar_epoch += 1;
+                    self.avatar_pending.clear();
+                    self.avatar_visible.clear();
                     self.save_checkpoint(true)?;
                 } else {
                     self.publish();
@@ -1307,6 +1432,36 @@ impl Core {
 
     async fn notice(&mut self, notice: Notice) -> Result<()> {
         match notice {
+            Notice::CacheInfo(account, result) => {
+                if account != self.state.me {
+                    return Ok(());
+                }
+                self.cache_job = None;
+                self.state.cache_loading = false;
+                match result {
+                    Ok(size) => self.state.cache_size = Some(size),
+                    Err(error) => self.state.cache_error = error,
+                }
+                self.publish();
+            }
+            Notice::SourcePhotos(epoch, photos) => {
+                if epoch != self.avatar_epoch {
+                    return Ok(());
+                }
+                self.avatar_job = None;
+                if !photos.is_empty() {
+                    self.state.sources = Arc::new(self.store.sources()?);
+                    let cache = Arc::make_mut(&mut self.state.avatar_paths);
+                    if cache.len() + photos.len() > 256 {
+                        cache.clear();
+                    }
+                    for (id, profile, path) in photos {
+                        cache.insert((id, profile), path);
+                    }
+                    self.publish();
+                }
+                self.start_source_photos();
+            }
             Notice::Catalog => {
                 self.store.revision += 1;
                 self.refresh()?;
@@ -1596,6 +1751,20 @@ impl Core {
                 self.refresh()?;
                 self.publish();
             }
+            "updateChatPhoto" | "updateUser" => {
+                let profile = kind(&event) == "updateUser";
+                let id = if profile {
+                    number(&event["user"], "id")
+                } else {
+                    number(&event, "chat_id")
+                };
+                if self.avatar_visible.contains(&(id, profile)) {
+                    if !self.avatar_pending.contains(&(id, profile)) {
+                        self.avatar_pending.push((id, profile));
+                    }
+                    self.start_source_photos();
+                }
+            }
             "spotygramFileComplete" => {
                 if let Some(f) = self.telegram()?.files.get(number(&event, "id") as i32) {
                     if self.store.file_complete(&f)? {
@@ -1662,6 +1831,82 @@ impl Core {
             _ => {}
         }
         Ok(())
+    }
+
+    fn start_cache_info(&mut self) {
+        if let Some(job) = self.cache_job.take() {
+            job.abort();
+        }
+        self.state.cache_loading = false;
+        self.state.cache_error.clear();
+        if self.state.auth.kind != "authorizationStateReady" {
+            self.state.cache_size = None;
+            self.publish();
+            return;
+        }
+        let Ok(td) = self.telegram() else {
+            return;
+        };
+        self.state.cache_loading = true;
+        self.publish();
+        let account = self.state.me;
+        let notices = self.notices.clone();
+        self.cache_job = Some(self.spawn(async move {
+            let result = td
+                .request_timeout(
+                    json!({"@type":"getStorageStatistics","chat_limit":0}),
+                    Duration::from_secs(120),
+                )
+                .await
+                .map(|data| {
+                    let mut bytes = 0u64;
+                    let mut count = 0u64;
+                    for chat in data["by_chat"].as_array().into_iter().flatten() {
+                        for entry in chat["by_file_type"].as_array().into_iter().flatten() {
+                            if matches!(
+                                kind(&entry["file_type"]),
+                                "fileTypeAudio" | "fileTypeDocument"
+                            ) {
+                                bytes += entry["size"].as_u64().unwrap_or(0);
+                                count += entry["count"].as_u64().unwrap_or(0);
+                            }
+                        }
+                    }
+                    (bytes, count)
+                })
+                .map_err(|error| error.to_string());
+            let _ = notices.send(Notice::CacheInfo(account, result)).await;
+            Ok(())
+        }));
+    }
+
+    fn start_source_photos(&mut self) {
+        if !self.visible
+            || self.state.auth.kind != "authorizationStateReady"
+            || self.avatar_pending.is_empty()
+            || self.avatar_job.is_some()
+        {
+            return;
+        }
+        let Ok(td) = self.telegram() else {
+            return;
+        };
+        let paths = self.paths.clone();
+        let notices = self.notices.clone();
+        let keys = std::mem::take(&mut self.avatar_pending);
+        self.avatar_epoch += 1;
+        let epoch = self.avatar_epoch;
+        self.avatar_job = Some(self.spawn(async move {
+            let photos = match Store::connect(&paths.root.join("library.db")) {
+                Ok(store) => library::source_photos(&td, &store, &keys).await,
+                Err(error) => {
+                    eprintln!("Cannot load source avatars: {error:#}");
+                    Vec::new()
+                }
+            };
+            let _ = notices.send(Notice::SourcePhotos(epoch, photos)).await;
+            Ok(())
+        }));
     }
 
     fn start_artwork(&mut self) {
@@ -1890,6 +2135,7 @@ impl Core {
         self.store.db.execute("DELETE FROM temporary_audio WHERE NOT EXISTS(SELECT 1 FROM tracks t WHERE t.file_key=temporary_audio.file_key AND t.path!='')",[])?;
         self.start_sync()?;
         self.state.status = "Music cache cleared".into();
+        self.start_cache_info();
         Ok(())
     }
 }

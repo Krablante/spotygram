@@ -111,7 +111,7 @@ jobs:
         if: runner.os != 'Linux'
         shell: python
         run: |
-          import json, os, shutil, subprocess, time, urllib.request
+          import json, os, re, shutil, subprocess, time, urllib.request
           from pathlib import Path
           state=Path(os.environ['SPOTYGRAM_STATE'])/'rust'
           root=state/'images'/'${{ matrix.target }}'
@@ -144,7 +144,7 @@ jobs:
                   print('::notice::Native Windows rendering is blocked: this runner lacks the required Direct3D adapter. Package/native-engine checks passed; this is not a visual pass.')
                   raise SystemExit(0)
               if result: raise RuntimeError(f'D3D11 graphics probe failed: {result:#x}')
-          environment=dict(os.environ,SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'))
+          environment=dict(os.environ,SPOTYGRAM_RUST_PROFILE=str(state/'verification-profile'),SPOTYGRAM_AUDIO_OUTPUT='null')
           with (evidence/'launch.log').open('wb') as log:
               app=subprocess.Popen([str(binary),'--remote=46871'],env=environment,stdout=log,stderr=log)
               try:
@@ -165,9 +165,13 @@ jobs:
                   for endpoint in ('snap','log'):
                       with urllib.request.urlopen('http://127.0.0.1:46871/'+endpoint,timeout=5) as response:
                           (evidence/(endpoint+'.json')).write_bytes(response.read())
-                  with urllib.request.urlopen('http://127.0.0.1:46871/quit',timeout=5) as response: response.read()
+                  with urllib.request.urlopen('http://127.0.0.1:46871/quit?if_user_seq=0',timeout=5) as response: response.read()
                   app.wait(timeout=15)
                   if app.returncode: raise RuntimeError(f'Interface exit code: {app.returncode}')
+                  log.flush()
+                  errors=[line for line in (evidence/'launch.log').read_text(errors='replace').splitlines()
+                          if re.search(r'\[E\].*(?:src/(?:app|ui|design)\.rs|shader|script)|panicked at',line)]
+                  if errors: raise RuntimeError('Interface script/shader failure: '+errors[0])
               finally:
                   if app.poll() is None: app.terminate(); app.wait(timeout=10)
       - uses: actions/upload-artifact@v7

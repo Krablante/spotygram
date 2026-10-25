@@ -557,6 +557,7 @@ pub async fn discover(
             id,
             title,
             forum,
+            kind: chat_label(&chat, store.account).into(),
             selected: selected.contains(&id),
             photo: if boolean(&chat["photo"]["small"]["local"], "is_downloading_completed") {
                 string(&chat["photo"]["small"]["local"], "path")
@@ -687,6 +688,18 @@ pub async fn topics(td: &Telegram, chat: i64) -> Result<Vec<Source>> {
     Ok(choices)
 }
 
+fn chat_label(chat: &Value, account: i64) -> &'static str {
+    if number(chat, "id") == account {
+        "Saved messages"
+    } else {
+        match kind(&chat["type"]) {
+            "chatTypePrivate" | "chatTypeSecret" => "Private chat",
+            _ if boolean(&chat["type"], "is_channel") => "Channel",
+            _ => "Group",
+        }
+    }
+}
+
 pub async fn send(
     td: &Telegram,
     store: &mut Store,
@@ -782,6 +795,21 @@ pub async fn send(
     if let Some((track, _)) = parse_message(&sent, &title) {
         store.upsert(&[track])?;
     }
+    let key = format!("sharing_recent_{}", store.account);
+    let mut recent: Vec<Source> = store.setting(&key)?.unwrap_or_default();
+    recent.retain(|s| s.id != recipient);
+    recent.insert(
+        0,
+        Source {
+            id: recipient,
+            title,
+            forum: topic != 0,
+            kind: chat_label(&target, store.account).into(),
+            ..Default::default()
+        },
+    );
+    recent.truncate(6);
+    store.put_setting(&key, &recent)?;
     let _ = notices.send(Notice::Sent).await;
     Ok(())
 }
@@ -994,4 +1022,45 @@ pub async fn artwork(td: &Telegram, store: &mut Store, ids: &[String]) -> Result
         }
     }
     Ok(changed)
+}
+
+/// Small avatars are requested only for visible sources/recipients. One worker
+/// downloads them serially at low priority; errors keep the initials fallback.
+pub async fn source_photos(
+    td: &Telegram,
+    store: &Store,
+    keys: &[(i64, bool)],
+) -> Vec<(i64, bool, String)> {
+    let mut changed = Vec::new();
+    for &(id, profile) in keys {
+        let result=tokio::time::timeout(std::time::Duration::from_secs(8),async {
+            let entity=if profile {td.request(json!({"@type":"getUser","user_id":id})).await?} else {
+                let cached=td.directory.lock().unwrap().get(&id).cloned();
+                if let Some(chat)=cached {chat} else {td.request(json!({"@type":"getChat","chat_id":id})).await?}
+            };
+            let small=if profile {&entity["profile_photo"]["small"]} else {&entity["photo"]["small"]};
+            let file=number(small,"id");
+            let path=if file==0 {String::new()} else if boolean(&small["local"],"is_downloading_completed") && std::path::Path::new(&string(&small["local"],"path")).is_file() {
+                string(&small["local"],"path")
+            } else {
+                let image=td.request(json!({"@type":"downloadFile","file_id":file,"priority":1,"offset":0,"limit":0,"synchronous":true})).await?;
+                ensure!(boolean(&image["local"],"is_downloading_completed"),"Avatar download is incomplete");
+                string(&image["local"],"path")
+            };
+            let rows=if profile {
+                if id==store.account {
+                    let title=format!("{} {}",string(&entity,"first_name"),string(&entity,"last_name")).trim().to_owned();
+                    store.db.execute("INSERT OR IGNORE INTO profiles(id,title) VALUES(?,?)",params![id,title])?;
+                }
+                store.db.execute("UPDATE profiles SET photo=? WHERE id=? AND photo!=?",params![path,id,path])?
+            } else {
+                store.db.execute("INSERT INTO source_photos(account,id,path) VALUES(?,?,?) ON CONFLICT(account,id) DO UPDATE SET path=excluded.path WHERE path!=excluded.path",params![store.account,id,path])?
+            };
+            Ok::<_,anyhow::Error>((rows>0,path))
+        }).await;
+        if let Ok(Ok((_, path))) = result {
+            changed.push((id, profile, path));
+        }
+    }
+    changed
 }

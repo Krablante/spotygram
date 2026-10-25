@@ -13,7 +13,9 @@
 | SQLite / rusqlite | Pinned in Cargo.lock | Public domain / MIT |
 | Tokio, serde, keyring, souvlaki, rfd and other Rust crates | Exact revisions and versions in Cargo.lock | License expressions and notices included in packages |
 | Lofty | Pinned in Cargo.lock | MIT or Apache 2.0 |
-| Fonts | Makepad's international font set: IBM Plex, Noto, LXGW and Font Awesome; JetBrains Mono for the optional code face | SIL OFL 1.1; copyright/license metadata and notices included in packages |
+| Fonts | Roboto Flex for application text; Makepad's international fallbacks: IBM Plex, Noto, LXGW and Font Awesome; JetBrains Mono for the optional code face | SIL OFL 1.1; copyright/license metadata and notices included in packages |
+| Rounded icons | [Google Material Icons](https://github.com/google/material-design-icons), rounded 24 px | Apache 2.0 |
+| Header stickers | [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji), the same PNG selection as the Kotlin app | MIT |
 
 Native library notices remain with their bundles. The build also includes Rust
 dependency license texts and font metadata in `licenses/` (Android assets).
@@ -23,7 +25,7 @@ Kotlin runtime is included.
 
 The Takopi identity is a photograph supplied by the owner, prepared with its
 background removed. The software's MIT license grants no rights to the character
-or photograph; its notice is bundled. The small SVG settings/selection symbols
-are application artwork. Development audio is private build/verification state,
+or photograph; its notice is bundled. Application SVGs supplement the rounded
+Material set. Development audio is private build/verification state,
 not part of the repository or released application. The application contains no
 bundled music catalog.

@@ -1,4 +1,4 @@
-use crate::ui::MediaSliderWidgetRefExt;
+use crate::ui::{MediaSliderWidgetRefExt, TouchScrollWidgetRefExt};
 use crate::{model as data, runtime, ui};
 use makepad_widgets::makepad_platform::event::finger::TouchState;
 use makepad_widgets::*;
@@ -31,6 +31,7 @@ enum Dialog {
     #[default]
     None,
     Settings,
+    Language,
     Auth,
     Track,
     Chats,
@@ -38,13 +39,11 @@ enum Dialog {
     Filter,
     Sort,
     Playlists,
-    NewPlaylist,
     RenamePlaylist(i64),
     PlaylistActions(i64),
     Recipients,
     Folders(bool),
     Topics(i64, String),
-    ConfirmSend(i64, i64, String),
     Delete,
     DeletePlaylist(i64),
     ClearCache,
@@ -53,6 +52,22 @@ enum Dialog {
     Order,
     Repeat,
     BookmarkThreshold,
+    RemoveSource(i64, bool),
+    Sharing,
+    Cache,
+    AddSource,
+    Queue,
+    DiscardEditor,
+}
+
+struct PlaylistEditor {
+    playlist: Option<i64>,
+    previous: data::Query,
+    ids: Vec<String>,
+    pending: Option<(data::Query, bool)>,
+    all_selected: Option<data::Query>,
+    saving: bool,
+    selection_revision: u64,
 }
 
 #[derive(Script, ScriptHook)]
@@ -97,9 +112,230 @@ pub struct App {
     image_paths: HashSet<String>,
     #[rust]
     qr_url: String,
+    #[rust]
+    panel_wide: Option<bool>,
+    #[rust]
+    sticker: Option<usize>,
+    #[rust]
+    hidden_at: Option<std::time::Instant>,
+    #[rust]
+    sheet_drag: Option<Vec2d>,
+    #[rust]
+    sheet_offset: f64,
+    #[rust]
+    panel_anchor: Option<Rect>,
+    #[rust]
+    safe: Inset,
+    #[rust]
+    pending_selection: Option<(data::Query, bool)>,
+    #[rust]
+    all_selected_query: Option<data::Query>,
+    #[rust]
+    filter_sources: Vec<data::Source>,
+    #[rust]
+    send_target: Option<(i64, i64, String)>,
+    #[rust]
+    sharing_return: bool,
+    #[rust]
+    quick_recipients: Vec<data::Source>,
+    #[rust]
+    queue_return: Option<data::Query>,
+    #[rust]
+    queue_restore: Option<data::Query>,
+    #[rust]
+    keyboard_height: f64,
+    #[rust]
+    keyboard_visible: bool,
+    #[rust]
+    editor: Option<PlaylistEditor>,
 }
 
 impl App {
+    fn header_state(&self, cx: &mut Cx, state: &data::Snapshot) {
+        let screen = &state.page.query.screen;
+        let title = if self.selecting {
+            format!("{} selected", self.selection.len())
+        } else {
+            match screen {
+                data::Screen::Music => "Music".into(),
+                data::Screen::Favorites => "Favorites".into(),
+                data::Screen::Playlists => "Playlists".into(),
+                data::Screen::OnDevice => "On device".into(),
+                data::Screen::Sources => "Sources".into(),
+                data::Screen::Queue => "Queue".into(),
+                data::Screen::PlaylistEditor(_) => "New playlist".into(),
+                data::Screen::Playlist(id) => state
+                    .playlists
+                    .iter()
+                    .find(|p| p.id == *id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| crate::i18n::tr(&state.language, "Playlist").into_owned()),
+                data::Screen::Profile(id) => state
+                    .sources
+                    .iter()
+                    .find(|s| s.profile && s.id == *id)
+                    .map(|s| s.title.clone())
+                    .unwrap_or_else(|| {
+                        crate::i18n::tr(&state.language, "Profile music").into_owned()
+                    }),
+            }
+        };
+        self.text(cx, ids!(heading), &title);
+        self.text(
+            cx,
+            ids!(count),
+            &crate::i18n::tracks(&state.language, state.page.total),
+        );
+        self.visible(
+            cx,
+            ids!(count),
+            !self.selecting
+                && !matches!(
+                    screen,
+                    data::Screen::Sources | data::Screen::Playlists | data::Screen::Profile(_)
+                ),
+        );
+        self.visible(
+            cx,
+            ids!(refresh),
+            !self.selecting && !matches!(screen, data::Screen::Playlists | data::Screen::Sources),
+        );
+        self.visible(
+            cx,
+            ids!(create_playlist),
+            *screen == data::Screen::Playlists,
+        );
+        self.visible(
+            cx,
+            ids!(favorite_heading),
+            !self.selecting && *screen == data::Screen::Favorites,
+        );
+        self.visible(
+            cx,
+            ids!(back),
+            self.selecting
+                || matches!(
+                    screen,
+                    data::Screen::Playlist(_)
+                        | data::Screen::Profile(_)
+                        | data::Screen::Queue
+                        | data::Screen::OnDevice
+                ),
+        );
+        self.visible(
+            cx,
+            ids!(music_controls),
+            !self.selecting
+                && matches!(
+                    screen,
+                    data::Screen::Music
+                        | data::Screen::Favorites
+                        | data::Screen::OnDevice
+                        | data::Screen::Playlist(_)
+                        | data::Screen::Profile(_)
+                ),
+        );
+        self.visible(
+            cx,
+            ids!(filters),
+            !self.selecting && matches!(screen, data::Screen::Music | data::Screen::OnDevice),
+        );
+        self.visible(
+            cx,
+            ids!(profile_header),
+            !self.selecting && matches!(screen, data::Screen::Profile(_)),
+        );
+        self.visible(cx, ids!(selection_controls), self.selecting);
+    }
+    fn anchor(&self, cx: &Cx, path: &[LiveId]) -> Option<Rect> {
+        let area = self.ui.widget(cx, path).area();
+        if area.is_valid(cx) {
+            let rect = area.rect(cx);
+            if rect.size.x > 0. && rect.size.y > 0. {
+                return Some(rect);
+            }
+        }
+        None
+    }
+    fn drag_sheet(&mut self, cx: &mut Cx, event: &Event) -> bool {
+        if self.dialog == Dialog::None
+            || self.dialog == Dialog::Auth
+            || self.panel_wide != Some(false)
+            || !self.ui.widget(cx, ids!(drag_handle)).visible()
+        {
+            return false;
+        }
+        let sample = match event {
+            Event::MouseDown(e) => Some((0, e.abs)),
+            Event::MouseMove(e) => Some((1, e.abs)),
+            Event::MouseUp(e) => Some((2, e.abs)),
+            Event::TouchUpdate(e) => e.touches.iter().find_map(|t| match t.state {
+                TouchState::Start => Some((0, t.abs)),
+                TouchState::Move => Some((1, t.abs)),
+                TouchState::Stop => Some((2, t.abs)),
+                _ => None,
+            }),
+            _ => None,
+        };
+        let Some((phase, position)) = sample else {
+            return false;
+        };
+        if phase == 0 {
+            let panel = self.ui.widget(cx, ids!(panel)).area().rect(cx);
+            if panel.contains(position)
+                && position.y < panel.pos.y + 48.
+                && position.x < panel.pos.x + panel.size.x - 64.
+            {
+                self.sheet_drag = Some(position);
+                self.sheet_offset = 0.;
+                return true;
+            }
+        } else if let Some(start) = self.sheet_drag {
+            self.sheet_offset = (position.y - start.y).clamp(0., self.size.y * 0.7);
+            if phase == 2 {
+                self.sheet_drag = None;
+                if self.sheet_offset >= 80. {
+                    self.close_dialog(cx);
+                } else {
+                    self.sheet_offset = 0.;
+                    self.layout(cx);
+                }
+            } else {
+                let padding = Inset {
+                    bottom: -self.sheet_offset,
+                    ..Default::default()
+                };
+                let mut layer = self.ui.widget(cx, ids!(panel_layer));
+                script_apply_eval!(cx,layer,{padding:#(padding)});
+            }
+            return true;
+        }
+        false
+    }
+    fn choose_sticker(&mut self, cx: &mut Cx) {
+        let previous = self.sticker.or_else(|| {
+            self.snapshot().settings["header_sticker"]
+                .as_u64()
+                .map(|v| v as usize)
+        });
+        let count = crate::design::STICKERS.len();
+        let previous = previous.filter(|p| *p < count);
+        let choice = rand::random_range(0..count - usize::from(previous.is_some()));
+        let choice = if previous.is_some_and(|p| choice >= p) {
+            choice + 1
+        } else {
+            choice
+        };
+        self.sticker = Some(choice);
+        let _ = self
+            .ui
+            .image(cx, ids!(header_sticker))
+            .load_png_from_data(cx, crate::design::STICKERS[choice]);
+        self.send(
+            cx,
+            data::Command::Setting("header_sticker".into(), json!(choice)),
+        );
+    }
     fn send(&mut self, cx: &mut Cx, command: data::Command) {
         let client = self.client.get_or_insert_with(runtime::start);
         match client.commands.try_send(command) {
@@ -125,7 +361,12 @@ impl App {
     }
 
     fn click(&self, cx: &mut Cx, actions: &Actions, path: &[LiveId]) -> bool {
-        self.ui.glass_button(cx, path).clicked(actions) || self.ui.button(cx, path).clicked(actions)
+        self.ui.button(cx, path).clicked(actions)
+            || self
+                .ui
+                .widget(cx, path)
+                .button(cx, ids!(hit))
+                .clicked(actions)
     }
     fn text(&self, cx: &mut Cx, path: &[LiveId], text: &str) {
         let state = self.snapshot();
@@ -136,15 +377,26 @@ impl App {
             ids!(mini_artist),
             ids!(player_title),
             ids!(player_artist),
+            ids!(send_title),
+            ids!(send_artist),
+            ids!(editor_playlist_name),
         ]
         .iter()
         .any(|p| p.as_slice() == path)
             || path == ids!(heading)
+                && !self.selecting
                 && matches!(
                     state.page.query.screen,
                     data::Screen::Playlist(_) | data::Screen::Profile(_)
                 )
             || path == ids!(panel_title) && matches!(self.dialog, Dialog::PlaylistActions(_));
+        let literal = literal
+            || path == ids!(playing_source)
+                && state
+                    .playback
+                    .track
+                    .as_ref()
+                    .is_some_and(|track| !track.imported());
         if literal {
             self.ui.widget(cx, path).set_text(cx, text);
         } else {
@@ -159,6 +411,17 @@ impl App {
     fn snapshot(&self) -> Arc<data::Snapshot> {
         self.state.clone().unwrap_or_default()
     }
+    fn browsing_query(&self) -> data::Query {
+        let state = self.snapshot();
+        // Closing the queue restores the worker's catalog asynchronously. A
+        // search typed in that interval still belongs to the previous library.
+        if state.page.query.screen == data::Screen::Queue && self.queue_return.is_none() {
+            if let Some(query) = &self.queue_restore {
+                return query.clone();
+            }
+        }
+        state.page.query.clone()
+    }
     fn ids(&self) -> Vec<String> {
         if self.selecting {
             self.selection.iter().cloned().collect()
@@ -171,13 +434,18 @@ impl App {
     }
 
     fn navigate(&mut self, cx: &mut Cx, screen: data::Screen) {
+        self.queue_return = None;
+        self.queue_restore = None;
         self.selection.clear();
         self.selecting = false;
+        self.pending_selection = None;
+        self.all_selected_query = None;
+        self.send(cx, data::Command::ClearSelection);
         self.full_player = false;
         self.selection_ui(cx);
         self.close_dialog(cx);
         self.send(cx, data::Command::ObserveClock(false));
-        let mut query = self.snapshot().page.query.clone();
+        let mut query = self.browsing_query();
         query.screen = screen;
         query.search.clear();
         query.source.clear();
@@ -186,8 +454,39 @@ impl App {
     }
 
     fn close_dialog(&mut self, cx: &mut Cx) {
+        self.ui.touch_scroll(cx, ids!(panel_scroll)).stop_motion();
+        cx.set_key_focus(Area::Empty);
+        cx.text_ime_was_dismissed();
+        if matches!(self.dialog, Dialog::Language | Dialog::BookmarkThreshold) {
+            self.open(cx, Dialog::Settings);
+            return;
+        }
+        if self.queue_return.is_some()
+            && self.dialog != Dialog::Queue
+            && self.snapshot().playback.queue_count > 0
+        {
+            self.open(cx, Dialog::Queue);
+            return;
+        }
+        if let Some(query) = self.queue_return.take() {
+            self.queue_restore = Some(query.clone());
+            self.send(cx, data::Command::Query(query, 0));
+        }
+        self.sheet_drag = None;
+        self.sheet_offset = 0.;
         self.dialog = Dialog::None;
+        self.panel_wide = None;
+        self.panel_anchor = None;
         self.visible(cx, ids!(overlay), false);
+        self.visible(cx, ids!(cache_loading), false);
+        self.send(cx, data::Command::SourcePhotos(Vec::new()));
+        if let Some(mut catalog) = self
+            .ui
+            .widget(cx, ids!(catalog))
+            .borrow_mut::<ui::Catalog>()
+        {
+            catalog.refresh_style();
+        }
         self.ui.text_input(cx, ids!(panel_input)).set_text(cx, "");
         self.ui.image(cx, ids!(auth_qrcode)).set_texture(cx, None);
         self.qr_url.clear();
@@ -197,20 +496,257 @@ impl App {
         let catalog = self.ui.widget(cx, ids!(catalog));
         if let Some(mut catalog) = catalog.borrow_mut::<ui::Catalog>() {
             catalog.selection = self.selection.clone();
+            catalog.selecting = self.selecting;
             catalog.redraw(cx);
         }
+        let state = self.snapshot();
+        self.header_state(cx, &state);
         self.text(
             cx,
-            ids!(selection_count),
-            &format!("{} selected", self.selection.len()),
+            ids!(selection_all),
+            if self.all_selected_query.as_ref() == Some(&state.page.query) {
+                "Deselect all"
+            } else {
+                "Select all"
+            },
+        );
+        self.ui
+            .button(cx, ids!(selection_all))
+            .set_loading(cx, self.pending_selection.is_some());
+        ui::set_icon(
+            &self.ui,
+            cx,
+            ids!(back),
+            if self.selecting {
+                include_str!("../resources/close.svg")
+            } else {
+                include_str!("../resources/back.svg")
+            },
         );
     }
 
+    fn open_editor(&mut self, cx: &mut Cx, playlist: Option<i64>) {
+        let previous = self.browsing_query();
+        self.close_dialog(cx);
+        self.editor = Some(PlaylistEditor {
+            playlist,
+            previous,
+            ids: Vec::new(),
+            pending: None,
+            all_selected: None,
+            saving: false,
+            selection_revision: 1,
+        });
+        self.ui.text_input(cx, ids!(editor_name)).set_text(cx, "");
+        self.ui.text_input(cx, ids!(editor_search)).set_text(cx, "");
+        self.ui
+            .widget(cx, ids!(editor_catalog))
+            .portal_list(cx, ids!(list))
+            .set_first_id_and_scroll(0, 0.0);
+        let mut query = self.browsing_query();
+        query.screen = data::Screen::PlaylistEditor(playlist);
+        query.search.clear();
+        query.source.clear();
+        self.send(cx, data::Command::ClearSelection);
+        self.send(cx, data::Command::Query(query, 0));
+        self.visible(cx, ids!(playlist_editor), true);
+        self.visible(cx, ids!(main), false);
+        self.visible(cx, ids!(full_player), false);
+        self.editor_ui(cx);
+    }
+
+    fn editor_ui(&self, cx: &mut Cx) {
+        let Some(editor) = &self.editor else {
+            return;
+        };
+        self.text(
+            cx,
+            ids!(editor_title),
+            if editor.playlist.is_some() {
+                "Add recordings"
+            } else {
+                "New playlist"
+            },
+        );
+        self.text(
+            cx,
+            ids!(editor_save),
+            if editor.playlist.is_some() {
+                "Add recordings"
+            } else {
+                "Create playlist"
+            },
+        );
+        self.text(
+            cx,
+            ids!(editor_count),
+            &format!("{} selected", editor.ids.len()),
+        );
+        let state = self.snapshot();
+        let error = if !state.error.is_empty() {
+            &state.error
+        } else {
+            &state.selection_error
+        };
+        self.visible(cx, ids!(editor_error), !error.is_empty());
+        self.text(cx, ids!(editor_error), error);
+        let ready = matches!(state.page.query.screen, data::Screen::PlaylistEditor(_));
+        self.visible(cx, ids!(editor_catalog), ready);
+        self.text(
+            cx,
+            ids!(editor_select_all),
+            if editor.all_selected.as_ref() == Some(&self.snapshot().page.query) {
+                "Deselect all"
+            } else {
+                "Select all"
+            },
+        );
+        self.visible(cx, ids!(editor_name_shell), editor.playlist.is_none());
+        self.visible(cx, ids!(editor_playlist_name), editor.playlist.is_some());
+        if let Some(id) = editor.playlist
+            && let Some(playlist) = self.snapshot().playlists.iter().find(|p| p.id == id)
+        {
+            self.text(cx, ids!(editor_playlist_name), &playlist.name);
+        }
+        self.ui.text_input(cx, ids!(editor_name)).set_empty_text(
+            cx,
+            crate::i18n::tr(&self.snapshot().language, "Playlist name").into_owned(),
+        );
+        self.ui.text_input(cx, ids!(editor_search)).set_empty_text(
+            cx,
+            crate::i18n::tr(&self.snapshot().language, "Title or artist").into_owned(),
+        );
+        let name = self.ui.text_input(cx, ids!(editor_name)).text();
+        for path in [ids!(editor_name), ids!(editor_search)] {
+            self.ui
+                .text_input(cx, path)
+                .set_is_read_only(cx, editor.saving);
+        }
+        let valid = if editor.playlist.is_some() {
+            !editor.ids.is_empty()
+        } else {
+            !name.trim().is_empty() && name.chars().count() <= 80
+        };
+        self.ui
+            .widget(cx, ids!(editor_save))
+            .set_disabled(cx, !valid || editor.saving);
+        self.ui
+            .button(cx, ids!(editor_save))
+            .set_loading(cx, editor.saving);
+        self.ui.widget(cx, ids!(editor_select_all)).set_disabled(
+            cx,
+            !ready || editor.pending.is_some() || editor.saving || state.page.total == 0,
+        );
+        if let Some(mut catalog) = self
+            .ui
+            .widget(cx, ids!(editor_catalog))
+            .borrow_mut::<ui::Catalog>()
+        {
+            catalog.selecting = true;
+            if catalog.selection_version != editor.selection_revision {
+                catalog.selection = editor.ids.iter().cloned().collect();
+                catalog.selection_version = editor.selection_revision;
+            }
+            catalog.redraw(cx);
+        }
+    }
+
+    fn close_editor(&mut self, cx: &mut Cx, saved: Option<i64>) {
+        let Some(editor) = self.editor.take() else {
+            return;
+        };
+        if let Some(mut catalog) = self
+            .ui
+            .widget(cx, ids!(editor_catalog))
+            .borrow_mut::<ui::Catalog>()
+        {
+            catalog.selection.clear();
+            catalog.selecting = false;
+            catalog.selection_version = 0;
+        }
+        cx.set_key_focus(Area::Empty);
+        cx.text_ime_was_dismissed();
+        cx.stop_timer(self.search_timer);
+        self.visible(cx, ids!(playlist_editor), false);
+        self.visible(cx, ids!(main), true);
+        let mut query = editor.previous;
+        if let Some(id) = saved {
+            query.screen = data::Screen::Playlist(id);
+            query.search.clear();
+            query.source.clear();
+        }
+        self.ui
+            .text_input(cx, ids!(search))
+            .set_text(cx, &query.search);
+        self.send(cx, data::Command::ClearSelection);
+        self.send(cx, data::Command::Query(query, 0));
+        self.ui.redraw(cx);
+    }
+
+    fn leave_editor(&mut self, cx: &mut Cx) {
+        let Some(editor) = &self.editor else {
+            return;
+        };
+        if editor.saving {
+            return;
+        }
+        if !editor.ids.is_empty()
+            || !self
+                .ui
+                .text_input(cx, ids!(editor_name))
+                .text()
+                .trim()
+                .is_empty()
+        {
+            self.open(cx, Dialog::DiscardEditor);
+        } else {
+            self.close_editor(cx, None);
+        }
+    }
+
     fn open(&mut self, cx: &mut Cx, dialog: Dialog) {
+        cx.set_key_focus(Area::Empty);
+        cx.text_ime_was_dismissed();
+        self.panel_wide.get_or_insert(self.size.x >= 600.);
+        self.panel_anchor = match &dialog {
+            Dialog::Track | Dialog::PlaylistActions(_) => self.panel_anchor,
+            Dialog::Speed => self.anchor(cx, ids!(speed)),
+            Dialog::Order if self.dialog == Dialog::Track => self.panel_anchor,
+            Dialog::Order => self.anchor(
+                cx,
+                if self.full_player {
+                    ids!(order)
+                } else {
+                    ids!(library_order)
+                },
+            ),
+            Dialog::Repeat => self.anchor(cx, ids!(repeat)),
+            Dialog::Filter => self.anchor(cx, ids!(source_filter)),
+            Dialog::Sort => self.anchor(cx, ids!(sort)),
+            Dialog::Playlists => self
+                .panel_anchor
+                .or_else(|| self.anchor(cx, ids!(selection_playlist))),
+            Dialog::Recipients | Dialog::Folders(true) | Dialog::Topics(..) => self
+                .panel_anchor
+                .or_else(|| self.anchor(cx, ids!(player_share))),
+            Dialog::AddSource | Dialog::Chats | Dialog::Folders(false) => self
+                .panel_anchor
+                .or_else(|| self.anchor(cx, ids!(add_source))),
+            _ => None,
+        };
         self.dialog = dialog;
         self.ui.text_input(cx, ids!(panel_input)).set_text(cx, "");
+        if self.dialog == Dialog::BookmarkThreshold {
+            self.ui.text_input(cx, ids!(panel_input)).set_text(
+                cx,
+                &self.snapshot().settings["resume_minutes"]
+                    .as_u64()
+                    .unwrap_or(30)
+                    .to_string(),
+            );
+        }
         self.ui
-            .view(cx, ids!(panel_scroll))
+            .touch_scroll(cx, ids!(panel_scroll))
             .set_scroll_pos(cx, Vec2d::default());
         self.ui
             .widget(cx, ids!(choices_body))
@@ -223,8 +759,27 @@ impl App {
         let state = self.snapshot();
         let dialog = self.dialog.clone();
         self.visible(cx, ids!(overlay), dialog != Dialog::None);
+        self.visible(cx, ids!(auth_background), dialog == Dialog::Auth);
+        self.visible(cx, ids!(scrim), dialog != Dialog::Auth);
+        self.visible(cx, ids!(panel_title), dialog != Dialog::Auth);
+        self.visible(cx, ids!(auth_heading), dialog == Dialog::Auth);
+        self.visible(cx, ids!(auth_back), dialog == Dialog::Auth);
+        self.visible(cx, ids!(panel_close), dialog != Dialog::Auth);
+        ui::set_icon(
+            &self.ui,
+            cx,
+            ids!(panel_close),
+            if dialog == Dialog::Auth {
+                include_str!("../resources/back.svg")
+            } else {
+                include_str!("../resources/close.svg")
+            },
+        );
         for path in [
             ids!(settings_body),
+            ids!(sharing_body),
+            ids!(cache_body),
+            ids!(panel_cancel),
             ids!(track_body),
             ids!(choices_body),
             ids!(speed_body),
@@ -235,6 +790,14 @@ impl App {
             ids!(auth_mark),
             ids!(auth_qr_area),
             ids!(directory_folder),
+            ids!(manage_sources),
+            ids!(send_header),
+            ids!(send_options),
+            ids!(quick_body),
+            ids!(folder_choices),
+            ids!(queue_catalog),
+            ids!(queue_summary),
+            ids!(panel_footer),
         ] {
             self.visible(cx, path, false);
         }
@@ -242,23 +805,46 @@ impl App {
             .text_input(cx, ids!(panel_input))
             .set_is_password(cx, false);
         self.choices.clear();
+        self.ui
+            .widget(cx, ids!(panel_confirm))
+            .set_disabled(cx, false);
+        let search = matches!(dialog, Dialog::Filter | Dialog::Chats | Dialog::Recipients);
+        self.visible(cx, ids!(panel_search_icon), search);
+        let mut input_wrap = self.ui.widget(cx, ids!(panel_input_wrap));
+        let padding = Inset {
+            left: if search { 16.0 } else { 0.0 },
+            right: if search { 4.0 } else { 0.0 },
+            ..Default::default()
+        };
+        script_apply_eval!(cx,input_wrap,{padding:#(padding)});
+        self.visible(
+            cx,
+            ids!(panel_back),
+            matches!(dialog, Dialog::Sharing | Dialog::Cache),
+        );
+        self.visible(cx, ids!(cache_refresh), dialog == Dialog::Cache);
+        self.visible(cx, ids!(panel_header), dialog != Dialog::Track);
         let title = match &dialog {
             Dialog::None => "",
             Dialog::Settings => "Settings",
+            Dialog::Language => "Language",
+            Dialog::Sharing => "Sharing audio",
+            Dialog::Cache => "Music cache",
+            Dialog::AddSource => "Add source",
+            Dialog::Queue => "Queue",
+            Dialog::DiscardEditor => "Discard playlist changes?",
             Dialog::Auth => "Connect Telegram",
             Dialog::Track => "Recording",
             Dialog::Chats => "Choose chats",
             Dialog::Profile => "Open a profile",
-            Dialog::Filter => "Music sources",
+            Dialog::Filter => "Choose source",
             Dialog::Sort => "Sort music",
             Dialog::Playlists => "Add to playlist",
-            Dialog::NewPlaylist => "New playlist",
             Dialog::RenamePlaylist(_) => "Rename playlist",
             Dialog::PlaylistActions(_) => "Playlist",
             Dialog::Recipients => "Send audio",
             Dialog::Folders(_) => "Chat folders",
             Dialog::Topics(..) => "Choose forum topic",
-            Dialog::ConfirmSend(..) => "Confirm send",
             Dialog::Delete => "Remove copy",
             Dialog::ClearCache => "Clear music cache",
             Dialog::Logout => "Sign out",
@@ -267,11 +853,13 @@ impl App {
             Dialog::Order => "Playback order",
             Dialog::Repeat => "Repeat",
             Dialog::BookmarkThreshold => "Bookmark threshold",
+            Dialog::RemoveSource(..) => "Remove source",
         };
         self.text(cx, ids!(panel_title), title);
         match &dialog {
-            Dialog::Settings => {
-                self.visible(cx, ids!(settings_body), true);
+            Dialog::Settings | Dialog::Sharing => {
+                self.visible(cx, ids!(settings_body), dialog == Dialog::Settings);
+                self.visible(cx, ids!(sharing_body), dialog == Dialog::Sharing);
                 self.text(
                     cx,
                     ids!(settings_account),
@@ -281,30 +869,29 @@ impl App {
                         "Connect Telegram"
                     },
                 );
+                for (path, selected) in [
+                    (ids!(theme_light), state.settings["theme"] == "light"),
+                    (ids!(theme_dark), state.settings["theme"] != "light"),
+                ] {
+                    let active = if selected { 1.0 } else { 0.0 };
+                    let mut widget = self.ui.widget(cx, path);
+                    script_apply_eval!(cx,widget,{draw_bg.active:#(active)});
+                }
+                self.text(cx, ids!(settings_language), "Language");
                 self.text(
                     cx,
-                    ids!(settings_theme),
-                    &format!(
-                        "Appearance: {}",
-                        state.settings["theme"].as_str().unwrap_or("system")
-                    ),
-                );
-                self.text(
-                    cx,
-                    ids!(settings_language),
-                    &format!(
-                        "Language: {}",
-                        match state.settings["language"].as_str().unwrap_or("system") {
-                            "ru" => "Русский",
-                            "en" => "English",
-                            _ =>
-                                if state.language == "ru" {
-                                    "Системный"
-                                } else {
-                                    "System"
-                                },
+                    ids!(settings_language.detail),
+                    match state.settings["language"].as_str().unwrap_or("system") {
+                        "ru" => "Русский",
+                        "en" => "English",
+                        _ => {
+                            if state.language == "ru" {
+                                "Системный"
+                            } else {
+                                "System"
+                            }
                         }
-                    ),
+                    },
                 );
                 for (id, key, label) in [
                     (
@@ -315,7 +902,7 @@ impl App {
                     (
                         ids!(settings_bookmarks),
                         "resume_long_audio",
-                        "Resume long recordings",
+                        "Remember audio positions",
                     ),
                     (
                         ids!(settings_wifi),
@@ -338,34 +925,34 @@ impl App {
                         "Keep original caption",
                     ),
                 ] {
-                    self.text(
-                        cx,
-                        id,
-                        &format!(
-                            "{label}: {}",
-                            if state.settings[key] == true {
-                                "On"
-                            } else {
-                                "Off"
-                            }
-                        ),
-                    );
+                    self.text(cx, id, label);
+                    let checked = if state.settings[key] == true {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    let mut toggle = self.ui.widget(cx, id).widget(cx, ids!(toggle));
+                    script_apply_eval!(cx,toggle,{draw_bg.checked:#(checked)});
                 }
+                self.text(cx, ids!(settings_minutes), "Audio duration threshold");
+                let minutes = state.settings["resume_minutes"].as_u64().unwrap_or(30);
                 self.text(
                     cx,
-                    ids!(settings_minutes),
-                    &format!(
-                        "Bookmark threshold: {} minutes",
-                        state.settings["resume_minutes"].as_u64().unwrap_or(30)
-                    ),
+                    ids!(settings_minutes.detail),
+                    &if state.language == "ru" {
+                        format!("От {minutes} мин")
+                    } else {
+                        format!("{minutes} min and longer")
+                    },
                 );
+                self.text(cx, ids!(settings_storage), "On device");
                 self.text(
                     cx,
-                    ids!(settings_storage),
+                    ids!(settings_storage.detail),
                     &format!(
-                        "On device: {} · {:.1} MiB",
+                        "{} · {}",
                         crate::i18n::tracks(&state.language, state.storage_count),
-                        state.storage_bytes as f64 / 1048576.
+                        crate::i18n::bytes(&state.language, state.storage_bytes.max(0) as u64)
                     ),
                 );
                 self.text(
@@ -380,16 +967,101 @@ impl App {
                 );
                 self.text(cx, ids!(settings_sync), &state.sync);
             }
+            Dialog::Cache => {
+                self.visible(cx, ids!(cache_body), true);
+                self.text(
+                    cx,
+                    ids!(cache_size),
+                    &state
+                        .cache_size
+                        .map(|(bytes, _)| crate::i18n::bytes(&state.language, bytes))
+                        .unwrap_or_else(|| "—".into()),
+                );
+                self.text(
+                    cx,
+                    ids!(cache_count),
+                    &state
+                        .cache_size
+                        .map(|(_, files)| crate::i18n::files(&state.language, files))
+                        .unwrap_or_default(),
+                );
+                self.visible(cx, ids!(cache_loading), state.cache_loading);
+                self.visible(
+                    cx,
+                    ids!(cache_connect),
+                    state.auth.kind != "authorizationStateReady",
+                );
+                self.visible(
+                    cx,
+                    ids!(cache_clear),
+                    state.auth.kind == "authorizationStateReady",
+                );
+                self.ui.widget(cx, ids!(cache_clear)).set_disabled(
+                    cx,
+                    state.cache_loading
+                        || state.cache_size.is_none_or(|(bytes, _)| bytes == 0)
+                        || !state.cache_error.is_empty(),
+                );
+                self.ui
+                    .widget(cx, ids!(cache_refresh))
+                    .set_disabled(cx, state.cache_loading);
+            }
             Dialog::Auth => {
                 self.visible(cx, ids!(auth_actions), true);
                 self.visible(cx, ids!(auth_mark), true);
                 let kind = state.auth.kind.as_str();
+                let compact = matches!(
+                    kind,
+                    "authorizationStateWaitCode"
+                        | "authorizationStateWaitPassword"
+                        | "authorizationStateWaitEmailAddress"
+                        | "authorizationStateWaitEmailCode"
+                        | "authorizationStateWaitOtherDeviceConfirmation"
+                );
+                let mut mark = self.ui.widget(cx, ids!(auth_mark));
+                let flow = if compact { Flow::right() } else { Flow::Down };
+                let height = if compact { 48.0 } else { 132.0 };
+                script_apply_eval!(cx,mark,{flow:#(flow) height:#(height)});
+                let mut photo = self.ui.widget(cx, ids!(auth_photo));
+                let size = if compact { 40.0 } else { 64.0 };
+                script_apply_eval!(cx,photo,{width:#(size) height:#(size)});
+                let mut name = self.ui.widget(cx, ids!(auth_name));
+                let font = if compact { 18.0 } else { 21.0 };
+                script_apply_eval!(cx,name,{draw_text.text_style.font_size:#(font)});
+                self.text(
+                    cx,
+                    ids!(auth_heading),
+                    match kind {
+                        "authorizationStateWaitCode" => "Login code",
+                        "authorizationStateWaitPassword" => "Password",
+                        "authorizationStateWaitEmailAddress" => "Email address",
+                        "authorizationStateWaitEmailCode" => "Email code",
+                        "authorizationStateWaitOtherDeviceConfirmation" => {
+                            "Confirm sign-in in Telegram"
+                        }
+                        _ => "Connect Telegram",
+                    },
+                );
                 let (message,placeholder)=match kind {
-                    "authorizationStateWaitCode"=>(format!("Enter the code sent to {}. {}",state.auth.phone,state.auth.detail),"Login code"),
-                    "authorizationStateWaitPassword"=>(format!("Enter your Telegram password. {}",state.auth.detail),"Password"),
+                    "authorizationStateWaitCode"=>{
+                        let help=match state.auth.detail.as_str(){
+                            "authenticationCodeTypeTelegramMessage"=>"Enter the code sent to you in Telegram.",
+                            "authenticationCodeTypeSms"|"authenticationCodeTypeSmsWord"|"authenticationCodeTypeSmsPhrase"=>"Enter the code sent to you by SMS.",
+                            "authenticationCodeTypeCall"=>"Enter the code from the Telegram phone call.",
+                            "authenticationCodeTypeMissedCall"=>"Enter the code from the missed call number.",
+                            "authenticationCodeTypeFragment"=>"Enter the code provided by Fragment.",
+                            _=>"Enter your Telegram sign-in code.",
+                        };
+                        (format!("{}\n{}",crate::i18n::tr(&state.language,help),state.auth.phone),"Login code")
+                    },
+                    "authorizationStateWaitPassword"=>{
+                        let mut message=crate::i18n::tr(&state.language,"Enter your Telegram password.").into_owned();
+                        if !state.auth.detail.is_empty(){message.push_str(&format!("\n{} {}",crate::i18n::tr(&state.language,"Hint:"),state.auth.detail));}
+                        (message,"Password")
+                    },
                     "authorizationStateWaitEmailAddress"=>("Telegram needs an email address to continue.".into(),"Email address"),
-                    "authorizationStateWaitEmailCode"=>(format!("Enter the code sent to {}.",state.auth.detail),"Email code"),
-                    "authorizationStateWaitOtherDeviceConfirmation"=>(format!("Open this link on a signed-in device:\n{}",state.auth.detail),""),
+                    "authorizationStateWaitEmailCode"=>(format!("{} {}",crate::i18n::tr(&state.language,"Enter the code sent to your email:"),state.auth.detail),"Email code"),
+                    "authorizationStateWaitOtherDeviceConfirmation"=>("In Telegram on your phone, open Settings → Devices → Link Desktop Device and scan this code.".into(),""),
                     "authorizationStateReady"=>("Telegram is connected.".into(),""),
                     "starting"|"authorizationStateWaitTdlibParameters"=>("Preparing a private Telegram session…".into(),""),
                     _=>("Enter your phone number with its country code. This preview uses a separate session. With the same account, playlists, favorites and library settings sync with stable Spotygram.".into(),"+1 234 567 890"),
@@ -426,13 +1098,12 @@ impl App {
                     kind == "authorizationStateWaitCode" && !state.auth.next_code.is_empty(),
                 );
                 if kind == "authorizationStateWaitOtherDeviceConfirmation" {
-                    self.visible(cx, ids!(auth_mark), false);
                     self.visible(cx, ids!(auth_qr_area), true);
                     if self.qr_url != state.auth.detail {
                         if let Ok(code) = qrcode::QrCode::new(state.auth.detail.as_bytes()) {
                             let svg = code
                                 .render::<qrcode::render::svg::Color>()
-                                .min_dimensions(440, 440)
+                                .min_dimensions(480, 480)
                                 .build();
                             let _ = self
                                 .ui
@@ -446,9 +1117,24 @@ impl App {
             Dialog::Track => {
                 self.visible(cx, ids!(track_body), true);
                 if let Some(track) = &self.selected {
+                    let connected = state.auth.kind == "authorizationStateReady";
+                    let profile_action = connected
+                        && !track.document
+                        && (track.available || track.local() || !track.remote.is_empty());
+                    let member = if state.profile_member_id == track.id {
+                        state.profile_member
+                    } else {
+                        None
+                    };
+                    let inspecting = profile_action && member.is_none() && state.error.is_empty();
                     self.text(cx, ids!(track_title), &track.title);
-                    self.text(cx, ids!(track_artist), track.subtitle());
+                    self.text(
+                        cx,
+                        ids!(track_artist),
+                        &ui::subtitle(&state.language, track),
+                    );
                     ui::set_image(&self.ui, cx, ids!(track_cover.art), &track.art);
+                    ui::set_cover(&self.ui, cx, ids!(track_cover), &track.title);
                     self.text(
                         cx,
                         ids!(track_favorite),
@@ -456,6 +1142,16 @@ impl App {
                             "Remove from favorites"
                         } else {
                             "Add to favorites"
+                        },
+                    );
+                    ui::set_icon(
+                        &self.ui,
+                        cx,
+                        ids!(track_favorite),
+                        if track.liked {
+                            include_str!("../resources/favorite.svg")
+                        } else {
+                            include_str!("../resources/favorite_border.svg")
                         },
                     );
                     self.text(
@@ -470,14 +1166,52 @@ impl App {
                     self.text(
                         cx,
                         ids!(track_profile_member),
-                        if state.profile_member == Some(true) {
-                            "Remove from profile"
+                        if member == Some(true) {
+                            "Remove"
                         } else {
                             "To profile"
                         },
                     );
-                    let connected = state.auth.kind == "authorizationStateReady";
-                    self.visible(cx, ids!(track_profile_member), !track.document && connected);
+                    ui::set_icon(
+                        &self.ui,
+                        cx,
+                        ids!(track_profile_member),
+                        if member == Some(true) {
+                            include_str!("../resources/person_remove.svg")
+                        } else {
+                            include_str!("../resources/person_add.svg")
+                        },
+                    );
+                    self.ui
+                        .button(cx, ids!(track_profile_member))
+                        .set_loading(cx, inspecting);
+                    if let Some(mut button) =
+                        self.ui.button(cx, ids!(track_profile_member)).borrow_mut()
+                    {
+                        button.draw_icon.opacity = if inspecting { 0.0 } else { 1.0 };
+                    }
+                    self.text(cx, ids!(track_order), "Playback order");
+                    self.text(
+                        cx,
+                        ids!(track_order.detail),
+                        match state.playback.order {
+                            data::Order::Normal => "In order",
+                            data::Order::Reverse => "Reverse order",
+                            data::Order::Shuffle => "Shuffle",
+                            data::Order::Random => "Random",
+                        },
+                    );
+                    self.visible(
+                        cx,
+                        ids!(track_send),
+                        connected && (track.local() || track.available),
+                    );
+                    self.visible(
+                        cx,
+                        ids!(track_download),
+                        track.temporary || !track.local() && track.available,
+                    );
+                    self.visible(cx, ids!(profile_member_wrap), profile_action);
                     self.ui.widget(cx, ids!(track_profile_member)).set_disabled(
                         cx,
                         state.profile_member_id != track.id || state.profile_member.is_none(),
@@ -526,7 +1260,7 @@ impl App {
                 self.ui
                     .text_input(cx, ids!(panel_input))
                     .set_empty_text(cx, "Search Telegram chats".into());
-                self.visible(cx, ids!(directory_folder), true);
+                self.visible(cx, ids!(directory_folder), dialog == Dialog::Chats);
                 let folder = state
                     .folders
                     .iter()
@@ -538,6 +1272,131 @@ impl App {
                         "All chats"
                     });
                 self.text(cx, ids!(directory_folder), folder);
+                if dialog == Dialog::Recipients {
+                    self.visible(cx, ids!(send_header), !self.keyboard_visible);
+                    self.visible(cx, ids!(send_options), true);
+                    self.visible(cx, ids!(folder_choices), true);
+                    if let Some(track) = &self.selected {
+                        self.text(cx, ids!(send_title), &track.title);
+                        self.text(cx, ids!(send_artist), &ui::subtitle(&state.language, track));
+                        ui::set_cover(&self.ui, cx, ids!(send_cover), &track.title);
+                        ui::set_image(&self.ui, cx, ids!(send_cover.art), &track.art);
+                    }
+                    let summary = format!(
+                        "{} · {}",
+                        crate::i18n::tr(
+                            &state.language,
+                            if state.settings["sharing_sender"] == true {
+                                "Original sender"
+                            } else {
+                                "From you"
+                            }
+                        ),
+                        crate::i18n::tr(
+                            &state.language,
+                            if state.settings["sharing_caption"] == true {
+                                "Original caption"
+                            } else {
+                                "No caption"
+                            }
+                        )
+                    );
+                    self.text(cx, ids!(send_summary), &summary);
+                    self.visible(cx, ids!(panel_confirm), true);
+                    self.visible(cx, ids!(panel_footer), true);
+                    let label = self
+                        .send_target
+                        .as_ref()
+                        .map(|(_, _, name)| {
+                            format!("{} {}", crate::i18n::tr(&state.language, "Send to"), name)
+                        })
+                        .unwrap_or_else(|| {
+                            crate::i18n::tr(&state.language, "Choose a chat").into_owned()
+                        });
+                    self.text(cx, ids!(panel_confirm), &label);
+                    self.ui
+                        .widget(cx, ids!(panel_confirm))
+                        .set_disabled(cx, self.send_target.is_none());
+                    self.ui
+                        .widget(cx, ids!(send_pin))
+                        .set_disabled(cx, self.send_target.is_none());
+                    self.quick_recipients.clear();
+                    for key in [
+                        format!("sharing_pins_{}", state.me),
+                        format!("sharing_recent_{}", state.me),
+                    ] {
+                        if let Ok(rows) = serde_json::from_value::<Vec<data::Source>>(
+                            state.settings[&key].clone(),
+                        ) {
+                            for row in rows {
+                                if !self.quick_recipients.iter().any(|s| s.id == row.id) {
+                                    self.quick_recipients.push(row);
+                                }
+                            }
+                        }
+                    }
+                    if state.me != 0 && !self.quick_recipients.iter().any(|s| s.id == state.me) {
+                        self.quick_recipients.insert(
+                            0,
+                            data::Source {
+                                id: state.me,
+                                title: crate::i18n::tr(&state.language, "Saved messages")
+                                    .into_owned(),
+                                kind: "Saved messages".into(),
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    self.quick_recipients.truncate(12);
+                    self.visible(cx, ids!(quick_body), !self.quick_recipients.is_empty());
+                    if self.keyboard_visible
+                        || !self
+                            .ui
+                            .text_input(cx, ids!(panel_input))
+                            .text()
+                            .trim()
+                            .is_empty()
+                    {
+                        self.visible(cx, ids!(quick_body), false);
+                    }
+                    if let Some(mut quick) = self
+                        .ui
+                        .widget(cx, ids!(quick_choices))
+                        .borrow_mut::<ui::Choices>()
+                    {
+                        quick.rows = self
+                            .quick_recipients
+                            .iter()
+                            .map(|source| ui::ChoiceRow {
+                                title: source.title.clone(),
+                                photo: source.photo.clone(),
+                                key: Some((source.id, false)),
+                                checked: self
+                                    .send_target
+                                    .as_ref()
+                                    .is_some_and(|(id, _, _)| *id == source.id),
+                                ..Default::default()
+                            })
+                            .collect();
+                        quick.redraw(cx);
+                    }
+                    if let Some(mut folders) = self
+                        .ui
+                        .widget(cx, ids!(folder_choices))
+                        .borrow_mut::<ui::Choices>()
+                    {
+                        folders.rows = std::iter::once((0, "All chats".to_owned()))
+                            .chain(std::iter::once((-1, "Archive".to_owned())))
+                            .chain(state.folders.iter().map(|f| (f.id, f.title.clone())))
+                            .map(|(id, title)| ui::ChoiceRow {
+                                title: crate::i18n::tr(&state.language, &title).into_owned(),
+                                checked: self.folder == id,
+                                ..Default::default()
+                            })
+                            .collect();
+                        folders.redraw(cx);
+                    }
+                }
                 if state.choices_scope
                     == if dialog == Dialog::Chats {
                         "chats"
@@ -594,18 +1453,58 @@ impl App {
                 self.confirm_button(cx, "Open profile");
             }
             Dialog::Filter => {
+                self.visible(cx, ids!(panel_input_wrap), true);
+                self.ui.text_input(cx, ids!(panel_input)).set_empty_text(
+                    cx,
+                    crate::i18n::tr(&state.language, "Search sources").into_owned(),
+                );
+                let search = self
+                    .ui
+                    .text_input(cx, ids!(panel_input))
+                    .text()
+                    .trim()
+                    .to_lowercase();
                 self.choices.push((0, "All sources".into()));
-                self.choices
-                    .extend(state.sources.iter().filter(|s| s.selected).map(|s| {
-                        (
-                            s.id,
-                            format!(
-                                "{}{}",
-                                if s.profile { "Profile · " } else { "Chat · " },
-                                s.title
-                            ),
-                        )
-                    }));
+                self.filter_sources = state
+                    .sources
+                    .iter()
+                    .filter(|s| s.selected || s.profile && s.id == state.me)
+                    .cloned()
+                    .collect();
+                if let Some((i, _)) = self
+                    .filter_sources
+                    .iter()
+                    .enumerate()
+                    .find(|(_, s)| s.profile && s.id == state.me)
+                {
+                    self.choices.push((i as i64 + 1, "My profile".into()));
+                }
+                for (profile, key, title) in [(true, -2, "Profiles"), (false, -3, "Chats")] {
+                    let rows: Vec<_> = self
+                        .filter_sources
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, s)| {
+                            s.profile == profile
+                                && !(s.profile && s.id == state.me)
+                                && s.title.to_lowercase().contains(&search)
+                        })
+                        .map(|(i, s)| (i as i64 + 1, s.title.clone()))
+                        .collect();
+                    if !rows.is_empty() {
+                        self.choices.push((key, title.into()));
+                        self.choices.extend(rows);
+                    }
+                }
+                self.visible(cx, ids!(manage_sources), true);
+                self.text(cx, ids!(manage_sources), "Manage sources");
+            }
+            Dialog::Language => {
+                self.choices = vec![
+                    (0, "System".into()),
+                    (1, "English".into()),
+                    (2, "Русский".into()),
+                ];
             }
             Dialog::Sort => {
                 self.choices = [
@@ -633,7 +1532,7 @@ impl App {
                     "Create a playlist from the Playlists tab first.",
                 );
             }
-            Dialog::NewPlaylist | Dialog::RenamePlaylist(_) => {
+            Dialog::RenamePlaylist(_) => {
                 self.visible(cx, ids!(panel_input_wrap), true);
                 self.ui
                     .text_input(cx, ids!(panel_input))
@@ -645,36 +1544,11 @@ impl App {
                     (0, "Play playlist".into()),
                     (1, "Rename playlist".into()),
                     (2, "Delete playlist".into()),
+                    (3, "Add recordings".into()),
                 ];
                 if let Some(p) = state.playlists.iter().find(|p| p.id == *id) {
                     self.text(cx, ids!(panel_title), &p.name);
                 }
-            }
-            Dialog::ConfirmSend(_, _, recipient) => {
-                self.visible(cx, ids!(panel_message), true);
-                let title = self
-                    .selected
-                    .as_ref()
-                    .map(|t| t.title.as_str())
-                    .unwrap_or("Selected recording");
-                self.text(
-                    cx,
-                    ids!(panel_message),
-                    &format!(
-                        "Send “{title}” to {recipient}?\nOriginal sender: {}\nOriginal caption: {}",
-                        if state.settings["sharing_sender"] == true {
-                            "kept"
-                        } else {
-                            "omitted"
-                        },
-                        if state.settings["sharing_caption"] == true {
-                            "kept"
-                        } else {
-                            "omitted"
-                        }
-                    ),
-                );
-                self.confirm_button(cx, "Send recording");
             }
             Dialog::Delete | Dialog::ClearCache | Dialog::Logout => {
                 self.visible(cx, ids!(panel_message), true);
@@ -691,11 +1565,27 @@ impl App {
                 self.text(
                     cx,
                     ids!(speed_value),
-                    &format!("{:.2}×", state.playback.speed),
+                    &crate::i18n::speed(&state.language, state.playback.speed),
                 );
                 self.ui
                     .media_slider(cx, ids!(speed_slider))
                     .set_value(cx, state.playback.speed);
+                for (id, value) in [
+                    (ids!(speed_slow), 0.5),
+                    (ids!(speed_normal), 1.0),
+                    (ids!(speed_fast), 1.5),
+                    (ids!(speed_double), 2.0),
+                    (ids!(speed_triple), 3.0),
+                ] {
+                    self.text(cx, id, &crate::i18n::speed(&state.language, value));
+                    let mut button = self.ui.widget(cx, id);
+                    let active = if (state.playback.speed - value).abs() < 0.025 {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    script_apply_eval!(cx,button,{draw_bg.accent:#(active)});
+                }
             }
             Dialog::Order => {
                 self.choices = ["In order", "Reverse order", "Shuffle", "Random"]
@@ -718,29 +1608,147 @@ impl App {
                     .set_empty_text(cx, "Minutes".into());
                 self.confirm_button(cx, "Save threshold");
             }
+            Dialog::RemoveSource(..) => {
+                self.visible(cx, ids!(panel_message), true);
+                self.text(
+                    cx,
+                    ids!(panel_message),
+                    "Disconnect this source from your library?",
+                );
+                self.confirm_button(cx, "Remove from library");
+            }
+            Dialog::AddSource => {
+                self.choices = vec![(0, "Add chats".into()), (1, "Add profile".into())];
+            }
+            Dialog::Queue => {
+                self.visible(cx, ids!(queue_catalog), true);
+                self.visible(cx, ids!(queue_summary), true);
+                let count = crate::i18n::tracks(&state.language, state.playback.queue_count);
+                let mode = match state.playback.order {
+                    data::Order::Shuffle => "Shuffle",
+                    data::Order::Random => "Random",
+                    data::Order::Reverse => "Reverse order",
+                    _ => "In order",
+                };
+                self.text(
+                    cx,
+                    ids!(queue_summary),
+                    &format!("{} · {}", count, crate::i18n::tr(&state.language, mode)),
+                );
+            }
+            Dialog::DiscardEditor => {
+                self.visible(cx, ids!(panel_message), true);
+                self.text(
+                    cx,
+                    ids!(panel_message),
+                    "The name and selected recordings have not been saved.",
+                );
+                self.confirm_button(cx, "Discard");
+            }
             Dialog::None => {}
         }
         let choices = self.ui.widget(cx, ids!(choices_body));
         if let Some(mut widget) = choices.borrow_mut::<ui::Choices>() {
-            widget.labels = self
+            let selected = match dialog {
+                Dialog::Language => Some(match state.settings["language"].as_str() {
+                    Some("en") => 1,
+                    Some("ru") => 2,
+                    _ => 0,
+                }),
+                Dialog::Sort => Some(match state.page.query.sort {
+                    data::Sort::Newest => 0,
+                    data::Sort::Oldest => 1,
+                    data::Sort::Title => 2,
+                    data::Sort::Artist => 3,
+                    data::Sort::Duration => 4,
+                }),
+                Dialog::Order => Some(match state.playback.order {
+                    data::Order::Normal => 0,
+                    data::Order::Reverse => 1,
+                    data::Order::Shuffle => 2,
+                    data::Order::Random => 3,
+                }),
+                Dialog::Repeat => Some(match state.playback.repeat {
+                    data::Repeat::Off => 0,
+                    data::Repeat::All => 1,
+                    data::Repeat::One => 2,
+                }),
+                Dialog::Filter => {
+                    let key = if state.page.query.source.is_empty() {
+                        0
+                    } else {
+                        self.filter_sources
+                            .iter()
+                            .position(|s| {
+                                format!("{}:{}", if s.profile { "profile" } else { "chat" }, s.id)
+                                    == state.page.query.source
+                            })
+                            .map(|i| i + 1)
+                            .unwrap_or(0)
+                    };
+                    self.choices.iter().position(|(id, _)| *id == key as i64)
+                }
+                Dialog::Recipients => self
+                    .send_target
+                    .as_ref()
+                    .and_then(|(chat, _, _)| self.choices.iter().position(|(id, _)| id == chat)),
+                _ => None,
+            };
+            widget.rows = self
                 .choices
                 .iter()
-                .map(|(_, s)| {
-                    if matches!(
+                .enumerate()
+                .map(|(index, (id, s))| {
+                    let source = if matches!(dialog, Dialog::Chats | Dialog::Recipients) {
+                        state.choices.get(index)
+                    } else if dialog == Dialog::Filter && *id > 0 {
+                        self.filter_sources.get(*id as usize - 1)
+                    } else {
+                        None
+                    };
+                    let title = if matches!(
                         dialog,
-                        Dialog::Sort | Dialog::Order | Dialog::Repeat | Dialog::PlaylistActions(_)
-                    ) {
+                        Dialog::Sort
+                            | Dialog::Language
+                            | Dialog::Order
+                            | Dialog::Repeat
+                            | Dialog::PlaylistActions(_)
+                            | Dialog::AddSource
+                    ) || dialog == Dialog::Filter && (*id <= 0 || s == "My profile")
+                    {
                         crate::i18n::tr(&state.language, s).into_owned()
                     } else {
-                        s.clone()
+                        s.trim_start_matches("✓  ")
+                            .trim_end_matches("  ›")
+                            .to_owned()
+                    };
+                    ui::ChoiceRow {
+                        title,
+                        subtitle: source
+                            .map(|source| {
+                                if dialog == Dialog::Filter {
+                                    crate::i18n::tracks(&state.language, source.count)
+                                } else {
+                                    crate::i18n::tr(&state.language, &source.kind).into_owned()
+                                }
+                            })
+                            .unwrap_or_default(),
+                        photo: source.map(|s| s.photo.clone()).unwrap_or_default(),
+                        key: source.map(|s| (s.id, s.profile)),
+                        heading: dialog == Dialog::Filter && *id < 0,
+                        library: dialog == Dialog::Filter && *id == 0,
+                        checked: selected == Some(index)
+                            || dialog == Dialog::Chats && source.is_some_and(|s| s.selected),
+                        glass: dialog == Dialog::Filter,
+                        radio: matches!(
+                            dialog,
+                            Dialog::Language | Dialog::Recipients | Dialog::Topics(..)
+                        ),
                     }
                 })
                 .collect();
             widget.redraw(cx);
         }
-        let mut choices = self.ui.widget(cx, ids!(choices_body));
-        let choices_height = (self.choices.len().max(1) as f64 * 58.).min(380.);
-        script_apply_eval!(cx,choices,{height:#(choices_height)});
         let input = self.ui.text_input(cx, ids!(panel_input));
         // Password and typed input survive language changes; only the placeholder changes.
         if let Some(mut input) = input.borrow_mut() {
@@ -750,8 +1758,13 @@ impl App {
                 crate::i18n::tr(&state.language, &placeholder).into_owned(),
             );
         }
-        self.visible(cx, ids!(panel_error), !state.error.is_empty());
-        self.text(cx, ids!(panel_error), &state.error);
+        let error = if dialog == Dialog::Cache && !state.cache_error.is_empty() {
+            &state.cache_error
+        } else {
+            &state.error
+        };
+        self.visible(cx, ids!(panel_error), !error.is_empty());
+        self.text(cx, ids!(panel_error), error);
         if dialog == Dialog::Auth {
             self.ui
                 .widget(cx, ids!(auth_submit))
@@ -770,8 +1783,20 @@ impl App {
     }
 
     fn confirm_button(&self, cx: &mut Cx, text: &str) {
+        self.visible(cx, ids!(panel_footer), true);
+        self.visible(cx, ids!(panel_cancel), true);
         self.visible(cx, ids!(panel_confirm), true);
         self.text(cx, ids!(panel_confirm), text);
+    }
+
+    fn select_recipient(&mut self, cx: &mut Cx, source: &data::Source) {
+        if source.forum {
+            self.send(cx, data::Command::ShareTopics(source.id));
+            self.open(cx, Dialog::Topics(source.id, source.title.clone()));
+        } else {
+            self.send_target = Some((source.id, 0, source.title.clone()));
+            self.configure_dialog(cx);
+        }
     }
 
     fn sync_ui(&mut self, cx: &mut Cx) {
@@ -785,20 +1810,102 @@ impl App {
             return;
         }
         let old = self.state.replace(state.clone());
+        if self.queue_return.is_some() && state.playback.queue_count == 0 {
+            self.full_player = false;
+            self.close_dialog(cx);
+            self.send(cx, data::Command::ObserveClock(false));
+        }
+        if self.editor.as_ref().is_some_and(|editor| editor.saving) {
+            if old
+                .as_ref()
+                .is_some_and(|old| old.playlist_save_revision != state.playlist_save_revision)
+            {
+                self.close_editor(cx, Some(state.playlist_saved_id));
+                return;
+            }
+            if !state.error.is_empty() {
+                if let Some(editor) = &mut self.editor {
+                    editor.saving = false;
+                }
+                self.editor_ui(cx);
+            }
+        }
         if old
             .as_ref()
-            .is_none_or(|old| old.language != state.language)
+            .is_none_or(|old| old.selection_revision != state.selection_revision)
         {
+            if let Some(editor) = &mut self.editor
+                && let Some((query, add)) = editor.pending.take()
+            {
+                editor.selection_revision += 1;
+                if query == state.selection_query && state.selection_error.is_empty() {
+                    if add {
+                        let mut chosen: HashSet<_> = editor.ids.iter().cloned().collect();
+                        editor.ids.extend(
+                            state
+                                .selection_ids
+                                .iter()
+                                .filter(|id| chosen.insert((*id).clone()))
+                                .cloned(),
+                        );
+                        editor.all_selected = Some(query);
+                    } else {
+                        let removed: HashSet<_> = state.selection_ids.iter().collect();
+                        editor.ids.retain(|id| !removed.contains(id));
+                        editor.all_selected = None;
+                    }
+                }
+                self.editor_ui(cx);
+            }
+            if let Some((query, add)) = self.pending_selection.take() {
+                if self.selecting
+                    && query == state.selection_query
+                    && state.selection_error.is_empty()
+                {
+                    if add {
+                        self.selection.extend(state.selection_ids.iter().cloned());
+                        self.all_selected_query = Some(query);
+                    } else {
+                        for id in state.selection_ids.iter() {
+                            self.selection.remove(id);
+                        }
+                        self.all_selected_query = None;
+                    }
+                }
+                self.selection_ui(cx);
+            }
+        }
+        if self.sticker.is_none() && state.revision > 0 {
+            self.choose_sticker(cx);
+        }
+        let language_changed = old
+            .as_ref()
+            .is_none_or(|old| old.language != state.language);
+        if language_changed {
             self.localize(cx);
+            self.editor_ui(cx);
         }
         let page_changed = old.as_ref().is_none_or(|old| {
             old.page.revision != state.page.revision
                 || old.page.offset != state.page.offset
                 || old.page.query != state.page.query
         });
-        if old
-            .as_ref()
-            .is_some_and(|old| old.page.query != state.page.query)
+        let queue_transition = state.page.query.screen == data::Screen::Queue
+            || old.as_ref().is_some_and(|old| {
+                old.page.query.screen == data::Screen::Queue
+                    && self.queue_restore.as_ref() == Some(&state.page.query)
+            });
+        // The overlay has its own list. Keep the library's scroll position,
+        // including the brief interval before its restored page is published.
+        self.visible(
+            cx,
+            ids!(catalog),
+            state.page.query.screen != data::Screen::Queue,
+        );
+        if !queue_transition
+            && old
+                .as_ref()
+                .is_some_and(|old| old.page.query != state.page.query)
         {
             self.ui
                 .widget(cx, ids!(catalog))
@@ -809,92 +1916,191 @@ impl App {
             !Arc::ptr_eq(&old.sources, &state.sources)
                 || !Arc::ptr_eq(&old.playlists, &state.playlists)
         });
+        if old
+            .as_ref()
+            .is_none_or(|old| !Arc::ptr_eq(&old.avatar_paths, &state.avatar_paths))
+        {
+            self.ui.widget(cx, ids!(choices_body)).redraw(cx);
+            if let Some(old) = &old {
+                let retained: HashSet<_> =
+                    state.avatar_paths.values().map(String::as_str).collect();
+                for path in old
+                    .avatar_paths
+                    .values()
+                    .filter(|path| !path.is_empty() && !retained.contains(path.as_str()))
+                {
+                    makepad_widgets::makepad_draw::evict_image_from_cache(
+                        cx,
+                        std::path::Path::new(path),
+                    );
+                }
+            }
+        }
         let screen = &state.page.query.screen;
-        let title = match screen {
-            data::Screen::Music => "Music".to_owned(),
-            data::Screen::Favorites => "Favorites".into(),
-            data::Screen::Playlists => "Playlists".into(),
-            data::Screen::OnDevice => "On device".into(),
-            data::Screen::Sources => "Sources".into(),
-            data::Screen::Queue => "Queue".into(),
-            data::Screen::Playlist(id) => state
-                .playlists
-                .iter()
-                .find(|p| p.id == *id)
-                .map(|p| p.name.clone())
-                .unwrap_or("Playlist".into()),
-            data::Screen::Profile(id) => state
-                .sources
-                .iter()
-                .find(|s| s.profile && s.id == *id)
-                .map(|s| s.title.clone())
-                .unwrap_or("Profile music".into()),
-        };
-        self.text(cx, ids!(heading), &title);
-        self.text(
-            cx,
-            ids!(count),
-            &crate::i18n::tracks(&state.language, state.page.total),
-        );
-        self.visible(
-            cx,
-            ids!(count),
-            !matches!(screen, data::Screen::Sources | data::Screen::Playlists),
-        );
-        self.visible(
-            cx,
-            ids!(back),
-            matches!(
-                screen,
-                data::Screen::Playlist(_)
-                    | data::Screen::Profile(_)
-                    | data::Screen::Queue
-                    | data::Screen::OnDevice
+        self.header_state(cx, &state);
+        if old
+            .as_ref()
+            .is_none_or(|old| old.page.query.screen != state.page.query.screen)
+        {
+            ui::set_icon(
+                &self.ui,
+                cx,
+                ids!(refresh),
+                if matches!(screen, data::Screen::Playlist(_)) {
+                    include_str!("../resources/more.svg")
+                } else {
+                    include_str!("../resources/refresh.svg")
+                },
+            );
+        }
+        let refreshing =
+            state.busy && self.editor.is_none() && !self.full_player && !self.selecting;
+        let source_screen = *screen == data::Screen::Sources;
+        let source_top = self.size.x - self.safe.left - self.safe.right >= 600.0;
+        for (path, visible) in [
+            (
+                ids!(refresh),
+                !matches!(
+                    screen,
+                    data::Screen::Sources | data::Screen::Playlists | data::Screen::Playlist(_)
+                ),
             ),
+            (ids!(source_refresh), source_screen && !source_top),
+            (ids!(source_refresh_top), source_screen && source_top),
+        ] {
+            let loading = refreshing && visible;
+            let button = self.ui.button(cx, path);
+            button.set_loading(cx, loading);
+            if let Some(mut button) = button.borrow_mut() {
+                button.draw_icon.opacity = if loading { 0.0 } else { 1.0 };
+            }
+        }
+        if page_changed || language_changed {
+            self.layout(cx);
+            self.editor_ui(cx);
+            let placeholder = match screen {
+                data::Screen::Profile(_) => "Search profile",
+                data::Screen::Favorites => "Search favorites",
+                data::Screen::Playlists => "Find a playlist",
+                _ => "Search music",
+            };
+            self.ui.text_input(cx, ids!(search)).set_empty_text(
+                cx,
+                crate::i18n::tr(&state.language, placeholder).into_owned(),
+            );
+            if let Some(source) = state.sources.iter().find(|s| {
+                format!("{}:{}", if s.profile { "profile" } else { "chat" }, s.id)
+                    == state.page.query.source
+            }) {
+                self.ui
+                    .widget(cx, ids!(source_filter))
+                    .set_text(cx, &source.title);
+            } else {
+                self.text(cx, ids!(source_filter), "All sources");
+            }
+        }
+        self.visible(
+            cx,
+            ids!(header),
+            !self.keyboard_visible && !matches!(screen, data::Screen::Profile(_)),
         );
         self.visible(
             cx,
-            ids!(music_controls),
-            matches!(
-                screen,
-                data::Screen::Music
-                    | data::Screen::Favorites
-                    | data::Screen::OnDevice
-                    | data::Screen::Playlist(_)
-            ),
+            ids!(search_shell),
+            !matches!(screen, data::Screen::Sources)
+                && (!matches!(screen, data::Screen::Playlists) || !state.playlists.is_empty()),
         );
+        if let data::Screen::Profile(id) = screen {
+            if let Some(source) = state.sources.iter().find(|s| s.profile && s.id == *id) {
+                let username = if source.username.is_empty() {
+                    crate::i18n::tr(&state.language, "Profile music").into_owned()
+                } else {
+                    format!("@{}", source.username.trim_start_matches('@'))
+                };
+                self.ui
+                    .widget(cx, ids!(profile_username))
+                    .set_text(cx, &username);
+                self.text(
+                    cx,
+                    ids!(profile_count),
+                    &format!(
+                        "{} · {}",
+                        crate::i18n::tr(&state.language, "Profile music in Telegram"),
+                        crate::i18n::tracks(&state.language, source.count)
+                    ),
+                );
+                self.ui
+                    .label(cx, ids!(profile_avatar.initials))
+                    .set_text(cx, &ui::initials(&source.title));
+                self.visible(cx, ids!(profile_connect), !source.selected);
+                self.visible(cx, ids!(profile_disconnect), source.selected);
+                ui::set_image(&self.ui, cx, ids!(profile_avatar.art), &source.photo);
+            }
+        }
         self.visible(
             cx,
             ids!(collection_controls),
-            matches!(screen, data::Screen::Playlists | data::Screen::Sources),
+            *screen == data::Screen::Sources,
         );
-        self.visible(
-            cx,
-            ids!(create_playlist),
-            *screen == data::Screen::Playlists,
-        );
-        self.visible(cx, ids!(add_chats), *screen == data::Screen::Sources);
-        self.visible(cx, ids!(add_profile), *screen == data::Screen::Sources);
-        self.visible(
-            cx,
-            ids!(profile_controls),
-            matches!(screen, data::Screen::Profile(_)),
-        );
-        self.visible(cx, ids!(selection_controls), self.selecting);
-        self.text(
-            cx,
-            ids!(selection_count),
-            &format!("{} selected", self.selection.len()),
-        );
-        self.text(
-            cx,
-            ids!(header_status),
-            if state.busy {
-                &state.status
+        let active_tab = match screen {
+            data::Screen::Favorites => 1,
+            data::Screen::Playlists | data::Screen::Playlist(_) => 2,
+            data::Screen::Sources | data::Screen::Profile(_) => 3,
+            _ => 0,
+        };
+        if old.as_ref().is_none_or(|s| {
+            s.page.query.screen != *screen || s.settings["theme"] != state.settings["theme"]
+        }) {
+            let light = state.settings["theme"] == "light";
+            let accents = if light {
+                [
+                    vec4(8. / 255., 109. / 255., 121. / 255., 1.),
+                    vec4(174. / 255., 68. / 255., 80. / 255., 1.),
+                    vec4(120. / 255., 90. / 255., 26. / 255., 1.),
+                    vec4(39. / 255., 115. / 255., 71. / 255., 1.),
+                ]
             } else {
-                "Rust preview"
-            },
-        );
+                [
+                    vec4(88. / 255., 201. / 255., 210. / 255., 1.),
+                    vec4(240. / 255., 113. / 255., 117. / 255., 1.),
+                    vec4(233. / 255., 217. / 255., 108. / 255., 1.),
+                    vec4(114. / 255., 201. / 255., 135. / 255., 1.),
+                ]
+            };
+            for (index, paths) in [
+                [ids!(nav_music), ids!(rail_music)],
+                [ids!(nav_favorites), ids!(rail_favorites)],
+                [ids!(nav_playlists), ids!(rail_playlists)],
+                [ids!(nav_sources), ids!(rail_sources)],
+            ]
+            .iter()
+            .enumerate()
+            {
+                let color = if index == active_tab {
+                    accents[index]
+                } else if light {
+                    vec4(0.349, 0.396, 0.459, 1.)
+                } else {
+                    vec4(0.690, 0.722, 0.765, 1.)
+                };
+                for path in paths {
+                    let mut widget = self.ui.widget(cx, *path);
+                    script_apply_eval!(cx,widget,{draw_bg.active:0.0 draw_text.color:#(color)});
+                    if let Some(mut button) = widget.borrow_mut::<Button>() {
+                        button.draw_icon.color = color;
+                    }
+                }
+            }
+            for path in [ids!(nav_lens), ids!(rail_lens)] {
+                if let Some(mut lens) = self
+                    .ui
+                    .widget(cx, path)
+                    .borrow_mut::<crate::design::NavLens>()
+                {
+                    lens.set_destination(cx, active_tab, accents[active_tab]);
+                }
+            }
+        }
         let notice = if !state.error.is_empty() {
             &state.error
         } else {
@@ -905,56 +2111,172 @@ impl App {
         let playback = &state.playback;
         let active = playback.track.is_some();
         self.visible(cx, ids!(player_dock), active);
-        self.visible(cx, ids!(full_player), self.full_player && active);
-        self.visible(cx, ids!(main), !self.full_player || !active);
+        self.visible(
+            cx,
+            ids!(full_player),
+            self.editor.is_none() && self.full_player && active,
+        );
+        if self.editor.is_some() || !self.full_player || !active {
+            self.ui.touch_scroll(cx, ids!(player_columns)).stop_motion();
+        }
+        self.visible(
+            cx,
+            ids!(main),
+            self.editor.is_none() && (!self.full_player || !active),
+        );
+        self.visible(cx, ids!(playlist_editor), self.editor.is_some());
         for path in [ids!(mini_play), ids!(previous), ids!(next)] {
             self.visible(cx, path, active);
         }
-        self.visible(cx, ids!(previous), active && self.size.x >= 480.);
+        self.visible(cx, ids!(previous), active);
         if let Some(track) = &playback.track {
+            if old
+                .as_ref()
+                .and_then(|s| s.playback.track.as_ref())
+                .is_none_or(|t| {
+                    t.id != track.id || t.path != track.path || t.temporary != track.temporary
+                })
+            {
+                let local = !track.path.is_empty();
+                self.text(
+                    cx,
+                    ids!(player_save),
+                    if track.temporary {
+                        "Keep on device"
+                    } else if local {
+                        "On device"
+                    } else {
+                        "Download"
+                    },
+                );
+                self.ui
+                    .widget(cx, ids!(player_save))
+                    .set_disabled(cx, local && !track.temporary);
+                let size = if local && !track.temporary { 0.0 } else { 20.0 };
+                let mut button = self.ui.widget(cx, ids!(player_save));
+                let icon_walk = Walk::fixed(size, size);
+                script_apply_eval!(cx,button,{icon_walk:#(icon_walk)});
+            }
+            self.text(
+                cx,
+                ids!(playing_source),
+                if track.imported() {
+                    "From device"
+                } else {
+                    &track.source
+                },
+            );
+            self.visible(
+                cx,
+                ids!(player_share),
+                state.auth.kind == "authorizationStateReady",
+            );
+            if old
+                .as_ref()
+                .and_then(|s| s.playback.track.as_ref())
+                .is_none_or(|t| t.id != track.id || t.liked != track.liked)
+            {
+                ui::set_icon(
+                    &self.ui,
+                    cx,
+                    ids!(player_favorite),
+                    if track.liked {
+                        include_str!("../resources/favorite.svg")
+                    } else {
+                        include_str!("../resources/favorite_border.svg")
+                    },
+                );
+                if let Some(mut button) = self.ui.button(cx, ids!(player_favorite)).borrow_mut() {
+                    button.draw_icon.color = if track.liked {
+                        if state.settings["theme"] == "light" {
+                            vec4(0.72, 0.278, 0.314, 1.)
+                        } else {
+                            vec4(1.0, 0.635, 0.635, 1.0)
+                        }
+                    } else if state.settings["theme"] == "light" {
+                        vec4(0.114, 0.188, 0.196, 1.)
+                    } else {
+                        vec4(0.945, 0.965, 0.953, 1.)
+                    };
+                }
+            }
             for id in [ids!(mini_title), ids!(player_title)] {
                 self.text(cx, id, &track.title);
             }
             for id in [ids!(mini_artist), ids!(player_artist)] {
-                self.text(cx, id, track.subtitle());
+                self.text(cx, id, &ui::subtitle(&state.language, track));
             }
-            for id in [ids!(mini_play), ids!(player_play)] {
-                self.text(
-                    cx,
-                    id,
-                    if playback.buffering {
-                        "…"
-                    } else if playback.playing {
-                        "Ⅱ"
-                    } else {
-                        "▶"
-                    },
-                );
+            if old.as_ref().is_none_or(|s| {
+                s.playback.playing != playback.playing || s.playback.buffering != playback.buffering
+            }) {
+                for id in [ids!(mini_play), ids!(player_play)] {
+                    ui::set_icon(
+                        &self.ui,
+                        cx,
+                        id,
+                        if playback.playing {
+                            include_str!("../resources/pause.svg")
+                        } else {
+                            include_str!("../resources/play.svg")
+                        },
+                    );
+                    let button = self.ui.button(cx, id);
+                    button.set_loading(cx, playback.buffering);
+                    if let Some(mut button) = button.borrow_mut() {
+                        button.draw_icon.opacity = if playback.buffering { 0.0 } else { 1.0 };
+                    }
+                }
             }
             self.text(cx, ids!(elapsed), &data::seconds(playback.position));
             self.text(cx, ids!(duration), &data::seconds(playback.duration));
-            self.text(cx, ids!(speed), &format!("{}×", playback.speed));
+            self.text(
+                cx,
+                ids!(speed),
+                &crate::i18n::speed(&state.language, playback.speed),
+            );
+            self.text(
+                cx,
+                ids!(mini_speed),
+                &crate::i18n::speed(&state.language, playback.speed),
+            );
+            self.visible(cx, ids!(mini_speed), (playback.speed - 1.).abs() > 0.001);
+            if old
+                .as_ref()
+                .is_none_or(|s| s.playback.speed != playback.speed)
+            {
+                self.layout(cx);
+            }
             self.text(cx, ids!(volume_label), &format!("{:.0}%", playback.volume));
-            self.text(cx, ids!(mute), if playback.muted { "×♪" } else { "♪" });
-            self.text(
-                cx,
-                ids!(order),
-                match playback.order {
-                    data::Order::Normal => "↕",
-                    data::Order::Reverse => "↓↑",
-                    data::Order::Shuffle => "⤨",
-                    data::Order::Random => "?",
-                },
-            );
-            self.text(
-                cx,
-                ids!(repeat),
-                match playback.repeat {
-                    data::Repeat::Off => "↻",
-                    data::Repeat::All => "↻∞",
-                    data::Repeat::One => "↻1",
-                },
-            );
+            if old
+                .as_ref()
+                .is_none_or(|s| s.playback.muted != playback.muted)
+            {
+                ui::set_icon(
+                    &self.ui,
+                    cx,
+                    ids!(mute),
+                    if playback.muted {
+                        include_str!("../resources/mute.svg")
+                    } else {
+                        include_str!("../resources/volume.svg")
+                    },
+                );
+            }
+            if old
+                .as_ref()
+                .is_none_or(|s| s.playback.repeat != playback.repeat)
+            {
+                ui::set_icon(
+                    &self.ui,
+                    cx,
+                    ids!(repeat),
+                    if playback.repeat == data::Repeat::One {
+                        include_str!("../resources/repeat_one.svg")
+                    } else {
+                        include_str!("../resources/repeat.svg")
+                    },
+                );
+            }
             if playback.duration > 0. {
                 self.ui
                     .media_slider(cx, ids!(seek))
@@ -970,6 +2292,23 @@ impl App {
             {
                 ui::set_image(&self.ui, cx, ids!(mini_cover.art), &track.art);
                 ui::set_image(&self.ui, cx, ids!(player_art.art), &track.art);
+                ui::set_image(&self.ui, cx, ids!(player_reflection.art), &track.art);
+                ui::set_cover(&self.ui, cx, ids!(mini_cover), &track.title);
+                ui::set_cover(&self.ui, cx, ids!(player_art), &track.title);
+                ui::set_cover(&self.ui, cx, ids!(player_reflection), &track.title);
+            }
+        }
+        if old
+            .as_ref()
+            .is_none_or(|old| old.playback.order != state.playback.order)
+        {
+            let svg = match state.playback.order {
+                data::Order::Shuffle => include_str!("../resources/shuffle.svg"),
+                data::Order::Random => include_str!("../resources/dice.svg"),
+                _ => include_str!("../resources/order.svg"),
+            };
+            for path in [ids!(order), ids!(library_order)] {
+                ui::set_icon(&self.ui, cx, path, svg);
             }
         }
         let dark = state.settings["theme"] != "light";
@@ -1049,12 +2388,18 @@ impl App {
         }
         if self.dialog != Dialog::None {
             let reconfigure = old.as_ref().is_none_or(|s| match self.dialog {
-                Dialog::Settings => {
+                Dialog::Settings | Dialog::Sharing => {
                     s.settings != state.settings
                         || s.storage_bytes != state.storage_bytes
                         || s.downloads != state.downloads
                         || s.transfer_progress != state.transfer_progress
                         || s.sync != state.sync
+                }
+                Dialog::Cache => {
+                    s.cache_size != state.cache_size
+                        || s.cache_loading != state.cache_loading
+                        || s.cache_error != state.cache_error
+                        || s.auth != state.auth
                 }
                 Dialog::Auth => s.auth != state.auth || s.error != state.error,
                 Dialog::Track => {
@@ -1066,9 +2411,14 @@ impl App {
                 Dialog::Chats | Dialog::Recipients | Dialog::Topics(..) => {
                     !Arc::ptr_eq(&s.choices, &state.choices)
                         || s.choices_scope != state.choices_scope
+                        || s.settings!=state.settings
                 }
+                Dialog::Queue => s.page.revision!=state.page.revision
+                    || s.page.total!=state.page.total
+                    || s.playback.queue_count!=state.playback.queue_count
+                    || s.playback.order!=state.playback.order,
                 _ => false,
-            });
+            } || s.error!=state.error || s.language!=state.language);
             if reconfigure {
                 self.configure_dialog(cx);
                 if self.dialog == Dialog::Auth
@@ -1077,7 +2427,7 @@ impl App {
                         .is_some_and(|old| old.auth.kind != state.auth.kind)
                 {
                     self.ui
-                        .view(cx, ids!(panel_scroll))
+                        .touch_scroll(cx, ids!(panel_scroll))
                         .set_scroll_pos(cx, Vec2d::default());
                 }
             }
@@ -1089,8 +2439,53 @@ impl App {
 
     fn localize(&self, cx: &mut Cx) {
         for (path, text) in [
-            (ids!(preview_label), "RUST PREVIEW"),
-            (ids!(playing_label), "NOW PLAYING"),
+            (ids!(panel_cancel).as_slice(), "Cancel"),
+            (ids!(settings_sharing), "Sharing audio"),
+            (ids!(settings_sharing.detail), "Sender and original caption"),
+            (ids!(sharing_help), "Sender and original caption"),
+            (
+                ids!(settings_language_help),
+                "Choose English, Russian or your device language.",
+            ),
+            (ids!(cache_loading), "Calculating…"),
+            (
+                ids!(cache_description),
+                "Downloaded Telegram audio and documents, including saved recordings, will be removed from this device.",
+            ),
+            (
+                ids!(cache_preserved),
+                "Imported files, favorites, playlists and sign-in stay intact.",
+            ),
+            (ids!(cache_clear), "Clear music cache"),
+            (ids!(cache_connect), "Connect Telegram"),
+            (ids!(appearance_label).as_slice(), "Appearance"),
+            (ids!(theme_light), "Light"),
+            (ids!(theme_dark), "Dark"),
+            (
+                ids!(settings_bookmarks.detail),
+                "Resume long recordings where you left off.",
+            ),
+            (
+                ids!(settings_duplicates.detail),
+                "Show one entry per recording in Music, Favorites and On device. Nothing is deleted. Existing playlists and the current queue stay unchanged.",
+            ),
+            (
+                ids!(settings_storage.detail),
+                "Saved music and imported recordings.",
+            ),
+            (
+                ids!(settings_discard.detail),
+                "Keep a temporary playback buffer instead of adding every song to On device. Previously stored files, explicit downloads and imports stay.",
+            ),
+            (
+                ids!(settings_clear.detail),
+                "Manage downloaded music on this device.",
+            ),
+            (
+                ids!(settings_wifi.detail),
+                "Applies to downloads, not streaming playback",
+            ),
+            (ids!(playing_label), "PLAYING FROM"),
             (ids!(rail_music), "Music"),
             (ids!(nav_music), "Music"),
             (ids!(rail_favorites), "Favorites"),
@@ -1099,16 +2494,16 @@ impl App {
             (ids!(nav_playlists), "Playlists"),
             (ids!(rail_sources), "Sources"),
             (ids!(nav_sources), "Sources"),
-            (ids!(rail_settings), "Settings"),
             (ids!(source_filter), "All sources"),
-            (ids!(play_all), "▶   Play all"),
-            (ids!(create_playlist), "New playlist"),
-            (ids!(add_chats), "Add chats"),
-            (ids!(add_profile), "Add profile"),
+            (ids!(play_all), "Play all"),
+            (ids!(selection_all), "Select all"),
+            (ids!(quick_label), "Quick access"),
+            (ids!(add_source), "Add source"),
+            (ids!(add_source_top), "Add source"),
             (ids!(profile_connect), "Add to library"),
-            (ids!(profile_play), "▶   Play"),
-            (ids!(queue), "≡  Queue"),
-            (ids!(player_save), "↓  Save"),
+            (ids!(profile_disconnect), "In library"),
+            (ids!(queue), "Queue"),
+            (ids!(player_save), "Save on device"),
             (ids!(auth_submit), "Continue"),
             (ids!(auth_qr), "Sign in with QR code"),
             (ids!(auth_phone), "Use another phone number"),
@@ -1118,11 +2513,6 @@ impl App {
             (ids!(settings_transfers), "Cancel downloads"),
             (ids!(settings_update), "Check Rust preview updates"),
             (ids!(settings_quit), "Quit spotygram rust"),
-            (
-                ids!(settings_about),
-                "spotygram rust · 0.1.0\nA personal testing build. Local data is separate from the stable app.",
-            ),
-            (ids!(track_play), "Play"),
             (ids!(track_playlist), "Add to playlist"),
             (ids!(track_queue), "Add to queue"),
             (ids!(track_download), "Save on device"),
@@ -1136,6 +2526,18 @@ impl App {
         ] {
             self.text(cx, path, text);
         }
+        self.text(
+            cx,
+            ids!(settings_about),
+            &format!(
+                "spotygram rust · {}\n{}",
+                env!("CARGO_PKG_VERSION"),
+                crate::i18n::tr(
+                    &self.snapshot().language,
+                    "A personal testing build. Local data is separate from the stable app."
+                )
+            ),
+        );
         self.ui.text_input(cx, ids!(search)).set_empty_text(
             cx,
             crate::i18n::tr(&self.snapshot().language, "Search music").into_owned(),
@@ -1143,43 +2545,271 @@ impl App {
     }
 
     fn layout(&mut self, cx: &mut Cx) {
-        let width = self.size.x.max(280.);
-        let height = self.size.y.max(360.);
-        let wide = width >= 840.;
-        self.visible(cx, ids!(rail), wide);
-        self.visible(cx, ids!(bottom_nav), !wide);
-        self.visible(cx, ids!(brand), !wide);
-        self.visible(cx, ids!(volume_row), cfg!(not(target_os = "android")));
+        let mut root_widget = self.ui.widget(cx, ids!(root));
+        let padding = Inset {
+            bottom: self.safe.bottom.max(self.keyboard_height),
+            ..self.safe
+        };
+        script_apply_eval!(cx,root_widget,{padding:#(padding)});
+        self.visible(cx, ids!(dock), !self.keyboard_visible);
         self.visible(
             cx,
-            ids!(previous),
-            self.size.x >= 480. && self.snapshot().playback.track.is_some(),
+            ids!(header),
+            !self.keyboard_visible
+                && !matches!(self.snapshot().page.query.screen, data::Screen::Profile(_)),
         );
+        if self.keyboard_visible {
+            self.visible(cx, ids!(auth_mark), false);
+        }
+        let root = self.ui.widget(cx, ids!(root)).area();
+        let bounds = if root.is_valid(cx) {
+            root.rect(cx)
+        } else {
+            Rect {
+                pos: Vec2d::default(),
+                size: self.size,
+            }
+        };
+        let width = (self.size.x - self.safe.left - self.safe.right).max(280.);
+        let height = (self.size.y
+            - bounds.pos.y
+            - self.safe.top
+            - self.safe.bottom.max(self.keyboard_height))
+        .max(260.);
+        let wide = width >= 840.;
+        let sources = self.snapshot().page.query.screen == data::Screen::Sources;
+        self.visible(cx, ids!(add_source_top), sources && width >= 600.);
+        self.visible(cx, ids!(source_refresh_top), sources && width >= 600.);
+        self.visible(cx, ids!(collection_controls), sources && width < 600.);
+        self.visible(cx, ids!(rail), wide);
+        self.visible(cx, ids!(bottom_nav), !wide);
+        self.visible(cx, ids!(brand), true);
+        self.visible(cx, ids!(volume_row), cfg!(not(target_os = "android")));
+        self.visible(cx, ids!(previous), self.snapshot().playback.track.is_some());
+        let artist_width = ((width - if wide { 96.0 } else { 0.0 }).min(720.0)
+            - 233.0
+            - if (self.snapshot().playback.speed - 1.0).abs() > 0.001 {
+                44.0
+            } else {
+                0.0
+            })
+        .max(24.0);
+        let mut mini_artist = self.ui.widget(cx, ids!(mini_artist));
+        script_apply_eval!(cx,mini_artist,{max_width:#(artist_width)});
         let mut panel = self.ui.widget(cx, ids!(panel));
-        let panel_width = (width - 28.).clamp(250., 520.);
-        script_apply_eval!(cx,panel,{width:#(panel_width)});
+        let alert = matches!(
+            self.dialog,
+            Dialog::Delete
+                | Dialog::DeletePlaylist(_)
+                | Dialog::ClearCache
+                | Dialog::Logout
+                | Dialog::RemoveSource(..)
+                | Dialog::DiscardEditor
+                | Dialog::RenamePlaylist(_)
+                | Dialog::BookmarkThreshold
+                | Dialog::Language
+        );
+        let wide_panel = alert || self.panel_wide.unwrap_or(width >= 600.);
+        let auth = self.dialog == Dialog::Auth;
+        let maximum = match self.dialog {
+            Dialog::Settings | Dialog::Sharing | Dialog::Cache | Dialog::Queue => 640.0,
+            Dialog::Track => 380.0,
+            Dialog::Speed => 360.0,
+            Dialog::Language => 360.0,
+            Dialog::Sort | Dialog::Order | Dialog::Repeat => 320.0,
+            Dialog::Filter | Dialog::Chats | Dialog::Recipients | Dialog::Playlists => 440.0,
+            _ => 520.0,
+        };
+        let panel_width = if auth {
+            width.min(480.)
+        } else if wide_panel {
+            (width - 48.).clamp(240., maximum)
+        } else {
+            width
+        };
+        let opacity = if auth { 0.0 } else { 1.0 };
+        let inset = if auth {
+            24.0
+        } else if self.dialog == Dialog::Track {
+            16.0
+        } else {
+            20.0
+        };
+        let panel_padding = Inset {
+            left: inset,
+            right: inset,
+            top: inset,
+            bottom: inset,
+        };
+        script_apply_eval!(cx,panel,{width:#(panel_width) padding:#(panel_padding) draw_bg.layer_opacity:#(opacity)});
+        if self.dialog == Dialog::Track {
+            let height = if wide_panel { 48.0 } else { 56.0 };
+            let font = if wide_panel { 10.5 } else { 12.0 };
+            let icon_size = if wide_panel { 20.0 } else { 24.0 };
+            let icon_walk = Walk::fixed(icon_size, icon_size);
+            let padding = Inset {
+                left: 8.0,
+                right: 8.0,
+                top: if wide_panel { 8.0 } else { 12.0 },
+                bottom: if wide_panel { 8.0 } else { 12.0 },
+            };
+            for path in [
+                ids!(track_send),
+                ids!(track_favorite),
+                ids!(track_playlist),
+                ids!(track_queue),
+                ids!(track_move_up),
+                ids!(track_move_down),
+                ids!(track_remove_queue),
+                ids!(track_download),
+                ids!(track_profile),
+                ids!(track_original),
+                ids!(track_remove_playlist),
+                ids!(track_delete),
+            ] {
+                let mut button = self.ui.widget(cx, path);
+                script_apply_eval!(cx,button,{height:#(height) padding:#(padding) spacing:18 icon_walk:#(icon_walk) draw_text.text_style.font_size:#(font)});
+            }
+            let mut order = self.ui.widget(cx, ids!(track_order));
+            script_apply_eval!(cx,order,{row.padding:#(padding) row.spacing:18 row.labels.spacing:0 row.labels.title.draw_text.text_style.font_size:#(font)});
+        }
+        // GlassLayer repeats its layout around the overlay. Position the panel
+        // in its ordinary child view so anchor and drag insets are applied once.
+        let mut layer = self.ui.widget(cx, ids!(panel_position));
+        let mut align = Align {
+            x: 0.5,
+            y: if auth {
+                0.0
+            } else if wide_panel {
+                0.5
+            } else {
+                1.0
+            },
+        };
+        let mut padding = Inset {
+            bottom: -self.sheet_offset,
+            ..Default::default()
+        };
+        let mut anchor_space = None;
+        if wide_panel && !auth {
+            if let Some(anchor) = self.panel_anchor {
+                let origin = bounds.pos
+                    + Vec2d {
+                        x: self.safe.left,
+                        y: self.safe.top,
+                    };
+                let left = (anchor.pos.x - origin.x).clamp(0., width);
+                let right = (anchor.pos.x + anchor.size.x - origin.x).clamp(0., width);
+                let top = (anchor.pos.y - origin.y).clamp(0., height);
+                let bottom = (anchor.pos.y + anchor.size.y - origin.y).clamp(0., height);
+                let horizontal_room = (width - panel_width - 8.).max(8.);
+                if (left + right) * 0.5 > width * 0.5 {
+                    align.x = 1.0;
+                    padding.right = (width - right).clamp(8., horizontal_room);
+                } else {
+                    align.x = 0.0;
+                    padding.left = left.clamp(8., horizontal_room);
+                }
+                if (top + bottom) * 0.5 > height * 0.5 {
+                    align.y = 1.0;
+                    padding.bottom = (height - top + 8.).max(8.);
+                    anchor_space = Some(top - 8.);
+                } else {
+                    align.y = 0.0;
+                    padding.top = (bottom + 8.).max(8.);
+                    anchor_space = Some(height - bottom - 8.);
+                }
+            }
+        }
+        script_apply_eval!(cx,layer,{align:#(align) padding:#(padding)});
+        self.visible(cx, ids!(drag_handle), !wide_panel && !auth);
         let mut panel_scroll = self.ui.widget(cx, ids!(panel_scroll));
-        let available = (height - 170.).max(130.);
-        let available = match self.dialog {
-            Dialog::Settings | Dialog::Track => available.min(580.),
-            Dialog::Chats | Dialog::Recipients | Dialog::Topics(..) => available.min(380.),
+        let mut chrome = inset * 2.0;
+        for (path, size) in [
+            (ids!(drag_handle), 16.0),
+            (ids!(panel_header), 48.0),
+            (ids!(panel_error), 60.0),
+            (ids!(manage_sources), 52.0),
+            (ids!(send_options), 48.0),
+            (ids!(panel_footer), 48.0),
+        ] {
+            if self.ui.widget(cx, path).visible() {
+                chrome += size + 10.0;
+            }
+        }
+        let available = (height - if wide_panel { 48.0 } else { 0.0 } - chrome).max(56.);
+        let mut available = match self.dialog {
+            Dialog::Settings | Dialog::Sharing | Dialog::Cache | Dialog::Track => {
+                if wide_panel {
+                    available.min(580.)
+                } else {
+                    available
+                }
+            }
+            Dialog::Chats
+            | Dialog::Recipients
+            | Dialog::Topics(..)
+            | Dialog::Filter
+            | Dialog::Queue => available.min(if wide_panel { 380. } else { height * 0.65 }),
             Dialog::Auth => available.min(560.),
             Dialog::Speed => available.min(150.),
             _ => available.min(260.),
         };
+        if let Some(space) = anchor_space {
+            available = available.min((space - 110.).max(60.));
+        }
         // Keep the panel header and confirmation outside the scrolling viewport.
         let fit = Size::fit();
         script_apply_eval!(cx,panel_scroll,{height:#(fit) max_height:#(available)});
+        let reserved = if matches!(
+            self.dialog,
+            Dialog::Chats | Dialog::Recipients | Dialog::Filter
+        ) {
+            if self.dialog == Dialog::Recipients {
+                240.0
+            } else {
+                112.0
+            }
+        } else {
+            0.0
+        };
+        let choices_height =
+            (self.choices.len().max(1) as f64 * 56.).min((available - reserved).max(56.));
+        let mut choices = self.ui.widget(cx, ids!(choices_body));
+        script_apply_eval!(cx,choices,{height:#(choices_height)});
+        let mut queue = self.ui.widget(cx, ids!(queue_catalog));
+        let queue_height = (available - 30.0)
+            .max(64.0)
+            .min((self.snapshot().page.total.max(1) * 64 + 16) as f64);
+        script_apply_eval!(cx,queue,{height:#(queue_height)});
         let mut columns = self.ui.widget(cx, ids!(player_columns));
-        let flow = if wide { Flow::right() } else { Flow::Down };
+        let wide_player = width >= 600. && width > height;
+        let flow = if wide_player {
+            Flow::right()
+        } else {
+            Flow::Down
+        };
         script_apply_eval!(cx,columns,{flow:#(flow)});
         let mut art = self.ui.widget(cx, ids!(player_art));
-        let size = if wide {
-            (width * 0.32).clamp(220., 380.)
+        let size = if wide_player {
+            (width * 0.43).min(height * 0.70).min(340.)
         } else {
-            (height * 0.29).clamp(120., 260.).min(width - 64.)
+            (width - 48.)
+                .min(height * 0.42)
+                .min((height - 390. - if cfg!(target_os = "android") { 0. } else { 48. }).max(96.))
+                .min(340.)
         };
         script_apply_eval!(cx,art,{width:#(size) height:#(size)});
+        let mut note = self.ui.widget(cx, ids!(player_art.note));
+        let note_size = size * 0.42;
+        script_apply_eval!(cx,note,{width:#(note_size) height:#(note_size)});
+        let mut fields = self.ui.widget(cx, ids!(editor_fields));
+        let flow = if height < 480.0 || self.keyboard_visible {
+            Flow::right()
+        } else {
+            Flow::Down
+        };
+        script_apply_eval!(cx,fields,{flow:#(flow)});
     }
 
     fn begin_quit(&mut self, cx: &mut Cx) {
@@ -1196,9 +2826,11 @@ impl App {
         let input = self.ui.text_input(cx, ids!(panel_input)).text();
         match self.dialog.clone() {
             Dialog::Profile => self.send(cx, data::Command::OpenProfile(input)),
-            Dialog::NewPlaylist => self.send(cx, data::Command::PlaylistCreate(input)),
             Dialog::RenamePlaylist(id) => self.send(cx, data::Command::PlaylistRename(id, input)),
-            Dialog::ConfirmSend(recipient, topic, _) => {
+            Dialog::Recipients => {
+                let Some((recipient, topic, _)) = self.send_target.clone() else {
+                    return;
+                };
                 if let Some(track) = &self.selected {
                     self.send(
                         cx,
@@ -1212,6 +2844,7 @@ impl App {
                     );
                 }
             }
+            Dialog::DiscardEditor => self.close_editor(cx, None),
             Dialog::Delete => self.send(cx, data::Command::Delete(self.ids())),
             Dialog::DeletePlaylist(id) => self.send(cx, data::Command::PlaylistDelete(id)),
             Dialog::ClearCache => self.send(cx, data::Command::ClearCache),
@@ -1226,9 +2859,22 @@ impl App {
                     }
                 }
             }
+            Dialog::RemoveSource(id, profile) => {
+                if let Some(source) = state
+                    .sources
+                    .iter()
+                    .find(|s| s.id == id && s.profile == profile)
+                {
+                    self.send(cx, data::Command::ConnectSource(source.clone(), false));
+                }
+            }
             _ => {}
         }
-        self.close_dialog(cx);
+        if self.dialog == Dialog::ClearCache {
+            self.open(cx, Dialog::Cache);
+        } else {
+            self.close_dialog(cx);
+        }
     }
 
     fn choose(&mut self, cx: &mut Cx, index: usize) {
@@ -1237,6 +2883,15 @@ impl App {
         };
         let state = self.snapshot();
         match self.dialog.clone() {
+            Dialog::AddSource => {
+                if id == 0 {
+                    self.send(cx, data::Command::Discover(String::new(), self.folder));
+                    self.open(cx, Dialog::Chats);
+                } else {
+                    self.open(cx, Dialog::Profile);
+                }
+                return;
+            }
             Dialog::Chats => {
                 if let Some(source) = state.choices.iter().find(|s| s.id == id) {
                     self.send(
@@ -1256,14 +2911,21 @@ impl App {
                     self.send(cx, data::Command::ShareTopics(id));
                     self.open(cx, Dialog::Topics(id, title));
                 } else {
-                    self.open(cx, Dialog::ConfirmSend(id, 0, title));
+                    self.send_target = Some((id, 0, title));
+                    self.configure_dialog(cx);
                 }
                 return;
             }
             Dialog::Topics(chat, name) => {
-                self.open(
+                self.send_target = Some((chat, id, format!("{name} · {title}")));
+                self.open(cx, Dialog::Recipients);
+                self.send(
                     cx,
-                    Dialog::ConfirmSend(chat, id, format!("{name} · {title}")),
+                    data::Command::ShareRecipients(
+                        String::new(),
+                        self.folder,
+                        self.selected.as_ref().is_some_and(|t| t.document),
+                    ),
                 );
                 return;
             }
@@ -1293,23 +2955,38 @@ impl App {
             }
             Dialog::Playlists => self.send(cx, data::Command::PlaylistAdd(id, self.ids())),
             Dialog::Filter => {
-                let mut query = state.page.query.clone();
-                query.source = if index == 0 {
+                if id < 0 {
+                    return;
+                }
+                let mut query = self.browsing_query();
+                query.source = if id == 0 {
                     String::new()
                 } else {
-                    state
-                        .sources
-                        .iter()
-                        .filter(|s| s.selected)
-                        .nth(index - 1)
+                    self.filter_sources
+                        .get(id as usize - 1)
                         .map(|s| format!("{}:{}", if s.profile { "profile" } else { "chat" }, s.id))
                         .unwrap_or_default()
                 };
                 self.text(cx, ids!(source_filter), &title);
                 self.send(cx, data::Command::Query(query, 0));
             }
+            Dialog::Language => {
+                self.send(
+                    cx,
+                    data::Command::Setting(
+                        "language".into(),
+                        json!(match id {
+                            1 => "en",
+                            2 => "ru",
+                            _ => "system",
+                        }),
+                    ),
+                );
+                self.open(cx, Dialog::Settings);
+                return;
+            }
             Dialog::Sort => {
-                let mut query = state.page.query.clone();
+                let mut query = self.browsing_query();
                 query.sort = match id {
                     1 => data::Sort::Oldest,
                     2 => data::Sort::Title,
@@ -1347,6 +3024,10 @@ impl App {
                 }
                 2 => {
                     self.open(cx, Dialog::DeletePlaylist(playlist));
+                    return;
+                }
+                3 => {
+                    self.open_editor(cx, Some(playlist));
                     return;
                 }
                 _ => {}
@@ -1390,9 +3071,31 @@ impl MatchEvent for App {
         }
     }
     fn handle_background(&mut self, cx: &mut Cx) {
+        self.hidden_at.get_or_insert_with(std::time::Instant::now);
         self.send(cx, data::Command::Visible(false));
     }
     fn handle_foreground(&mut self, cx: &mut Cx) {
+        if let Some(mut catalog) = self
+            .ui
+            .widget(cx, ids!(catalog))
+            .borrow_mut::<ui::Catalog>()
+        {
+            catalog.refresh_photos();
+        }
+        if let Some(mut choices) = self
+            .ui
+            .widget(cx, ids!(choices_body))
+            .borrow_mut::<ui::Choices>()
+        {
+            choices.refresh_photos();
+        }
+        if self
+            .hidden_at
+            .take()
+            .is_some_and(|t| t.elapsed().as_secs() >= 1800)
+        {
+            self.choose_sticker(cx);
+        }
         self.send(cx, data::Command::Visible(true));
     }
     fn handle_next_frame(&mut self, cx: &mut Cx, _: &NextFrameEvent) {
@@ -1405,8 +3108,18 @@ impl MatchEvent for App {
     }
     fn handle_timer(&mut self, cx: &mut Cx, event: &TimerEvent) {
         if event.timer_id == self.search_timer.0 {
-            let mut query = self.snapshot().page.query.clone();
-            query.search = self.ui.text_input(cx, ids!(search)).text();
+            let mut query = self.browsing_query();
+            query.search = self
+                .ui
+                .text_input(
+                    cx,
+                    if self.editor.is_some() {
+                        ids!(editor_search)
+                    } else {
+                        ids!(search)
+                    },
+                )
+                .text();
             self.send(cx, data::Command::Query(query, 0));
         }
         if event.timer_id == self.directory_timer.0
@@ -1428,14 +3141,48 @@ impl MatchEvent for App {
         }
     }
     fn handle_back_pressed(&mut self, cx: &mut Cx) -> bool {
+        if self.keyboard_visible {
+            cx.set_key_focus(Area::Empty);
+            cx.text_ime_was_dismissed();
+            return true;
+        }
         if self.dialog != Dialog::None {
-            self.close_dialog(cx);
+            match self.dialog {
+                Dialog::Sharing if self.sharing_return => self.open(cx, Dialog::Recipients),
+                Dialog::Cache | Dialog::Sharing | Dialog::Language => {
+                    self.open(cx, Dialog::Settings)
+                }
+                Dialog::Topics(..) => {
+                    self.open(cx, Dialog::Recipients);
+                    self.send(
+                        cx,
+                        data::Command::ShareRecipients(
+                            String::new(),
+                            self.folder,
+                            self.selected.as_ref().is_some_and(|t| t.document),
+                        ),
+                    );
+                }
+                Dialog::ClearCache => self.open(cx, Dialog::Cache),
+                _ => self.close_dialog(cx),
+            }
+            true
+        } else if self.editor.is_some() {
+            self.leave_editor(cx);
             true
         } else if self.full_player {
             self.full_player = false;
             self.visible(cx, ids!(full_player), false);
             self.visible(cx, ids!(main), true);
             self.send(cx, data::Command::ObserveClock(false));
+            true
+        } else if self.selecting {
+            self.selecting = false;
+            self.selection.clear();
+            self.pending_selection = None;
+            self.all_selected_query = None;
+            self.send(cx, data::Command::ClearSelection);
+            self.selection_ui(cx);
             true
         } else if matches!(
             self.snapshot().page.query.screen,
@@ -1444,7 +3191,12 @@ impl MatchEvent for App {
                 | data::Screen::Queue
                 | data::Screen::OnDevice
         ) {
-            self.navigate(cx, data::Screen::Music);
+            let destination = match self.snapshot().page.query.screen {
+                data::Screen::Profile(_) => data::Screen::Sources,
+                data::Screen::Playlist(_) => data::Screen::Playlists,
+                _ => data::Screen::Music,
+            };
+            self.navigate(cx, destination);
             true
         } else {
             false
@@ -1471,6 +3223,56 @@ impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         use data::Command as C;
         let state = self.snapshot();
+        if self.click(cx, actions, ids!(editor_close)) {
+            self.handle_back_pressed(cx);
+            return;
+        }
+        if self
+            .ui
+            .text_input(cx, ids!(editor_name))
+            .changed(actions)
+            .is_some()
+        {
+            let name = self.ui.text_input(cx, ids!(editor_name)).text();
+            if name.chars().count() > 80 {
+                self.ui
+                    .text_input(cx, ids!(editor_name))
+                    .set_text(cx, &name.chars().take(80).collect::<String>());
+            }
+            self.editor_ui(cx);
+        }
+        if self
+            .ui
+            .text_input(cx, ids!(editor_search))
+            .changed(actions)
+            .is_some()
+        {
+            cx.stop_timer(self.search_timer);
+            self.search_timer = cx.start_timeout(0.12);
+        }
+        if self.click(cx, actions, ids!(editor_select_all))
+            && let Some(editor) = &mut self.editor
+        {
+            let query = state.page.query.clone();
+            let add = editor.all_selected.as_ref() != Some(&query);
+            editor.pending = Some((query.clone(), add));
+            self.send(cx, C::SelectAll(query));
+            self.editor_ui(cx);
+        }
+        if self.click(cx, actions, ids!(editor_save))
+            && let Some(editor) = &mut self.editor
+        {
+            editor.saving = true;
+            cx.set_key_focus(Area::Empty);
+            cx.text_ime_was_dismissed();
+            let command = C::PlaylistSave {
+                playlist: editor.playlist,
+                name: self.ui.text_input(cx, ids!(editor_name)).text(),
+                ids: editor.ids.clone(),
+            };
+            self.send(cx, command);
+            self.editor_ui(cx);
+        }
         for (path, screen) in [
             (ids!(nav_music), data::Screen::Music),
             (ids!(rail_music), data::Screen::Music),
@@ -1481,18 +3283,40 @@ impl MatchEvent for App {
             (ids!(nav_sources), data::Screen::Sources),
             (ids!(rail_sources), data::Screen::Sources),
             (ids!(on_device), data::Screen::OnDevice),
-            (ids!(queue), data::Screen::Queue),
         ] {
             if self.click(cx, actions, path) {
                 self.navigate(cx, screen);
                 return;
             }
         }
-        if self.click(cx, actions, ids!(settings)) || self.click(cx, actions, ids!(rail_settings)) {
+        if self.click(cx, actions, ids!(queue)) {
+            let mut query = self.browsing_query();
+            self.queue_return = Some(query.clone());
+            self.queue_restore = None;
+            query.screen = data::Screen::Queue;
+            query.search.clear();
+            query.source.clear();
+            self.send(cx, C::Query(query, 0));
+            self.open(cx, Dialog::Queue);
+        }
+        if self.click(cx, actions, ids!(settings)) {
             self.open(cx, Dialog::Settings);
         }
         if self.click(cx, actions, ids!(panel_close)) {
             self.close_dialog(cx);
+        }
+        if self.click(cx, actions, ids!(auth_back)) {
+            self.close_dialog(cx);
+        }
+        if self.click(cx, actions, ids!(panel_back)) {
+            self.handle_back_pressed(cx);
+        }
+        if self.click(cx, actions, ids!(panel_cancel)) {
+            if self.dialog == Dialog::ClearCache {
+                self.open(cx, Dialog::Cache);
+            } else {
+                self.close_dialog(cx);
+            }
         }
         if self.click(cx, actions, ids!(player_close)) {
             self.full_player = false;
@@ -1501,15 +3325,23 @@ impl MatchEvent for App {
             self.send(cx, C::ObserveClock(false));
         }
         if self.click(cx, actions, ids!(back)) {
-            self.navigate(cx, data::Screen::Music);
+            self.handle_back_pressed(cx);
         }
-        if self.click(cx, actions, ids!(refresh)) {
-            self.send(cx, C::Refresh);
+        if self.click(cx, actions, ids!(refresh))
+            || self.click(cx, actions, ids!(source_refresh))
+            || self.click(cx, actions, ids!(source_refresh_top))
+        {
+            if let data::Screen::Playlist(id) = state.page.query.screen {
+                self.panel_anchor = self.anchor(cx, ids!(refresh));
+                self.open(cx, Dialog::PlaylistActions(id));
+            } else {
+                self.send(cx, C::Refresh);
+            }
         }
         if self.click(cx, actions, ids!(import)) || self.click(cx, actions, ids!(settings_import)) {
             self.send(cx, C::PickFiles);
         }
-        if self.click(cx, actions, ids!(play_all)) || self.click(cx, actions, ids!(profile_play)) {
+        if self.click(cx, actions, ids!(play_all)) {
             self.send(cx, C::PlayAll);
         }
         if self.click(cx, actions, ids!(mini_play)) || self.click(cx, actions, ids!(player_play)) {
@@ -1529,6 +3361,7 @@ impl MatchEvent for App {
             self.layout(cx);
         }
         if self.click(cx, actions, ids!(player_more)) {
+            self.panel_anchor = self.anchor(cx, ids!(player_more));
             self.selected = state.playback.track.clone();
             if let Some(t) = &self.selected
                 && !t.document
@@ -1544,7 +3377,7 @@ impl MatchEvent for App {
         if self.click(cx, actions, ids!(sort)) {
             self.open(cx, Dialog::Sort);
         }
-        if self.click(cx, actions, ids!(order)) {
+        if self.click(cx, actions, ids!(order)) || self.click(cx, actions, ids!(library_order)) {
             self.open(cx, Dialog::Order);
         }
         if self.click(cx, actions, ids!(repeat)) {
@@ -1560,6 +3393,30 @@ impl MatchEvent for App {
             if let Some(t) = &state.playback.track {
                 self.send(cx, C::Download(vec![t.id.clone()]));
             }
+        }
+        if self.click(cx, actions, ids!(player_favorite)) {
+            if let Some(track) = &state.playback.track {
+                self.send(cx, C::Favorite(vec![track.id.clone()], !track.liked));
+            }
+        }
+        if self.click(cx, actions, ids!(player_share)) {
+            self.send_target = None;
+            self.selected = state.playback.track.clone();
+            if let Some(track) = &self.selected {
+                self.send(
+                    cx,
+                    C::ShareRecipients(String::new(), self.folder, track.document),
+                );
+            }
+            self.open(cx, Dialog::Recipients);
+        }
+        for (path, value) in [(ids!(theme_light), "light"), (ids!(theme_dark), "dark")] {
+            if self.click(cx, actions, path) {
+                self.send(cx, C::Setting("theme".into(), json!(value)));
+            }
+        }
+        if self.click(cx, actions, ids!(settings_storage)) {
+            self.navigate(cx, data::Screen::OnDevice);
         }
         if let Some(value) = self.ui.media_slider(cx, ids!(seek)).slided(actions) {
             self.text(
@@ -1578,14 +3435,21 @@ impl MatchEvent for App {
             self.send(cx, C::Speed(value));
         }
         for (id, speed) in [
-            (ids!(speed_slow), 0.75),
+            (ids!(speed_slow), 0.5),
             (ids!(speed_normal), 1.),
             (ids!(speed_fast), 1.5),
             (ids!(speed_double), 2.),
+            (ids!(speed_triple), 3.),
         ] {
             if self.click(cx, actions, id) {
                 self.send(cx, C::Speed(speed));
             }
+        }
+        if self.click(cx, actions, ids!(speed_minus)) {
+            self.send(cx, C::Speed((state.playback.speed - 0.1).max(0.3)));
+        }
+        if self.click(cx, actions, ids!(speed_plus)) {
+            self.send(cx, C::Speed((state.playback.speed + 0.1).min(4.0)));
         }
         if self
             .ui
@@ -1606,37 +3470,59 @@ impl MatchEvent for App {
             cx.stop_timer(self.directory_timer);
             self.directory_timer = cx.start_timeout(0.25);
         }
-        if self.click(cx, actions, ids!(add_chats)) {
-            self.send(cx, C::Discover(String::new(), self.folder));
-            self.open(cx, Dialog::Chats);
+        if self.dialog == Dialog::Filter
+            && self
+                .ui
+                .text_input(cx, ids!(panel_input))
+                .changed(actions)
+                .is_some()
+        {
+            self.configure_dialog(cx);
+        }
+        if self.click(cx, actions, ids!(add_source))
+            || self.click(cx, actions, ids!(add_source_top))
+        {
+            if state.auth.kind == "authorizationStateReady" {
+                self.open(cx, Dialog::AddSource);
+            } else {
+                self.send(cx, C::StartTelegram);
+                self.open(cx, Dialog::Auth);
+            }
         }
         if self.click(cx, actions, ids!(directory_folder)) {
             self.open(cx, Dialog::Folders(self.dialog == Dialog::Recipients));
         }
-        if self.click(cx, actions, ids!(add_profile)) {
-            self.open(cx, Dialog::Profile);
+        if self.click(cx, actions, ids!(manage_sources)) {
+            self.navigate(cx, data::Screen::Sources);
         }
         if self.click(cx, actions, ids!(create_playlist)) {
-            self.open(cx, Dialog::NewPlaylist);
+            self.open_editor(cx, None);
         }
         if self.click(cx, actions, ids!(profile_connect)) {
             if let data::Screen::Profile(id) = state.page.query.screen {
                 if let Some(source) = state.sources.iter().find(|s| s.profile && s.id == id) {
-                    self.send(cx, C::ConnectSource(source.clone(), !source.selected));
+                    self.send(cx, C::ConnectSource(source.clone(), true));
                 }
+            }
+        }
+        if self.click(cx, actions, ids!(profile_disconnect)) {
+            if let data::Screen::Profile(id) = state.page.query.screen {
+                self.open(cx, Dialog::RemoveSource(id, true));
             }
         }
         if self.click(cx, actions, ids!(select_mode)) {
             self.selecting = !self.selecting;
             self.selection.clear();
+            self.pending_selection = None;
+            self.all_selected_query = None;
             self.selection_ui(cx);
-            self.visible(cx, ids!(selection_controls), self.selecting);
         }
-        if self.click(cx, actions, ids!(selection_close)) {
-            self.selecting = false;
-            self.selection.clear();
+        if self.click(cx, actions, ids!(selection_all)) {
+            let query = state.page.query.clone();
+            let add = self.all_selected_query.as_ref() != Some(&query);
+            self.pending_selection = Some((query.clone(), add));
+            self.send(cx, C::SelectAll(query));
             self.selection_ui(cx);
-            self.visible(cx, ids!(selection_controls), false);
         }
         if self.click(cx, actions, ids!(selection_playlist)) {
             self.open(cx, Dialog::Playlists);
@@ -1681,23 +3567,28 @@ impl MatchEvent for App {
             );
         }
         if self.click(cx, actions, ids!(settings_language)) {
-            self.send(
-                cx,
-                C::Setting(
-                    "language".into(),
-                    json!(if state.settings["language"] == "ru" {
-                        "en"
-                    } else {
-                        "ru"
-                    }),
-                ),
-            );
+            self.open(cx, Dialog::Language);
         }
         if self.click(cx, actions, ids!(settings_minutes)) {
             self.open(cx, Dialog::BookmarkThreshold);
         }
         if self.click(cx, actions, ids!(settings_clear)) {
+            self.send(cx, C::CacheInfo);
+            self.open(cx, Dialog::Cache);
+        }
+        if self.click(cx, actions, ids!(settings_sharing)) {
+            self.sharing_return = false;
+            self.open(cx, Dialog::Sharing);
+        }
+        if self.click(cx, actions, ids!(cache_refresh)) {
+            self.send(cx, C::CacheInfo);
+        }
+        if self.click(cx, actions, ids!(cache_clear)) {
             self.open(cx, Dialog::ClearCache);
+        }
+        if self.click(cx, actions, ids!(cache_connect)) {
+            self.send(cx, C::StartTelegram);
+            self.open(cx, Dialog::Auth);
         }
         if self.click(cx, actions, ids!(settings_transfers)) {
             self.send(cx, C::CancelDownloads);
@@ -1747,16 +3638,8 @@ impl MatchEvent for App {
             self.confirm(cx);
         }
         if let Some(track) = self.selected.clone() {
-            if self.click(cx, actions, ids!(track_play)) {
-                self.send(
-                    cx,
-                    if let Some(position) = track.queue_position {
-                        C::PlayQueue(position)
-                    } else {
-                        C::Play(track.id.clone())
-                    },
-                );
-                self.close_dialog(cx);
+            if self.click(cx, actions, ids!(track_order)) {
+                self.open(cx, Dialog::Order);
             }
             if self.click(cx, actions, ids!(track_favorite)) {
                 self.send(cx, C::Favorite(vec![track.id.clone()], !track.liked));
@@ -1797,6 +3680,7 @@ impl MatchEvent for App {
                 self.close_dialog(cx);
             }
             if self.click(cx, actions, ids!(track_send)) {
+                self.send_target = None;
                 self.send(
                     cx,
                     C::ShareRecipients(String::new(), self.folder, track.document),
@@ -1837,15 +3721,84 @@ impl MatchEvent for App {
                 self.open(cx, Dialog::Delete);
             }
         }
-        let catalog = self.ui.widget(cx, ids!(catalog));
+        let catalog = self.ui.widget(
+            cx,
+            if self.editor.is_some() {
+                ids!(editor_catalog)
+            } else if self.queue_return.is_some() {
+                ids!(queue_catalog)
+            } else {
+                ids!(catalog)
+            },
+        );
         let list = catalog.portal_list(cx, ids!(list));
+        let source_rows = if state.page.query.screen == data::Screen::Sources {
+            ui::source_rows(&state)
+        } else {
+            Vec::new()
+        };
         for (index, item) in list.items_with_actions(actions) {
+            if item.button(cx, ids!(empty_connect)).clicked(actions) {
+                self.send(cx, C::StartTelegram);
+                self.open(cx, Dialog::Auth);
+            }
+            if item.button(cx, ids!(empty_import)).clicked(actions) {
+                self.send(cx, C::PickFiles);
+            }
+            if item.button(cx, ids!(empty_add)).clicked(actions)
+                && let data::Screen::Playlist(id) = state.page.query.screen
+            {
+                self.open_editor(cx, Some(id));
+                return;
+            }
+            if item.button(cx, ids!(empty_profile)).clicked(actions)
+                && let data::Screen::Profile(id) = state.page.query.screen
+            {
+                let link = state
+                    .sources
+                    .iter()
+                    .find(|s| s.profile && s.id == id && !s.username.is_empty())
+                    .map(|s| format!("https://t.me/{}", s.username.trim_start_matches('@')))
+                    .unwrap_or_else(|| format!("tg://user?id={id}"));
+                if let Err(error) = crate::platform::open_url(&link) {
+                    self.text(cx, ids!(notice), &error.to_string());
+                    self.visible(cx, ids!(notice), true);
+                }
+            }
             match state.page.query.screen {
+                data::Screen::Queue => {
+                    if let Some(track) = index
+                        .checked_sub(state.page.offset)
+                        .and_then(|i| state.page.tracks.get(i))
+                    {
+                        let position = track.queue_position.unwrap_or(index);
+                        if item.button(cx, ids!(queue_play)).clicked(actions) {
+                            self.send(cx, C::PlayQueue(position));
+                        }
+                        if item.button(cx, ids!(queue_up)).clicked(actions) {
+                            self.send(cx, C::QueueMove(position, position.saturating_sub(1)));
+                        }
+                        if item.button(cx, ids!(queue_remove)).clicked(actions) {
+                            self.send(cx, C::QueueRemove(position));
+                        }
+                    }
+                }
                 data::Screen::Sources => {
-                    if item.button(cx, ids!(open)).clicked(actions) {
+                    let source = match source_rows.get(index) {
+                        Some(ui::SourceEntry::Source { index, .. }) => state.sources.get(*index),
+                        _ => None,
+                    };
+                    if item.button(cx, ids!(open)).clicked(actions)
+                        || item.button(cx, ids!(open_cover)).clicked(actions)
+                    {
                         if index == 0 {
-                            self.send(cx, C::OpenProfile("me".into()));
-                        } else if let Some(source) = state.sources.get(index - 1) {
+                            if state.auth.kind == "authorizationStateReady" {
+                                self.send(cx, C::OpenProfile("me".into()));
+                            } else {
+                                self.send(cx, C::StartTelegram);
+                                self.open(cx, Dialog::Auth);
+                            }
+                        } else if let Some(source) = source {
                             if source.profile {
                                 self.send(cx, C::OpenProfile(source.id.to_string()));
                             } else {
@@ -1856,20 +3809,29 @@ impl MatchEvent for App {
                             }
                         }
                     }
-                    if item.glass_button(cx, ids!(select)).clicked(actions) {
-                        if let Some(source) =
-                            index.checked_sub(1).and_then(|i| state.sources.get(i))
-                        {
-                            self.send(cx, C::ConnectSource(source.clone(), !source.selected));
+                    if item.button(cx, ids!(select)).clicked(actions) {
+                        if let Some(source) = source {
+                            self.open(cx, Dialog::RemoveSource(source.id, source.profile));
+                        } else if index == 0 {
+                            if state.auth.kind == "authorizationStateReady" {
+                                self.send(cx, C::OpenProfile("me".into()));
+                            } else {
+                                self.send(cx, C::StartTelegram);
+                                self.open(cx, Dialog::Auth);
+                            }
                         }
                     }
                 }
                 data::Screen::Playlists => {
-                    if let Some(p) = state.playlists.get(index) {
+                    if let Some(p) = ui::playlist_indices(&state)
+                        .get(index)
+                        .and_then(|index| state.playlists.get(*index))
+                    {
                         if item.button(cx, ids!(open)).clicked(actions) {
                             self.navigate(cx, data::Screen::Playlist(p.id));
                         }
                         if item.button(cx, ids!(more)).clicked(actions) {
+                            self.panel_anchor = Some(item.widget(cx, ids!(more)).area().rect(cx));
                             self.open(cx, Dialog::PlaylistActions(p.id));
                         }
                     }
@@ -1879,8 +3841,40 @@ impl MatchEvent for App {
                         .checked_sub(state.page.offset)
                         .and_then(|i| state.page.tracks.get(i))
                     {
-                        if item.button(cx, ids!(song)).clicked(actions) {
-                            if self.selecting {
+                        let held = [ids!(song), ids!(play_cover), ids!(row_hit)]
+                            .iter()
+                            .any(|path| item.button(cx, *path).long_pressed(actions));
+                        if held && !self.selecting && self.editor.is_none() {
+                            self.selecting = true;
+                            self.selection.insert(track.id.clone());
+                            self.selection_ui(cx);
+                        }
+                        if item.button(cx, ids!(song)).clicked(actions)
+                            || item.button(cx, ids!(select_hit)).clicked(actions)
+                            || item.button(cx, ids!(row_hit)).clicked(actions)
+                            || item.button(cx, ids!(play_cover)).clicked(actions)
+                        {
+                            if let Some(editor) = &mut self.editor {
+                                if editor.saving {
+                                    continue;
+                                }
+                                editor.selection_revision += 1;
+                                let canceled = editor.pending.take().is_some();
+                                editor.all_selected = None;
+                                if editor.ids.iter().any(|id| id == &track.id) {
+                                    editor.ids.retain(|id| id != &track.id);
+                                } else {
+                                    editor.ids.push(track.id.clone());
+                                }
+                                if canceled {
+                                    self.send(cx, C::ClearSelection);
+                                }
+                                self.editor_ui(cx);
+                            } else if self.selecting {
+                                if self.pending_selection.take().is_some() {
+                                    self.send(cx, C::ClearSelection);
+                                }
+                                self.all_selected_query = None;
                                 if !self.selection.insert(track.id.clone()) {
                                     self.selection.remove(&track.id);
                                 }
@@ -1895,6 +3889,7 @@ impl MatchEvent for App {
                             self.send(cx, C::Favorite(vec![track.id.clone()], !track.liked));
                         }
                         if item.button(cx, ids!(more)).clicked(actions) {
+                            self.panel_anchor = Some(item.widget(cx, ids!(more)).area().rect(cx));
                             self.selected_position = index;
                             self.selected = Some(track.clone());
                             if !track.document && state.auth.kind == "authorizationStateReady" {
@@ -1915,21 +3910,87 @@ impl MatchEvent for App {
                 self.choose(cx, index);
             }
         }
+        let quick = self
+            .ui
+            .widget(cx, ids!(quick_choices))
+            .portal_list(cx, ids!(list));
+        for (index, item) in quick.items_with_actions(actions) {
+            if item.button(cx, ids!(choice)).clicked(actions)
+                && let Some(source) = self.quick_recipients.get(index).cloned()
+            {
+                self.select_recipient(cx, &source);
+            }
+        }
+        let folders = self
+            .ui
+            .widget(cx, ids!(folder_choices))
+            .portal_list(cx, ids!(list));
+        for (index, item) in folders.items_with_actions(actions) {
+            if item.button(cx, ids!(choice)).clicked(actions) {
+                self.folder = match index {
+                    0 => 0,
+                    1 => -1,
+                    _ => state.folders.get(index - 2).map(|f| f.id).unwrap_or(0),
+                };
+                let search = self.ui.text_input(cx, ids!(panel_input)).text();
+                self.send(
+                    cx,
+                    C::ShareRecipients(
+                        search,
+                        self.folder,
+                        self.selected.as_ref().is_some_and(|t| t.document),
+                    ),
+                );
+                self.configure_dialog(cx);
+            }
+        }
+        if self.click(cx, actions, ids!(send_settings)) {
+            self.sharing_return = true;
+            self.open(cx, Dialog::Sharing);
+        }
+        if self.click(cx, actions, ids!(send_pin))
+            && let Some((id, _, _)) = &self.send_target
+        {
+            let key = format!("sharing_pins_{}", state.me);
+            let mut pins: Vec<data::Source> =
+                serde_json::from_value(state.settings[&key].clone()).unwrap_or_default();
+            if pins.iter().any(|source| source.id == *id) {
+                pins.retain(|source| source.id != *id);
+            } else if let Some(source) = state
+                .choices
+                .iter()
+                .chain(self.quick_recipients.iter())
+                .find(|source| source.id == *id)
+            {
+                pins.insert(0, source.clone());
+                pins.truncate(8);
+            }
+            self.send(cx, C::Setting(key, json!(pins)));
+        }
     }
 }
 
 impl AppMain for App {
     fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
         makepad_widgets::script_mod(vm);
+        script_eval!(vm,{
+            use mod.prelude.widgets.*
+            mod.theme.font_regular = TextStyle{font_family:FontFamily{latin := FontMember{res:crate_resource("makepad_widgets:resources/RobotoFlex.ttf") weight:400.0 asc:0.0 desc:0.0}} line_spacing:1.0};
+            mod.theme.font_bold = TextStyle{font_family:FontFamily{latin := FontMember{res:crate_resource("makepad_widgets:resources/RobotoFlex.ttf") weight:600.0 asc:0.0 desc:0.0}} line_spacing:1.0};
+        });
         if base_theme(vm.cx_mut()) == BaseTheme::Light {
-            script_eval!(vm,{mod.theme.color_bg_app = #xf9fafc; mod.theme.color_text = #x1d3032; mod.theme.color_text_meta = #x596575; mod.theme.color_primary = #x137b8a;});
+            script_eval!(vm,{mod.theme.spotygram_dark = 0.0; mod.theme.color_bg_app = #xf9fafc; mod.theme.color_text = #x1d3032; mod.theme.color_text_meta = #x596575; mod.theme.color_primary = #x137b8a;});
         } else {
-            script_eval!(vm,{mod.theme.color_bg_app = #x080a0e; mod.theme.color_text = #xf1f6f3; mod.theme.color_text_meta = #xb0b8c3; mod.theme.color_primary = #x58c9d2;});
+            script_eval!(vm,{mod.theme.spotygram_dark = 1.0; mod.theme.color_bg_app = #x080a0e; mod.theme.color_text = #xf1f6f3; mod.theme.color_text_meta = #xb0b8c3; mod.theme.color_primary = #x58c9d2;});
         }
+        crate::design::script_mod(vm);
         crate::ui::script_mod(vm);
         self::script_mod(vm)
     }
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if self.drag_sheet(cx, event) {
+            return;
+        }
         let drop_area = self.ui.widget(cx, ids!(root)).area();
         match event.drag_hits(cx, drop_area) {
             DragHit::Drag(drag) => {
@@ -1958,17 +4019,44 @@ impl AppMain for App {
         }
         if let Event::WindowGeomChange(change) = event {
             self.size = change.new_geom.inner_size;
-            self.layout(cx);
             let safe = change.new_geom.safe_area_insets;
             let top = safe.top;
             let bottom = safe.bottom;
-            let mut root = self.ui.widget(cx, ids!(root));
             let padding = Inset {
                 top,
                 bottom,
-                ..Default::default()
+                left: safe.left,
+                right: safe.right,
             };
-            script_apply_eval!(cx,root,{padding:#(padding)});
+            self.safe = padding;
+            self.layout(cx);
+        }
+        if let Event::VirtualKeyboard(keyboard) = event {
+            match keyboard {
+                VirtualKeyboardEvent::WillShow { height, .. }
+                | VirtualKeyboardEvent::DidShow { height, .. } => {
+                    self.keyboard_height = *height;
+                    self.keyboard_visible = true;
+                }
+                VirtualKeyboardEvent::WillHide { .. } | VirtualKeyboardEvent::DidHide { .. } => {
+                    // Dismissing the mobile keyboard ends field editing. Some
+                    // Android input devices are reported as physical keyboards;
+                    // retaining focus then makes TextInput request the IME again.
+                    #[cfg(target_os = "android")]
+                    if self.keyboard_visible {
+                        cx.set_key_focus(Area::Empty);
+                        cx.text_ime_was_dismissed();
+                    }
+                    self.keyboard_height = 0.;
+                    self.keyboard_visible = false;
+                }
+            }
+            if self.dialog != Dialog::None {
+                self.configure_dialog(cx);
+            } else {
+                self.layout(cx);
+            }
+            self.ui.redraw(cx);
         }
         if let Event::WindowCloseRequested(request) = event {
             if !self.closed {
@@ -2001,9 +4089,43 @@ impl AppMain for App {
             }
         }
         self.match_event(cx, event);
+        if matches!(event, Event::Draw(_)) {
+            // Style reloads also reach controls that were hidden. Restore their
+            // desired glyph before drawing; unchanged SVGs keep their GPU mesh.
+            for path in [
+                ids!(back),
+                ids!(panel_close),
+                ids!(track_favorite),
+                ids!(track_profile_member),
+                ids!(refresh),
+                ids!(player_favorite),
+                ids!(mini_play),
+                ids!(player_play),
+                ids!(mute),
+                ids!(order),
+                ids!(library_order),
+                ids!(repeat),
+            ] {
+                ui::refresh_icon(&self.ui, cx, path);
+            }
+        }
         if matches!(event, Event::LiveEdit | Event::ScriptReapply) {
+            if let Some(mut catalog) = self
+                .ui
+                .widget(cx, ids!(catalog))
+                .borrow_mut::<ui::Catalog>()
+            {
+                catalog.refresh_style();
+            }
             self.localize(cx);
+            self.state = None;
             self.sync_ui(cx);
+            if let Some(choice) = self.sticker {
+                let _ = self
+                    .ui
+                    .image(cx, ids!(header_sticker))
+                    .load_png_from_data(cx, crate::design::STICKERS[choice]);
+            }
             self.configure_dialog(cx);
             self.layout(cx);
             self.selection_ui(cx);

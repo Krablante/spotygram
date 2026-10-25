@@ -3,6 +3,7 @@ pub use makepad_widgets;
 pub mod android;
 pub mod app;
 pub mod cloud;
+pub mod design;
 pub mod i18n;
 pub mod library;
 #[cfg(not(target_os = "android"))]

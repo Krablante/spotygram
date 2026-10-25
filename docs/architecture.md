@@ -9,12 +9,28 @@ There is no webview, audio proxy or application backend.
 
 ## Interface and application state
 
-`app.rs` binds navigation and actions to the widgets in `ui.rs`. The photographed
-Takopi artwork is reused from the stable application. Makepad's glass material
-replaces Compose/Haze; it is a visual adaptation, not a pixel-identical port.
-Standalone glass buttons and buttons drawn inside a glass surface have separate
-implementations so hidden panels do not leave independent overlay draw lists.
-The music sliders handle absolute taps and drags without creating text inputs.
+`app.rs` binds navigation and actions to `ui.rs`. `design.rs` contains the shared
+palette, Roboto typography, original header stickers, rounded vector icons and
+glass shaders. Dimensions and layouts follow the Kotlin application, including
+the continuous navigation capsule, moving tab lens, compact player and sheets.
+Makepad and Haze use different renderers, so optical effects are compared through
+actual GPU frames rather than claimed to be identical.
+
+Controls over the stationary background evaluate its light field directly.
+The floating dock and modal panels capture and blur real content through one
+shared per-window blur pyramid. Their children remain in the same glass layer;
+closed panels do not leave separate button overlays. Sliders accept absolute
+taps, drags and keyboard input without opening a numeric keyboard. Tab animation
+stops when it settles; changing a header sticker does not wake cloud sync.
+
+Dynamic SVGs retain their parsed document and GPU mesh until the glyph changes.
+A bounded cache restores the desired glyph after style reloads, including hidden
+controls. Drawing an unchanged row must not request another frame for its icon.
+
+`TouchScroll` keeps the native wheel and scrollbar path and uses Makepad's touch
+gesture helper for forms. Touch swipes may start over a button; crossing touch
+slop cancels that button's press. Claimed slider drags and nested catalog scrolling
+retain their own gesture. Closing a panel stops its remaining momentum.
 
 The UI sends bounded, non-blocking commands to `runtime.rs`. One Tokio worker
 with a local task set owns the main SQLite connection, playback intent and job
@@ -34,6 +50,12 @@ cache entries while retaining current artwork. Playback clock updates reach the
 full player at most four times per second; hidden UI does not receive those
 redraws. Position checkpoints are written at five-second intervals and on
 meaningful playback transitions. Sound controls do not reload the catalog.
+
+Small source avatars load serially at low priority for bounded visible requests.
+Hiding the app cancels that work. The source-photo table and bounded directory
+image cache are local and account-scoped. Select all reads matching IDs on the
+worker only when requested. Recipient pins and recent successful recipients are
+local to the Telegram account; they are not part of the shared library format.
 
 ## Catalog and synchronization
 

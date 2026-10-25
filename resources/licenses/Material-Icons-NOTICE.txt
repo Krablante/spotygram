@@ -1,0 +1,4 @@
+Material Design Icons, rounded 24 px SVGs
+Copyright Google LLC. Licensed under Apache License 2.0.
+Source: https://github.com/google/material-design-icons
+The SVGs are bundled unchanged. See Material-Icons-Apache-2.0.txt.

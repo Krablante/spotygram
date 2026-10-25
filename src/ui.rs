@@ -1,52 +1,17 @@
 use crate::{model as data, runtime};
+use makepad_widgets::makepad_platform::event::finger::TouchState;
+use makepad_widgets::touch_gesture::{ScrollMode, TouchGesture, TouchMotionChange};
 use makepad_widgets::*;
-use std::collections::HashSet;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+};
 
 script_mod! {
     use mod.prelude.widgets.*
     use mod.widgets.*
     use mod.widgets.glass.*
 
-    mod.spotygram = {}
-    mod.spotygram.Title = Label {
-        width: Fill height: 34 padding:0 max_lines: 1 text_overflow: Ellipsis
-        draw_text.color: theme.color_text
-        draw_text.text_style: theme.font_bold{font_size: 24 line_spacing:1.0}
-    }
-    mod.spotygram.Body = Label {
-        width: Fill height: 22 padding:0 max_lines: 1 text_overflow: Ellipsis
-        draw_text +:{color:theme.color_text text_style:theme.font_regular{font_size:14 line_spacing:1.0}}
-    }
-    mod.spotygram.Caption = Label {
-        width: Fill height: 18 padding:0 max_lines: 1 text_overflow: Ellipsis
-        draw_text +:{color:theme.color_text_meta text_style:theme.font_regular{font_size:12 line_spacing:1.0}}
-    }
-    mod.spotygram.Prism = View {
-        width: Fill height: Fill show_bg: true
-        draw_bg +: {
-            color: theme.color_bg_app
-            pixel: fn() {
-                let p = self.pos;
-                let a = exp(-dot(p-vec2(0.0,0.2),p-vec2(0.0,0.2))*18.0);
-                let b = exp(-dot(p-vec2(1.0,0.24),p-vec2(1.0,0.24))*22.0);
-                let c = exp(-dot(p-vec2(0.0,1.0),p-vec2(0.0,1.0))*15.0);
-                let d = exp(-dot(p-vec2(1.0,1.0),p-vec2(1.0,1.0))*20.0);
-                let base=mix(self.color.rgb,vec3(0.28,0.66,0.69),a*0.20);
-                let warm=mix(base,vec3(0.93,0.68,0.50),b*0.16);
-                let blue=mix(warm,vec3(0.34,0.53,0.81),c*0.18);
-                return vec4(mix(blue,vec3(0.87,0.48,0.63),d*0.16),1.0);
-            }
-        }
-    }
-    mod.spotygram.Glass = glass.GlassButton {
-        height: 48
-        draw_glass +:{shadow_color:#x0000001c shadow_radius:8.0 shadow_offset:vec2(0.0,2.0)}
-        draw_text +: {color: theme.color_text text_style: theme.font_bold{font_size: 13}}
-    }
-    mod.spotygram.Icon = mod.spotygram.Glass {width:48 padding:0}
-    // Cut buttons stay in their containing glass surface's draw list.
-    mod.spotygram.InlineGlass = glass.Button{height:48 draw_text +:{color:theme.color_text color_hover:theme.color_text color_down:theme.color_text color_focus:theme.color_text text_style:theme.font_bold{font_size:13}} draw_bg +:{border_radius:24.0}}
-    mod.spotygram.InlineIcon = mod.spotygram.InlineGlass{width:48 padding:0}
     mod.spotygram.DrawMediaBar = set_type_default() do #(DrawMediaBar::script_shader(vm)){
         ..mod.draw.DrawQuad
         progress:0.0
@@ -68,43 +33,49 @@ script_mod! {
         width:Fill height:32 min:0.0 max:1.0 step:0.0
         draw_bg:mod.spotygram.DrawMediaBar{}
     }
-    mod.spotygram.Flat = ButtonFlatter {
-        height: 44 width: Fill
-        margin:0 padding:Inset{left:12 right:12 top:5 bottom:5}
-        label_walk:Walk{width:Fill height:Fit} label_align:Align{x:0.0}
-        draw_text +: {color: theme.color_text text_style:theme.font_regular{font_size:13 line_spacing:1.0}}
-    }
-    mod.spotygram.Nav = mod.spotygram.Glass{width:Fill padding:Inset{left:4 right:4 top:10 bottom:10} draw_text.text_style.font_size:11}
-    mod.spotygram.Input = TextInput {
-        width: Fill height: 48
-        padding: Inset{left: 16, right: 14, top: 13, bottom: 10}
-        draw_bg +: {border_radius: 24.0 border_size: 1.0}
-        draw_text +: {color:theme.color_text color_empty:theme.color_text_meta color_empty_hover:theme.color_text text_style.font_size: 14}
-    }
-    mod.spotygram.Cover = RoundedView {
-        width: 46 height: 46
-        flow: Overlay align: Center
-        draw_bg +: {
-            border_radius: 10.0
-            color: #x3b637c
-            pixel: fn() {
-                let sdf = Sdf2d.viewport(self.pos * self.rect_size);
-                sdf.box(0.0,0.0,self.rect_size.x,self.rect_size.y,10.0);
-                sdf.fill(mix(vec4(0.22,0.43,0.43,1.0),vec4(0.42,0.62,0.82,1.0),(self.pos.x+self.pos.y)*0.5));
-                return sdf.result;
-            }
-        }
-        note := Label {text: "♫" draw_text.color: #xd5e6e2 draw_text.text_style.font_size: 26}
-        art := Image {width: Fill height: Fill fit: ImageFit.CropToFill downscale_to_drawn_size:true draw_bg +:{border_radius:10.0}}
-    }
 
     mod.spotygram.CatalogBase = #(Catalog::register_widget(vm))
     mod.spotygram.ChoicesBase = #(Choices::register_widget(vm))
+    mod.spotygram.TouchScroll = #(TouchScroll::register_widget(vm)) {
+        scroll_bars:ScrollBars{show_scroll_x:false show_scroll_y:true scroll_bar_y.drag_scrolling:false}
+    }
     mod.spotygram.Choices = set_type_default() do mod.spotygram.ChoicesBase {
         width:Fill height:300 flow:Down
         list := PortalList{width:Fill height:Fill scroll_bar:ScrollBar{}
-            Choice := CachedView{width:Fill height:58 flow:Right spacing:10 align:Align{y:0.5}
-                choice := mod.spotygram.Flat{width:Fill text:""}
+            Quick := View{width:76 height:90 flow:Overlay
+                choice := ButtonFlatter{width:Fill height:Fill text:""}
+                View{width:Fill height:Fill flow:Down align:Align{x:0.5} spacing:5 padding:Inset{top:4 left:4 right:4}
+                    avatar := mod.spotygram.Avatar{width:48 height:48}
+                    title := mod.spotygram.Caption{height:32 max_lines:2 align:Center draw_text.text_style.font_size:9}
+                }
+            }
+            Chip := mod.spotygram.Surface{width:Fit height:40 flow:Overlay margin:Inset{right:6} padding:Inset{left:14 right:14 top:10 bottom:8}
+                choice := ButtonFlatter{width:Fill height:Fill text:""}
+                title := mod.spotygram.Caption{width:Fit height:20}
+            }
+            Heading := View{width:Fill height:36 padding:Inset{left:12 top:12 bottom:4}
+                title := mod.spotygram.Caption{draw_text.color:theme.color_primary}
+            }
+            Choice := View{width:Fill height:56 flow:Overlay
+                surface := mod.spotygram.Surface{visible:false width:Fill height:Fill draw_bg.corner_radius:11.0}
+                highlight := RoundedView{width:Fill height:Fill draw_bg +:{border_radius:12.0 color:#x00000000}}
+                choice := ButtonFlatter{width:Fill height:Fill text:""}
+                View{width:Fill height:Fill flow:Right spacing:12 padding:Inset{left:12 right:12 top:6 bottom:6} align:Align{y:0.5}
+                    avatar := mod.spotygram.Avatar{visible:false width:40 height:40}
+                    library := View{visible:false width:40 height:40 align:Center
+                        mod.spotygram.Mark{width:24 height:24 draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/library.svg")}}
+                    }
+                    View{width:Fill height:Fit flow:Down spacing:2
+                        title := mod.spotygram.Body{height:Fit max_lines:1 text:""}
+                        subtitle := mod.spotygram.Caption{visible:false}
+                    }
+                    checked := View{visible:false width:22 height:22
+                        mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/check.svg")}}
+                    }
+                    radio := View{visible:false width:22 height:22 show_bg:true draw_bg +:{checked:uniform(0.0) ink:uniform(theme.color_text_meta) active:uniform(theme.color_primary)
+                        pixel:fn(){let sdf=Sdf2d.viewport(self.pos*self.rect_size);sdf.circle(11.0,11.0,9.0);sdf.stroke(mix(self.ink,self.active,self.checked),1.5);sdf.circle(11.0,11.0,5.0);sdf.fill(vec4(self.active.rgb,self.checked));return sdf.result;}
+                    }}
+                }
             }
         }
     }
@@ -114,57 +85,121 @@ script_mod! {
             width: Fill height: Fill
             auto_tail: false
             scroll_bar: ScrollBar{}
-            Song := CachedView {
-                width: Fill height: 68
-                flow: Right spacing: 10 align: Align{y:0.5}
-                padding: Inset{left:6,right:4,top:8,bottom:8}
-                cover := mod.spotygram.Cover{}
-                selection := Label{visible:false width:22 text:"✓" draw_text.color:theme.color_primary draw_text.text_style.font_size:18}
+            Song := View {
+                width:Fill height:64 flow:Overlay
+                highlight := SolidView{width:Fill height:Fill draw_bg.color:#x00000000}
+                row_hit := ButtonFlatter{width:Fill height:Fill text:"" enable_long_press:true}
+                View{width:Fill height:Fill flow:Right spacing:0 align:Align{y:0.5} padding:Inset{left:16 right:4 top:4 bottom:4}
+                selection := View{visible:false width:36 height:48 flow:Overlay align:Align{x:0.0 y:0.5}
+                    checkbox := View{width:24 height:24 show_bg:true
+                    draw_bg +:{checked:uniform(0.0) ink:uniform(theme.color_text) paper:uniform(theme.color_bg_app) pixel:fn(){
+                        let sdf=Sdf2d.viewport(self.pos*self.rect_size);
+                        sdf.box(2.0,2.0,20.0,20.0,1.0);
+                        sdf.fill_keep(vec4(self.ink.rgb,self.checked));
+                        sdf.stroke(vec4(self.ink.rgb,0.75),1.4);
+                        if self.checked>0.5 {sdf.move_to(6.0,12.0);sdf.line_to(10.0,16.0);sdf.line_to(18.0,8.0);sdf.stroke(self.paper,2.0);}
+                        return sdf.result;
+                    }}
+                    }
+                    select_hit := ButtonFlatter{width:Fill height:Fill text:""}
+                }
+                cover := mod.spotygram.Cover{play_cover := ButtonFlatter{width:Fill height:Fill text:"" enable_long_press:true}}
                 View {
-                    width: Fill height: Fill flow: Overlay
-                    song := ButtonFlatter {width:Fill height:Fill text:""}
+                    width: Fill height: Fill flow: Overlay padding:Inset{left:10 right:4}
+                    song := ButtonFlatter {width:Fill height:Fill text:"" enable_long_press:true}
                     View {
-                        width: Fill height: Fill flow: Down spacing:4 align:Align{y:0.5}
-                        title := mod.spotygram.Body {draw_text.text_style:theme.font_bold{font_size:15}}
+                        width: Fill height: Fill flow: Down spacing:0 align:Align{y:0.5}
+                        title := mod.spotygram.Body {height:21 draw_text.text_style:theme.font_bold{font_size:12}}
+                        View{width:Fill height:18 flow:Right spacing:3 align:Align{y:0.5}
+                            saved := View{visible:false width:13 height:13
+                                mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/offline.svg")}}
+                            }
+                            artist := mod.spotygram.Caption{height:18}
+                        }
+                    }
+                }
+                duration := mod.spotygram.Caption {width:Fit text:"0:00"}
+                favorite := mod.spotygram.PlainIcon {draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/favorite_border.svg")}}
+                more := mod.spotygram.PlainIcon {draw_icon.svg:crate_resource("self:resources/more.svg")}
+                }
+            }
+            SourceHeading := View{width:Fill height:40 padding:Inset{left:24 right:16 top:12 bottom:4}
+                title := mod.spotygram.Caption{draw_text.color:theme.color_primary}
+            }
+            QueueEntry := View{width:Fill height:64 flow:Right align:Align{y:0.5}
+                View{width:Fill height:Fill flow:Overlay padding:Inset{left:12 right:12}
+                    queue_play := ButtonFlatter{width:Fill height:Fill text:""}
+                    View{width:Fill height:Fill flow:Down spacing:2 align:Align{y:0.5}
+                        title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:12}}
                         artist := mod.spotygram.Caption{}
                     }
                 }
-                duration := mod.spotygram.Caption {width:42 text:"0:00"}
-                favorite := ButtonFlatter {width:32 height:44 padding:0 text:"♡" draw_text +:{color:#xffa2a2 text_style.font_size:24}}
-                more := ButtonFlatter {width:32 height:44 padding:0 text:"⋮" draw_text +:{color:theme.color_text text_style.font_size:24}}
+                queue_up := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/up.svg")}
+                queue_remove := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/close.svg")}
             }
-            Source := CachedView {
-                width: Fill height: 76 flow:Right spacing:12 align:Align{y:0.5}
-                padding: Inset{left:8,right:6,top:10,bottom:10}
-                cover := mod.spotygram.Cover{}
+            Source := mod.spotygram.Surface {
+                width:Fill height:64 margin:Inset{left:16 right:16} flow:Right spacing:12 align:Align{y:0.5}
+                padding:Inset{left:12,right:8,top:10,bottom:10}
+                draw_bg.corner_radius:11.0
+                cover := mod.spotygram.Avatar{open_cover := ButtonFlatter{width:Fill height:Fill text:""}}
                 View {
                     width:Fill height:Fill flow:Overlay
                     open := ButtonFlatter{width:Fill height:Fill text:""}
                     View{width:Fill height:Fill flow:Down spacing:5 align:Align{y:0.5}
-                        title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:15}}
+                        title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:12}}
                         subtitle := mod.spotygram.Caption{}
                     }
                 }
-                select := mod.spotygram.Icon{text:"+"}
+                select := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/more.svg")}
             }
-            Playlist := CachedView {
-                width:Fill height:76 flow:Right spacing:12 align:Align{y:0.5}
-                cover := mod.spotygram.Cover{}
+            Playlist := View {
+                width:Fill height:76 flow:Right spacing:12 align:Align{y:0.5} padding:Inset{left:20 right:12}
+                playlist_cover := RoundedView{width:56 height:56 flow:Overlay align:Center draw_bg +:{border_radius:8.0 color:mix(theme.color_bg_app,theme.color_text,0.08)}
+                    mod.spotygram.Mark{width:24 height:24 draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/order.svg")}}
+                    single := mod.spotygram.Cover{visible:false width:Fill height:Fill draw_bg.border_radius:16.0 art.draw_bg.border_radius:8.0}
+                    mosaic := View{visible:false width:Fill height:Fill flow:Down
+                        View{width:Fill height:28 flow:Right
+                            art0 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
+                            art1 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
+                        }
+                        View{width:Fill height:28 flow:Right
+                            art2 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
+                            art3 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
+                        }
+                    }
+                    View{width:Fill height:Fill show_bg:true draw_bg +:{color:theme.color_bg_app pixel:fn(){
+                        let p=self.pos*self.rect_size;
+                        let q=abs(p-self.rect_size*0.5)-(self.rect_size*0.5-vec2(16.0));
+                        let d=min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-16.0;
+                        let alpha=smoothstep(-0.5,0.5,d);
+                        return vec4(self.color.rgb*alpha,alpha);
+                    }}}
+                }
                 View{width:Fill height:Fill flow:Overlay
                     open := ButtonFlatter{width:Fill height:Fill text:""}
                     View{width:Fill height:Fill flow:Down spacing:5 align:Align{y:0.5}
-                        title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:15}}
+                        title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:12}}
                         subtitle := mod.spotygram.Caption{}
                     }
                 }
-                more := ButtonFlatter{width:40 height:48 text:"⋮" draw_text +:{text_style.font_size:24}}
+                more := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/more.svg")}
             }
-            Empty := CachedView {
-                width:Fill height:250 flow:Down align:Center spacing:12
-                Image{width:112 height:112 fit:ImageFit.Smallest src:crate_resource("self:resources/spotygram_mark.png")}
-                title := mod.spotygram.Body{align:Center text:"Your next favorite song starts here."}
-                subtitle := mod.spotygram.Caption{align:Center text:"Import audio files or connect Telegram."}
+            Empty := View {
+                width:Fill height:Fit flow:Down align:Center spacing:12 padding:24
+                empty_library := View{width:40 height:40 margin:16
+                    mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/library.svg")}}
+                }
+                empty_favorite := View{visible:false width:40 height:40 margin:16
+                    mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/favorite_border.svg")}}
+                }
+                title := mod.spotygram.Body{height:Fit max_lines:3 align:Center draw_text.text_style.font_size:16.5 text:"Your next favorite song starts here."}
+                subtitle := mod.spotygram.Caption{height:Fit max_lines:4 align:Center text:"Import audio files or connect Telegram."}
+                empty_connect := mod.spotygram.Flat{text:"Connect Telegram" label_align:Center}
+                empty_import := mod.spotygram.Flat{text:"Import audio files" label_align:Center}
+                empty_add := mod.spotygram.Glass{visible:false text:"Add recordings"}
+                empty_profile := mod.spotygram.Flat{visible:false text:"Open in Telegram" label_align:Center}
             }
+            End := View{width:Fill height:150}
         }
     }
 
@@ -173,214 +208,364 @@ script_mod! {
         main := View {
             width: Fill height: Fill flow: Right
             rail := View {
-                width:196 height:Fill padding:Inset{left:18,right:12,top:28,bottom:20}
-                flow:Down spacing:12
-                View{width:Fill height:48 flow:Right spacing:8 align:Align{y:0.5}
-                    Image{width:32 height:32 fit:ImageFit.Smallest src:crate_resource("self:resources/spotygram_mark.png")}
-                    Label{text:"spotygram" draw_text.color:theme.color_text draw_text.text_style:theme.font_bold{font_size:19}}
-                }
-                rail_music := mod.spotygram.Glass{width:Fill text:"Music"}
-                rail_favorites := mod.spotygram.Glass{width:Fill text:"Favorites"}
-                rail_playlists := mod.spotygram.Glass{width:Fill text:"Playlists"}
-                rail_sources := mod.spotygram.Glass{width:Fill text:"Sources"}
-                Filler{}
-                preview_label := Label{text:"RUST PREVIEW" draw_text.color:theme.color_text_meta draw_text.text_style.font_size:10}
-                rail_settings := mod.spotygram.Glass{width:Fill text:"Settings"}
-            }
-            content := View {
-                width:Fill height:Fill flow:Down spacing:10
-                padding:Inset{left:18,right:18,top:20,bottom:14}
-                header := View{width:Fill height:48 flow:Right align:Align{y:0.5}
-                    brand := Label{width:Fill text:"spotygram" draw_text.color:theme.color_text draw_text.text_style:theme.font_bold{font_size:19}}
-                    header_status := mod.spotygram.Caption{width:Fill text:"Rust preview"}
-                    settings := mod.spotygram.Icon{text:"" padding:12 icon_walk:Walk{width:24 height:24} draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/settings.svg")}}
-                }
-                View{width:Fill height:48 flow:Right align:Align{y:0.5} spacing:8
-                    back := mod.spotygram.Icon{visible:false text:"‹"}
-                    heading := mod.spotygram.Title{text:"Music"}
-                    count := mod.spotygram.Caption{width:Fit text:"0 tracks"}
-                    refresh := mod.spotygram.Icon{text:"↻"}
-                }
-                search := mod.spotygram.Input{empty_text:"Search music"}
-                music_controls := View{width:Fill height:Fit flow:Down spacing:8
-                    View{width:Fill height:48 flow:Right spacing:8
-                        source_filter := mod.spotygram.Glass{width:Fill text:"All sources"}
-                        on_device := mod.spotygram.Icon{text:"↓"}
-                        sort := mod.spotygram.Icon{text:"A↕"}
-                    }
-                    View{width:Fill height:48 flow:Right spacing:8
-                        play_all := mod.spotygram.Glass{width:Fill text:"▶   Play all"}
-                        select_mode := mod.spotygram.Icon{text:"" padding:12 icon_walk:Walk{width:24 height:24} draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/select.svg")}}
-                        import := mod.spotygram.Icon{text:"+"}
-                    }
-                }
-                collection_controls := View{width:Fill height:48 flow:Right spacing:8 visible:false
-                    create_playlist := mod.spotygram.Glass{width:Fill text:"New playlist"}
-                    add_chats := mod.spotygram.Glass{width:Fill text:"Add chats"}
-                    add_profile := mod.spotygram.Glass{width:Fill text:"Add profile"}
-                }
-                profile_controls := View{width:Fill height:48 flow:Right spacing:8 visible:false
-                    profile_connect := mod.spotygram.Glass{width:Fill text:"Add to library"}
-                    profile_play := mod.spotygram.Glass{width:Fill text:"▶   Play"}
-                }
-                selection_controls := View{width:Fill height:48 flow:Right spacing:8 visible:false
-                    selection_count := mod.spotygram.Caption{text:"Selected"}
-                    selection_playlist := mod.spotygram.Icon{text:"≡+"}
-                    selection_download := mod.spotygram.Icon{text:"↓"}
-                    selection_close := mod.spotygram.Icon{text:"×"}
-                }
-                notice := mod.spotygram.Caption{visible:false height:Fit max_lines:3}
-                catalog := mod.spotygram.Catalog{}
-                player_dock := View{width:Fill height:74 flow:Overlay visible:false
-                    glass.Layer{width:Fill height:Fill
-                        glass.Card{width:Fill height:Fill flow:Right spacing:12 padding:12 align:Align{y:0.5}
-                            mini_cover := mod.spotygram.Cover{width:46 height:46}
-                            View{width:Fill height:Fill flow:Overlay
-                                show_player := ButtonFlatter{width:Fill height:Fill text:""}
-                                View{width:Fill height:Fill flow:Down spacing:4 align:Align{y:0.5}
-                                    mini_title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:15}}
-                                    mini_artist := mod.spotygram.Caption{}
-                                }
-                            }
-                            previous := mod.spotygram.InlineIcon{text:"|‹"}
-                            mini_play := mod.spotygram.InlineIcon{text:"▶"}
-                            next := mod.spotygram.InlineIcon{text:"›|"}
+                width:96 height:Fill flow:Overlay align:Align{x:0.0 y:0.5} padding:Inset{left:16}
+                glass.Layer{width:76 height:288
+                    mod.spotygram.Surface{width:76 height:288 flow:Overlay padding:Inset{top:8 bottom:8} draw_bg +:{corner_radius:16.0 diffusion:0.32}
+                        rail_lens := mod.spotygram.NavLens{draw_bg.vertical:1.0}
+                        View{width:Fill height:Fill flow:Down spacing:0
+                        rail_music := mod.spotygram.RailNav{text:"Music" draw_icon.svg:crate_resource("self:resources/music.svg")}
+                        rail_favorites := mod.spotygram.RailNav{text:"Favorites" draw_icon.svg:crate_resource("self:resources/favorite.svg")}
+                        rail_playlists := mod.spotygram.RailNav{text:"Playlists" draw_icon.svg:crate_resource("self:resources/order.svg")}
+                        rail_sources := mod.spotygram.RailNav{text:"Sources" draw_icon.svg:crate_resource("self:resources/sources.svg")}
                         }
                     }
                 }
-                bottom_nav := View{width:Fill height:58 flow:Right spacing:6
-                    nav_music := mod.spotygram.Nav{text:"Music"}
-                    nav_favorites := mod.spotygram.Nav{text:"Favorites"}
-                    nav_playlists := mod.spotygram.Nav{text:"Playlists"}
-                    nav_sources := mod.spotygram.Nav{text:"Sources"}
+            }
+            content := View {
+                width:Fill height:Fill flow:Overlay align:Align{x:0.5}
+                page := View{width:Fill max_width:720 height:Fill flow:Down spacing:0
+                header := View{width:Fill height:48 padding:Inset{left:16 right:12} flow:Right spacing:8 align:Align{y:0.5}
+                    // All stickers have at least six transparent source pixels
+                    // at every edge. Clip that empty margin to prevent Vulkan
+                    // sampler-edge streaks without cropping the visible art.
+                    header_sticker := Image{width:28 height:28 fit:ImageFit.Smallest draw_bg +:{border_size:1.0 border_color:#x00000000} src:crate_resource("self:resources/emoji_handshake.png")}
+                    brand := Label{width:Fill text:"spotygram" draw_text.color:theme.color_text draw_text.text_style:theme.font_bold{font_size:12}}
+                    settings := mod.spotygram.Icon{text:"" padding:12 icon_walk:Walk{width:24 height:24} draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/settings.svg")}}
+                }
+                heading_row := View{width:Fill height:48 padding:Inset{left:16 right:4} flow:Right align:Align{y:0.5} spacing:8
+                    back := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
+                    favorite_heading := View{visible:false width:24 height:24
+                        mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/favorite.svg")}}
+                    }
+                    heading := mod.spotygram.Title{text:"Music"}
+                    count := mod.spotygram.Caption{width:Fit text:"0 tracks"}
+                    add_source_top := mod.spotygram.Glass{visible:false width:Fit text:"Add source" draw_bg +:{accent:1.0 accent_color:mix(#x277347,#x72c987,theme.spotygram_dark)} draw_icon.svg:crate_resource("self:resources/add.svg")}
+                    source_refresh_top := mod.spotygram.Icon{visible:false draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                    refresh := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                    create_playlist := mod.spotygram.Icon{visible:false draw_bg +:{accent:1.0 accent_color:mix(#x785a1a,#xe9d96c,theme.spotygram_dark)} draw_icon.svg:crate_resource("self:resources/add.svg")}
+                }
+                profile_header := View{visible:false width:Fill height:Fit flow:Right spacing:12 padding:Inset{left:20 right:20 top:10 bottom:10} align:Align{y:0.5}
+                    profile_avatar := mod.spotygram.Avatar{width:52 height:52}
+                    View{width:Fill height:Fit flow:Down spacing:4
+                        profile_username := mod.spotygram.Body{text:"Profile music"}
+                        profile_count := mod.spotygram.Caption{text:"Music in Telegram"}
+                        profile_connect := mod.spotygram.Glass{width:Fit text:"Add to library" margin:Inset{top:8} icon_walk:Walk{width:18 height:18} draw_icon.svg:crate_resource("self:resources/add.svg")}
+                        profile_disconnect := mod.spotygram.Flat{visible:false width:Fit height:40 text:"In library" padding:0 spacing:6 icon_walk:Walk{width:18 height:18} draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/check.svg")} icon_end_walk:Walk{width:18 height:18} draw_icon_end +:{color:theme.color_primary svg:crate_resource("self:resources/down.svg")} draw_text.color:theme.color_primary}
+                    }
+                }
+                search_shell := View{width:Fill height:56 padding:Inset{left:16 right:16 top:4 bottom:4} flow:Overlay
+                    mod.spotygram.Surface{width:Fill height:48 flow:Right align:Align{y:0.5} padding:Inset{left:16 right:4}
+                        mod.spotygram.Mark{width:20 height:20 draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/search.svg")}}
+                        search := mod.spotygram.Input{empty_text:"Search music"}
+                    }
+                }
+                music_controls := View{width:Fill height:Fit flow:Down spacing:0
+                    filters := View{width:Fill height:54 padding:Inset{left:16 right:16 top:3 bottom:3} flow:Right spacing:8
+                        View{width:Fill height:48 flow:Overlay
+                            mod.spotygram.Surface{width:Fill height:Fill
+                                source_filter := mod.spotygram.Preference{height:48 row.height:48 row.padding:Inset{left:16 right:16} row.leading.width:20 row.leading.height:20 row.leading.mark.draw_icon.svg:crate_resource("self:resources/library.svg") row.labels.title.draw_text.text_style:theme.font_bold{font_size:10.5} row.labels.detail.visible:false row.arrow.width:18 row.arrow.height:18 row.arrow.mark.draw_icon.svg:crate_resource("self:resources/dropdown.svg")}
+                            }
+                        }
+                        on_device := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/offline.svg")}
+                        sort := mod.spotygram.PlainIcon{draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/sort.svg")}}
+                    }
+                    View{width:Fill height:54 padding:Inset{left:16 right:16 top:3 bottom:3} flow:Right spacing:8
+                        play_all := mod.spotygram.Glass{width:Fill text:"Play all" draw_bg.accent:1.0 draw_icon.svg:crate_resource("self:resources/play.svg")}
+                        library_order := mod.spotygram.Icon{draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/shuffle.svg")}}
+                        select_mode := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/checklist.svg")}
+                    }
+                }
+                collection_controls := View{width:Fill height:64 padding:Inset{left:20 right:20 top:8 bottom:8} flow:Right spacing:8 visible:false
+                    add_source := mod.spotygram.Glass{width:Fit text:"Add source" draw_bg +:{accent:1.0 accent_color:mix(#x277347,#x72c987,theme.spotygram_dark)} draw_icon.svg:crate_resource("self:resources/add.svg")}
+                    source_refresh := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                }
+                selection_controls := View{width:Fill height:56 padding:Inset{left:16 right:16 top:4 bottom:4} flow:Right spacing:8 visible:false
+                    selection_all := mod.spotygram.Glass{width:Fill text:"Select all"}
+                    selection_playlist := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/playlist_add.svg")}
+                    selection_download := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/download.svg")}
+                }
+                // The pinned Label applies its walk margin around both turtles.
+                notice := mod.spotygram.Caption{visible:false height:Fit max_lines:3 margin:Inset{left:8 right:8 top:2 bottom:2}}
+                catalog := mod.spotygram.Catalog{}
+                }
+                dock := View{width:Fill max_width:720 height:Fill flow:Down padding:Inset{left:12 right:12 bottom:6} spacing:6
+                Filler{}
+                player_dock := View{width:Fill height:56 flow:Overlay visible:false
+                    glass.Layer{width:Fill height:Fill
+                        mod.spotygram.CapturedSurface{width:Fill height:Fill flow:Right spacing:4 padding:Inset{left:7 right:4 top:4 bottom:4} align:Align{y:0.5} draw_bg +:{corner_radius:14.0 diffusion:0.32 environment:0.0 blur_level:4.5}
+                            mini_cover := mod.spotygram.Cover{width:44 height:44}
+                            View{width:Fill height:Fill flow:Overlay
+                                show_player := ButtonFlatter{width:Fill height:Fill text:""}
+                                View{width:Fill height:Fill flow:Down spacing:0 padding:Inset{left:6 right:4} align:Align{y:0.5}
+                                    mini_title := mod.spotygram.Body{height:22 draw_text.text_style:theme.font_bold{font_size:12}}
+                                    View{width:Fill height:18 flow:Right spacing:5
+                                        mini_artist := mod.spotygram.Caption{width:Fit}
+                                        mini_speed := mod.spotygram.Caption{width:Fit visible:false draw_text.color:theme.color_primary}
+                                    }
+                                }
+                            }
+                            previous := mod.spotygram.PlainIcon{width:40 draw_icon.svg:crate_resource("self:resources/previous.svg")}
+                            mini_play := mod.spotygram.InlineIcon{draw_icon.svg:crate_resource("self:resources/play.svg")}
+                            next := mod.spotygram.PlainIcon{width:40 draw_icon.svg:crate_resource("self:resources/next.svg")}
+                        }
+                    }
+                }
+                bottom_nav := View{width:Fill height:62 flow:Overlay
+                    glass.Layer{width:Fill height:Fill
+                        mod.spotygram.CapturedSurface{width:Fill height:Fill flow:Overlay padding:Inset{left:5 right:5 top:5 bottom:5} draw_bg +:{corner_radius:15.5 diffusion:0.32 environment:0.0 blur_level:4.5}
+                            nav_lens := mod.spotygram.NavLens{}
+                            View{width:Fill height:Fill flow:Right spacing:0
+                            nav_music := mod.spotygram.Nav{text:"Music" draw_icon.svg:crate_resource("self:resources/music.svg")}
+                            nav_favorites := mod.spotygram.Nav{text:"Favorites" draw_icon.svg:crate_resource("self:resources/favorite.svg")}
+                            nav_playlists := mod.spotygram.Nav{text:"Playlists" draw_icon.svg:crate_resource("self:resources/order.svg")}
+                            nav_sources := mod.spotygram.Nav{text:"Sources" draw_icon.svg:crate_resource("self:resources/sources.svg")}
+                            }
+                        }
+                    }
+                }
                 }
             }
         }
-        full_player := mod.spotygram.Prism{visible:false flow:Down padding:24 spacing:20
-            View{width:Fill height:48 flow:Right align:Align{y:0.5}
-                player_close := mod.spotygram.Icon{text:"↓"}
-                playing_label := Label{width:Fill text:"NOW PLAYING" align:Center draw_text.color:theme.color_text_meta draw_text.text_style.font_size:11}
-                player_more := mod.spotygram.Icon{text:"⋮"}
+        full_player := mod.spotygram.Prism{visible:false flow:Overlay padding:Inset{left:20 right:20 top:0 bottom:12} align:Align{x:0.5}
+            View{width:Fill height:Fill flow:Down align:Align{x:0.5}
+                Filler{}
+                player_reflection := mod.spotygram.Reflection{}
             }
-            player_columns := ScrollYView{width:Fill height:Fill flow:Right spacing:32 align:Center
-                player_art := mod.spotygram.Cover{width:320 height:320
-                    note +:{draw_text.text_style.font_size:100}
+            View{width:Fill max_width:1000 height:Fill flow:Down spacing:16
+            View{width:Fill height:56 flow:Right align:Align{y:0.5}
+                player_close := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/down.svg")}
+                View{width:Fill height:Fit flow:Down align:Center spacing:4
+                    playing_label := Label{text:"PLAYING FROM" align:Center draw_text.color:theme.color_text_meta draw_text.text_style.font_size:7.5}
+                    playing_source := mod.spotygram.Caption{align:Center text:"From device"}
                 }
-                player_details := View{width:Fill height:Fit flow:Down spacing:18
-                    View{width:Fill height:Fit flow:Down spacing:8
-                        player_title := mod.spotygram.Title{text:""}
-                        player_artist := mod.spotygram.Body{text:""}
+                player_share := mod.spotygram.Icon{visible:false margin:Inset{right:8} draw_icon.svg:crate_resource("self:resources/share.svg")}
+                player_more := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/more.svg")}
+            }
+            player_columns := mod.spotygram.TouchScroll{width:Fill height:Fill flow:Right spacing:24 align:Center
+                player_art := mod.spotygram.Cover{width:320 height:320
+                    draw_bg.border_radius:24.0
+                    note +:{width:100 height:100}
+                    art.draw_bg.border_radius:12.0
+                }
+                player_details := View{width:Fill max_width:520 height:Fit flow:Down spacing:0
+                    View{width:Fill height:Fit flow:Right spacing:10 align:Align{y:0.5}
+                        View{width:Fill height:Fit flow:Down spacing:6
+                            player_title := mod.spotygram.Title{height:Fit max_lines:2 draw_text.text_style.font_size:21 text:""}
+                            player_artist := mod.spotygram.Body{draw_text.color:theme.color_text_meta text:""}
+                        }
+                        player_favorite := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/favorite_border.svg")}
                     }
+                    View{width:Fill height:16}
                     seek := mod.spotygram.Slider{min:0.0 max:1.0 step:0.0}
                     View{width:Fill height:20 flow:Right
                         elapsed := mod.spotygram.Caption{width:Fill text:"0:00"}
                         duration := mod.spotygram.Caption{width:Fit text:"0:00"}
                     }
-                    View{width:Fill height:64 flow:Right spacing:12 align:Align{y:0.5}
-                        order := mod.spotygram.Icon{text:"↕"}
-                        player_previous := mod.spotygram.Icon{text:"|‹"}
-                        player_play := mod.spotygram.Glass{width:Fill height:64 text:"▶"}
-                        player_next := mod.spotygram.Icon{text:"›|"}
-                        repeat := mod.spotygram.Icon{text:"↻"}
+                    View{width:Fill height:100 padding:Inset{top:12 bottom:12} flow:Overlay
+                        glass.Layer{width:Fill height:Fill
+                            mod.spotygram.Surface{width:Fill height:76 flow:Right padding:Inset{left:4 right:4 top:6 bottom:6} spacing:0 align:Align{y:0.5} draw_bg.corner_radius:19.0
+                                order := mod.spotygram.PlainIcon{width:Fill padding:12 draw_icon.svg:crate_resource("self:resources/order.svg")}
+                                player_previous := mod.spotygram.PlainIcon{width:Fill padding:8 icon_walk:Walk{width:32 height:32} draw_icon.svg:crate_resource("self:resources/previous.svg")}
+                                player_play := mod.spotygram.InlineIcon{width:64 height:64 padding:11 icon_walk:Walk{width:42 height:42} draw_icon.svg:crate_resource("self:resources/play.svg") draw_bg +:{border_radius:32.0 color:mix(theme.color_bg_app,theme.color_primary,0.16)}}
+                                player_next := mod.spotygram.PlainIcon{width:Fill padding:8 icon_walk:Walk{width:32 height:32} draw_icon.svg:crate_resource("self:resources/next.svg")}
+                                repeat := mod.spotygram.PlainIcon{width:Fill padding:12 draw_icon.svg:crate_resource("self:resources/repeat.svg")}
+                            }
+                        }
                     }
-                    View{width:Fill height:48 flow:Right spacing:10
-                        player_save := mod.spotygram.Glass{width:Fill padding:8 text:"↓  Save"}
-                        speed := mod.spotygram.Glass{width:64 text:"1×"}
-                        queue := mod.spotygram.Glass{width:Fill text:"≡  Queue"}
+                    View{width:Fill height:56 padding:Inset{top:4 bottom:4} flow:Right spacing:8
+                        player_save := mod.spotygram.Glass{width:Fill padding:8 text:"Save on device" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/download.svg")}
+                        speed := mod.spotygram.Glass{width:64 padding:8 text:"1×"}
+                        queue := mod.spotygram.Glass{width:Fill padding:8 text:"Queue" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/order.svg")}
                     }
                     volume_row := View{width:Fill height:44 flow:Right align:Align{y:0.5} spacing:8
-                        mute := mod.spotygram.Icon{text:"♪"}
+                        mute := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/volume.svg")}
                         volume := mod.spotygram.Slider{min:0.0 max:100.0 step:1.0}
                         volume_label := mod.spotygram.Caption{width:56 text:"100%"}
                     }
                 }
             }
+            }
+        }
+        playlist_editor := mod.spotygram.Prism{visible:false flow:Overlay align:Align{x:0.5}
+            View{width:Fill max_width:720 height:Fill flow:Down
+                View{width:Fill height:56 flow:Right spacing:12 padding:Inset{left:4 right:16} align:Align{y:0.5}
+                    editor_close := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/back.svg")}
+                    editor_title := mod.spotygram.Title{text:"New playlist"}
+                }
+                editor_playlist_name := mod.spotygram.Caption{visible:false height:28 margin:Inset{left:8 right:8}}
+                editor_fields := View{width:Fill height:Fit flow:Down
+                    editor_name_shell := View{width:Fill height:60 padding:Inset{left:16 right:16 top:6 bottom:6}
+                        mod.spotygram.Surface{width:Fill height:48 editor_name := mod.spotygram.Input{empty_text:"Playlist name"}}
+                    }
+                    View{width:Fill height:60 padding:Inset{left:16 right:16 top:6 bottom:6}
+                        mod.spotygram.Surface{width:Fill height:48 flow:Right align:Align{y:0.5} padding:Inset{left:16 right:4}
+                            mod.spotygram.Mark{width:20 height:20 draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/search.svg")}}
+                            editor_search := mod.spotygram.Input{empty_text:"Title or artist"}
+                        }
+                    }
+                }
+                View{width:Fill height:48 flow:Right padding:Inset{left:16 right:8} align:Align{y:0.5}
+                    editor_count := mod.spotygram.Body{text:"0 selected"}
+                    editor_select_all := mod.spotygram.Flat{width:Fit height:48 text:"Select all" draw_text.color:theme.color_primary}
+                }
+                editor_error := mod.spotygram.Caption{visible:false height:Fit max_lines:3 margin:8 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
+                editor_catalog := mod.spotygram.Catalog{reserve_dock:false}
+                editor_save := mod.spotygram.Glass{width:Fill height:48 margin:16 text:"Create playlist" draw_bg +:{accent:1.0 accent_color:mix(#x785a1a,#xe9d96c,theme.spotygram_dark)}}
+            }
         }
         overlay := View{visible:false width:Fill height:Fill flow:Overlay align:Center
-            scrim := SolidView{width:Fill height:Fill draw_bg.color:#x00000055}
-            glass.Layer{width:Fill height:Fill align:Center
-                panel := glass.Card{width:500 height:Fit flow:Down spacing:14 padding:22
-                    draw_bg +:{blur_level:4.5 tint_color:theme.color_bg_app tint_alpha:0.88}
-                    View{width:Fill height:48 flow:Right align:Align{y:0.5} spacing:10
-                    panel_title := mod.spotygram.Title{text:"Settings"}
-                        panel_close := mod.spotygram.InlineIcon{text:"×"}
+            auth_background := mod.spotygram.Prism{visible:false}
+            scrim := SolidView{width:Fill height:Fill draw_bg.color:#x00000022}
+            panel_layer := glass.Layer{width:Fill height:Fill align:Center
+                panel_position := View{width:Fill height:Fill flow:Overlay align:Center
+                panel := mod.spotygram.CapturedSurface{width:500 height:Fit flow:Down spacing:10 padding:20
+                    draw_bg +:{blur_level:4.5 diffusion:mix(0.32,0.38,theme.spotygram_dark) corner_radius:14.0 environment:0.0}
+                    drag_handle := View{visible:false width:Fill height:16 align:Center
+                        RoundedView{width:32 height:4 draw_bg +:{color:theme.color_text_meta border_radius:2.0}}
                     }
-                    panel_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:#xff8e8e}
-                    panel_scroll := ScrollYView{width:Fill height:Fit flow:Down spacing:12
+                    panel_header := View{width:Fill height:48 flow:Right align:Align{y:0.5} spacing:10
+                        auth_back := mod.spotygram.Icon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
+                        panel_back := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
+                    panel_title := mod.spotygram.Title{height:Fill align:Align{x:0.0 y:0.5} max_lines:2 draw_text.text_style.font_size:15 text:"Settings"}
+                        cache_refresh := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                        panel_close := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/close.svg")}
+                    }
+                    panel_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
+                    panel_scroll := mod.spotygram.TouchScroll{width:Fill height:Fit flow:Down spacing:12
+                        auth_mark := View{visible:false width:Fill height:132 flow:Down spacing:12 align:Center
+                            auth_photo := Image{width:64 height:64 fit:ImageFit.Smallest src:crate_resource("self:resources/spotygram_mark.png")}
+                            auth_name := Label{text:"spotygram" draw_text.color:theme.color_text draw_text.text_style:theme.font_bold{font_size:21}}
+                        }
+                        auth_heading := mod.spotygram.Body{visible:false height:Fit max_lines:2 draw_text.text_style:theme.font_bold{font_size:16.5} text:"Connect Telegram"}
                         panel_message := mod.spotygram.Body{height:Fit max_lines:8 visible:false}
+                        send_header := View{visible:false width:Fill height:56 flow:Right spacing:12 align:Align{y:0.5}
+                            send_cover := mod.spotygram.Cover{}
+                            View{width:Fill height:Fit flow:Down spacing:2
+                                send_title := mod.spotygram.Body{draw_text.text_style:theme.font_bold{font_size:12}}
+                                send_artist := mod.spotygram.Caption{}
+                            }
+                        }
                         directory_folder := mod.spotygram.Flat{visible:false text:"All chats"}
-                        panel_input_wrap := View{visible:false width:Fill height:Fit
+                        panel_input_wrap := mod.spotygram.Surface{visible:false width:Fill height:48 flow:Right align:Align{y:0.5}
+                            panel_search_icon := View{visible:false width:20 height:20
+                                mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/search.svg")}}
+                            }
                             panel_input := mod.spotygram.Input{}
                         }
-                        auth_mark := View{visible:false width:Fill height:120 align:Center
-                            Image{width:120 height:120 fit:ImageFit.Smallest src:crate_resource("self:resources/spotygram_mark.png")}
+                        auth_qr_area := View{visible:false width:Fill height:240 align:Center
+                            auth_qrcode := Image{width:240 height:240 fit:ImageFit.Smallest}
                         }
-                        auth_qr_area := View{visible:false width:Fill height:220 align:Center
-                            auth_qrcode := Image{width:220 height:220 fit:ImageFit.Smallest}
+                        quick_body := View{visible:false width:Fill height:Fit flow:Down spacing:4
+                            quick_label := mod.spotygram.Section{text:"Quick access"}
+                            quick_choices := mod.spotygram.Choices{height:90 layout_mode:2 list.flow:Right}
                         }
+                        folder_choices := mod.spotygram.Choices{visible:false height:42 layout_mode:1 list.flow:Right}
                         auth_actions := View{visible:false width:Fill height:Fit flow:Down spacing:8
                             auth_submit := mod.spotygram.InlineGlass{width:Fill text:"Continue"}
                             auth_qr := mod.spotygram.Flat{text:"Sign in with QR code"}
                             auth_phone := mod.spotygram.Flat{text:"Use another phone number"}
                             auth_resend := mod.spotygram.Flat{text:"Resend code"}
                         }
-                        settings_body := View{visible:false width:Fill height:Fit flow:Down spacing:8
-                            settings_import := mod.spotygram.InlineGlass{width:Fill text:"Import audio files"}
-                            settings_account := mod.spotygram.InlineGlass{width:Fill text:"Connect Telegram"}
-                            settings_theme := mod.spotygram.Flat{text:"Appearance: System"}
-                            settings_language := mod.spotygram.Flat{text:"Language: English"}
-                            settings_duplicates := mod.spotygram.Flat{text:"Hide duplicates: On"}
-                            settings_bookmarks := mod.spotygram.Flat{text:"Resume long recordings: On"}
-                            settings_minutes := mod.spotygram.Flat{text:"Bookmark threshold: 30 minutes"}
-                            settings_wifi := mod.spotygram.Flat{text:"Downloads over Wi-Fi only: Off"}
-                            settings_discard := mod.spotygram.Flat{text:"Do not keep played tracks: Off"}
-                            settings_storage := mod.spotygram.Caption{text:"On device"}
-                            settings_clear := mod.spotygram.Flat{text:"Clear music cache"}
-                            settings_transfers := mod.spotygram.Flat{text:"Cancel downloads"}
-                            settings_sync := mod.spotygram.Caption{height:Fit max_lines:3 text:"Library sync"}
-                            settings_sharing_sender := mod.spotygram.Flat{text:"Keep original sender: Off"}
-                            settings_sharing_caption := mod.spotygram.Flat{text:"Keep original caption: Off"}
-                            settings_update := mod.spotygram.Flat{text:"Check Rust preview updates"}
-                            settings_about := mod.spotygram.Caption{height:Fit max_lines:3 text:"spotygram rust · 0.1.0\nA personal testing build. Local data is separate from the stable app."}
-                            settings_quit := mod.spotygram.Flat{text:"Quit spotygram rust"}
+                        settings_body := View{visible:false width:Fill height:Fit flow:Down spacing:0
+                            appearance_label := mod.spotygram.Section{text:"Appearance"}
+                            mod.spotygram.Surface{width:Fill height:56 flow:Right padding:4
+                                theme_light := mod.spotygram.Nav{height:48 flow:Right padding:0 text:"Light" icon_walk:Walk{width:0 height:0} draw_text.text_style.font_size:12}
+                                theme_dark := mod.spotygram.Nav{height:48 flow:Right padding:0 text:"Dark" icon_walk:Walk{width:0 height:0} draw_text.text_style.font_size:12}
+                            }
+                            settings_language := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/language.svg") row.labels.title.text:"Language"}
+                            settings_language_help := mod.spotygram.Caption{height:Fit max_lines:4 margin:Inset{left:6 right:6} text:"Choose English, Russian or your device language."}
+                            mod.spotygram.Divider{}
+                            settings_sharing := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/share.svg") row.labels.title.text:"Sharing audio" row.labels.detail.text:"Sender and original caption"}
+                            settings_bookmarks := mod.spotygram.TogglePreference{row.labels.title.text:"Resume long recordings" row.labels.detail.text:"Continue from where you stopped."}
+                            settings_minutes := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/history.svg") row.labels.title.text:"Bookmark threshold"}
+                            mod.spotygram.Divider{}
+                            settings_duplicates := mod.spotygram.TogglePreference{row.labels.title.text:"Hide duplicates" row.labels.detail.text:"Show one copy of the same recording."}
+                            settings_storage := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/offline.svg") row.labels.title.text:"On device" row.labels.detail.text:"Saved music and imported recordings."}
+                            settings_import := mod.spotygram.Flat{text:"Import audio files" draw_icon.svg:crate_resource("self:resources/add.svg")}
+                            settings_discard := mod.spotygram.TogglePreference{row.labels.title.text:"Do not keep played tracks" row.labels.detail.text:"Keep saved recordings; remove old temporary listening copies."}
+                            settings_clear := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/delete.svg") row.labels.title.text:"Clear music cache" row.labels.detail.text:"Manage downloaded music on this device."}
+                            mod.spotygram.Divider{}
+                            settings_wifi := mod.spotygram.TogglePreference{row.labels.title.text:"Downloads over Wi-Fi only" row.labels.detail.text:"Mobile data is still used for playback."}
+                            settings_transfers := mod.spotygram.Flat{text:"Cancel downloads" draw_icon.svg:crate_resource("self:resources/download.svg")}
+                            mod.spotygram.Divider{}
+                            settings_account := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/telegram.svg") row.labels.title.text:"Connect Telegram"}
+                            settings_sync := mod.spotygram.Caption{height:Fit max_lines:3 margin:6 text:"Library sync"}
+                            settings_update := mod.spotygram.Flat{text:"Check Rust preview updates" draw_icon.svg:crate_resource("self:resources/refresh.svg")}
+                            settings_about := mod.spotygram.Caption{height:Fit max_lines:3 text:""}
+                            settings_quit := mod.spotygram.Flat{text:"Quit spotygram rust" draw_icon.svg:crate_resource("self:resources/logout.svg")}
                         }
-                        track_body := View{visible:false width:Fill height:Fit flow:Down spacing:4
-                            track_header := View{width:Fill height:64 flow:Right spacing:12 align:Align{y:0.5}
-                                track_cover := mod.spotygram.Cover{}
+                        sharing_body := View{visible:false width:Fill height:Fit flow:Down spacing:12
+                            sharing_help := mod.spotygram.Body{height:Fit max_lines:4 text:"Sender and original caption"}
+                            settings_sharing_sender := mod.spotygram.TogglePreference{row.labels.title.text:"Keep original sender"}
+                            settings_sharing_caption := mod.spotygram.TogglePreference{row.labels.title.text:"Keep original caption"}
+                        }
+                        cache_body := View{visible:false width:Fill height:Fit flow:Down spacing:20 padding:Inset{top:24 bottom:24}
+                            cache_loading := SpinnerFlat{visible:false size:20 text:"Calculating…" draw_text.text_style.font_size:12}
+                            View{width:Fill height:Fit flow:Down padding:20 spacing:8
+                                cache_size := mod.spotygram.Title{height:48 draw_text.text_style.font_size:27 text:"—"}
+                                cache_count := mod.spotygram.Body{draw_text.color:theme.color_text_meta text:""}
+                            }
+                            cache_description := mod.spotygram.Body{height:Fit max_lines:8 text:"Downloaded Telegram audio and documents, including saved recordings, will be removed from this device."}
+                            cache_preserved := mod.spotygram.Body{height:Fit max_lines:6 draw_text.color:theme.color_text_meta text:"Imported files, favorites, playlists and sign-in stay intact."}
+                            cache_clear := mod.spotygram.InlineGlass{width:Fill text:"Clear music cache" draw_icon.svg:crate_resource("self:resources/delete.svg")}
+                            cache_connect := mod.spotygram.InlineGlass{visible:false width:Fill text:"Connect Telegram" draw_icon.svg:crate_resource("self:resources/telegram.svg")}
+                        }
+                        track_body := View{visible:false width:Fill height:Fit flow:Down spacing:0
+                            track_header := View{width:Fill height:76 flow:Right spacing:16 align:Align{y:0.5}
+                                track_cover := mod.spotygram.Cover{width:48 height:48}
                                 View{width:Fill height:Fit flow:Down spacing:6
-                                    track_title := mod.spotygram.Body{}
+                                    track_title := mod.spotygram.Body{height:Fit max_lines:2}
                                     track_artist := mod.spotygram.Caption{}
                                 }
                             }
-                            track_profile_member := mod.spotygram.InlineGlass{width:Fill text:"To profile"}
+                            profile_member_wrap := View{width:Fill height:60 align:Center
+                                track_profile_member := mod.spotygram.InlineGlass{width:128 text:"To profile" icon_walk:Walk{width:18 height:18} draw_text.text_style.font_size:9 draw_icon.svg:crate_resource("self:resources/person_add.svg")}
+                            }
                             track_profile_hint := mod.spotygram.Caption{visible:false height:Fit max_lines:3 text:"This local recording will be uploaded to your Telegram profile."}
-                            track_play := mod.spotygram.Flat{text:"Play"}
-                            track_favorite := mod.spotygram.Flat{text:"Add to favorites"}
-                            track_playlist := mod.spotygram.Flat{text:"Add to playlist"}
-                            track_queue := mod.spotygram.Flat{text:"Add to queue"}
-                            track_move_up := mod.spotygram.Flat{text:"Move up"}
-                            track_move_down := mod.spotygram.Flat{text:"Move down"}
-                            track_remove_queue := mod.spotygram.Flat{text:"Remove from queue"}
-                            track_download := mod.spotygram.Flat{text:"Save on device"}
-                            track_send := mod.spotygram.Flat{text:"Send to Telegram chat"}
-                            track_profile := mod.spotygram.Flat{text:"Open Telegram profile"}
-                            track_original := mod.spotygram.Flat{text:"Open original message"}
-                            track_remove_playlist := mod.spotygram.Flat{text:"Remove from this playlist"}
-                            track_delete := mod.spotygram.Flat{text:"Remove local copy"}
+                            track_send := mod.spotygram.Flat{text:"Send to Telegram chat" draw_icon.svg:crate_resource("self:resources/share.svg")}
+                            track_favorite := mod.spotygram.Flat{text:"Add to favorites" draw_icon.svg:crate_resource("self:resources/favorite_border.svg")}
+                            track_playlist := mod.spotygram.Flat{text:"Add to playlist" draw_icon.svg:crate_resource("self:resources/playlist_add.svg")}
+                            track_queue := mod.spotygram.Flat{text:"Add to queue" draw_icon.svg:crate_resource("self:resources/order.svg")}
+                            track_order := mod.spotygram.Preference{row.leading.mark.draw_icon.svg:crate_resource("self:resources/order.svg") row.labels.title.text:"Playback order" row.arrow.visible:false}
+                            track_move_up := mod.spotygram.Flat{text:"Move up" draw_icon.svg:crate_resource("self:resources/order.svg")}
+                            track_move_down := mod.spotygram.Flat{text:"Move down" draw_icon.svg:crate_resource("self:resources/down.svg")}
+                            track_remove_queue := mod.spotygram.Flat{text:"Remove from queue" draw_icon.svg:crate_resource("self:resources/close.svg")}
+                            track_download := mod.spotygram.Flat{text:"Save on device" draw_icon.svg:crate_resource("self:resources/download.svg")}
+                            track_profile := mod.spotygram.Flat{text:"Open Telegram profile" draw_icon.svg:crate_resource("self:resources/person.svg")}
+                            track_original := mod.spotygram.Flat{text:"Open original message" draw_icon.svg:crate_resource("self:resources/telegram.svg")}
+                            track_remove_playlist := mod.spotygram.Flat{text:"Remove from this playlist" draw_icon.svg:crate_resource("self:resources/close.svg")}
+                            track_delete := mod.spotygram.Flat{text:"Remove local copy" draw_icon.svg:crate_resource("self:resources/delete.svg")}
                         }
                         choices_body := mod.spotygram.Choices{visible:false}
-                        speed_body := View{visible:false width:Fill height:Fit flow:Down spacing:12
-                            speed_value := mod.spotygram.Title{text:"1×" align:Center}
+                        queue_summary := mod.spotygram.Caption{visible:false height:Fit max_lines:3}
+                        queue_catalog := mod.spotygram.Catalog{visible:false height:360 reserve_dock:false}
+                         speed_body := View{visible:false width:Fill height:Fit flow:Down spacing:12
+                             View{width:Fill height:48 flow:Right align:Align{y:0.5}
+                                 speed_minus := mod.spotygram.InlineIcon{draw_icon.svg:crate_resource("self:resources/remove.svg")}
+                                 speed_value := mod.spotygram.Title{text:"1×" align:Center}
+                                 speed_plus := mod.spotygram.InlineIcon{draw_icon.svg:crate_resource("self:resources/add.svg")}
+                             }
                             speed_slider := mod.spotygram.Slider{min:0.3 max:4.0 step:0.05}
                             View{width:Fill height:48 flow:Right spacing:6
-                                speed_slow := mod.spotygram.InlineGlass{width:Fill text:"0.75×"}
-                                speed_normal := mod.spotygram.InlineGlass{width:Fill text:"1×"}
-                                speed_fast := mod.spotygram.InlineGlass{width:Fill text:"1.5×"}
-                                speed_double := mod.spotygram.InlineGlass{width:Fill text:"2×"}
+                                 speed_slow := mod.spotygram.InlineGlass{width:Fill padding:4 text:"0.5×"}
+                                 speed_normal := mod.spotygram.InlineGlass{width:Fill padding:4 text:"1×"}
+                                 speed_fast := mod.spotygram.InlineGlass{width:Fill padding:4 text:"1.5×"}
+                                 speed_double := mod.spotygram.InlineGlass{width:Fill padding:4 text:"2×"}
+                                 speed_triple := mod.spotygram.InlineGlass{width:Fill padding:4 text:"3×"}
                             }
                         }
                     }
-                    panel_confirm := mod.spotygram.InlineGlass{visible:false width:Fill text:"Confirm"}
+                    manage_sources := mod.spotygram.Flat{visible:false text:"Manage sources" draw_icon.svg:crate_resource("self:resources/sources.svg")}
+                    send_options := View{visible:false width:Fill height:48 flow:Right align:Align{y:0.5}
+                        send_summary := mod.spotygram.Caption{width:Fill}
+                        send_pin := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/pin.svg")}
+                        send_settings := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/settings.svg")}
+                    }
+                    panel_footer := View{visible:false width:Fill height:Fit flow:Right spacing:8
+                        panel_cancel := mod.spotygram.Flat{visible:false width:Fill text:"Cancel"}
+                        panel_confirm := mod.spotygram.InlineGlass{visible:false width:Fill text:"Confirm"}
+                    }
+                }
                 }
             }
         }
@@ -397,6 +582,131 @@ pub struct DrawMediaBar {
 }
 
 /// A music slider: a tap sets an absolute value and never opens a numeric keyboard.
+/// Keep native wheel/scrollbar behavior and let a touch drag start over a row
+/// button. The pinned ScrollYView only joins presses held by other scrollers.
+#[derive(Script, ScriptHook, Widget)]
+pub struct TouchScroll {
+    #[deref]
+    view: View,
+    #[rust]
+    touch: Option<TouchGesture>,
+    #[rust]
+    press: Option<(u64, Vec2d)>,
+    #[rust]
+    claimed: bool,
+}
+
+impl TouchScroll {
+    fn touch_event(&mut self, cx: &mut Cx, event: &Event, start: bool) {
+        let Some(extent) = self.view.scroll_extent() else {
+            return;
+        };
+        if start {
+            let mut touch = TouchGesture::new();
+            touch.set_mode(ScrollMode::Swipe);
+            touch.scrolled_at = extent.pos.y;
+            self.touch = Some(touch);
+        }
+        if let Some(touch) = &mut self.touch {
+            touch.set_range(0., extent.max().y);
+            if touch.handle_event(cx, event, self.view.area())
+                == TouchMotionChange::ScrolledAtChanged
+            {
+                self.view.set_scroll_pos(
+                    cx,
+                    dvec2(extent.pos.x, touch.scrolled_at.clamp(0., extent.max().y)),
+                );
+            }
+        }
+    }
+}
+
+impl Widget for TouchScroll {
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        if !self.view.visible() || matches!(event, Event::MouseDown(_) | Event::Scroll(_)) {
+            self.touch = None;
+        }
+        let press = match event {
+            Event::TouchUpdate(e) => e
+                .touches
+                .iter()
+                .find(|t| {
+                    t.state == TouchState::Start
+                        && self.view.area().clipped_rect(cx).contains(t.abs)
+                })
+                .map(|t| (t.uid, t.abs)),
+            _ => None,
+        };
+        let start = press.is_some();
+        if start {
+            self.press = press;
+            self.claimed = false;
+        }
+        // A vertical swipe cancels the row's press after touch slop. Otherwise
+        // a moved button can still be under the finger when it is released.
+        if !self.claimed && self.touch.as_ref().is_some_and(TouchGesture::is_dragging) {
+            if let (Some((uid, origin)), Event::TouchUpdate(e)) = (self.press, event) {
+                let digit = live_id_num!(touch, uid).into();
+                if !cx.fingers.is_drag_claimed_by_widget(digit)
+                    && e.touches
+                        .iter()
+                        .any(|t| t.uid == uid && t.abs.distance(&origin) > 8.0)
+                {
+                    cx.fingers.cancel_digit_except(digit, self.view.area());
+                    cx.set_key_focus(Area::Empty);
+                    self.claimed = true;
+                }
+            }
+        }
+        // Catching momentum consumes this press before a child can activate.
+        let caught = start
+            && self
+                .touch
+                .as_ref()
+                .is_some_and(|t| !t.is_stopped() && !t.is_dragging());
+        if caught {
+            self.touch_event(cx, event, true);
+        }
+        self.view.handle_event(cx, event, scope);
+        if !self.view.visible() {
+            return;
+        }
+        if matches!(event, Event::TouchUpdate(e) if e.touches.iter().any(|t|
+            cx.fingers.is_drag_claimed_by_widget(live_id_num!(touch, t.uid).into())))
+        {
+            self.touch = None;
+            return;
+        }
+        if !caught
+            && matches!(
+                event,
+                Event::TouchUpdate(_) | Event::NextFrame(_) | Event::FingerCancel(_)
+            )
+        {
+            self.touch_event(cx, event, start);
+        }
+    }
+}
+
+impl TouchScrollRef {
+    pub fn stop_motion(&self) {
+        if let Some(mut scroll) = self.borrow_mut() {
+            scroll.touch = None;
+            scroll.press = None;
+        }
+    }
+    pub fn set_scroll_pos(&self, cx: &mut Cx, value: Vec2d) {
+        if let Some(mut scroll) = self.borrow_mut() {
+            scroll.touch = None;
+            scroll.press = None;
+            scroll.view.set_scroll_pos(cx, value);
+        }
+    }
+}
+
 #[derive(Script, ScriptHook, Widget)]
 pub struct MediaSlider {
     #[uid]
@@ -511,16 +821,102 @@ impl MediaSliderRef {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum SourceEntry {
+    Own,
+    Heading(&'static str),
+    Source {
+        index: usize,
+        position: usize,
+        length: usize,
+    },
+}
+
+pub fn source_rows(state: &data::Snapshot) -> Vec<SourceEntry> {
+    if state.auth.kind != "authorizationStateReady" && !state.sources.iter().any(|s| s.selected) {
+        return Vec::new();
+    }
+    let search = state.page.query.search.to_lowercase();
+    let mut rows = if search.is_empty()
+        || crate::i18n::tr(&state.language, "My profile")
+            .to_lowercase()
+            .contains(&search)
+    {
+        vec![SourceEntry::Own]
+    } else {
+        Vec::new()
+    };
+    for (profile, title) in [(true, "Profiles"), (false, "Chats")] {
+        let indices: Vec<_> = state
+            .sources
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.selected && s.profile == profile && !(profile && s.id == state.me))
+            .filter(|(_, s)| s.title.to_lowercase().contains(&search))
+            .map(|(i, _)| i)
+            .collect();
+        if indices.is_empty() {
+            continue;
+        }
+        rows.push(SourceEntry::Heading(title));
+        for (position, index) in indices.iter().enumerate() {
+            rows.push(SourceEntry::Source {
+                index: *index,
+                position,
+                length: indices.len(),
+            });
+        }
+    }
+    rows
+}
+
+pub fn playlist_indices(state: &data::Snapshot) -> Vec<usize> {
+    let search = state.page.query.search.to_lowercase();
+    state
+        .playlists
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.name.to_lowercase().contains(&search))
+        .map(|(i, _)| i)
+        .collect()
+}
+
 #[derive(Script, ScriptHook, Widget)]
 pub struct Catalog {
     #[deref]
     view: View,
+    #[live(true)]
+    reserve_dock: bool,
     #[rust]
     requested: Option<(u64, usize)>,
     #[rust]
     pub selection: HashSet<String>,
     #[rust]
+    pub selecting: bool,
+    #[rust]
+    pub selection_version: u64,
+    #[rust]
     artwork_ids: Vec<String>,
+    #[rust]
+    row_icons: HashMap<WidgetUid, (String, bool, bool, u8)>,
+    #[rust]
+    playlist_art: HashMap<WidgetUid, Vec<data::Artwork>>,
+    #[rust]
+    source_layout: HashMap<WidgetUid, (usize, u64)>,
+    #[rust]
+    source_photo_ids: Vec<(i64, bool)>,
+    #[rust]
+    source_snapshot: Option<std::sync::Arc<Vec<data::Source>>>,
+    #[rust]
+    source_rows: Vec<SourceEntry>,
+    #[rust]
+    source_account: i64,
+    #[rust]
+    source_ready: bool,
+    #[rust]
+    source_generation: u64,
+    #[rust]
+    source_query: String,
 }
 
 impl Widget for Catalog {
@@ -528,78 +924,301 @@ impl Widget for Catalog {
         let client = runtime::start();
         let state = client.snapshot.load_full();
         let screen = &state.page.query.screen;
+        if *screen == data::Screen::Sources {
+            let ready = state.auth.kind == "authorizationStateReady";
+            if self
+                .source_snapshot
+                .as_ref()
+                .is_none_or(|old| !std::sync::Arc::ptr_eq(old, &state.sources))
+                || self.source_account != state.me
+                || self.source_ready != ready
+                || self.source_query != state.page.query.search
+            {
+                self.source_rows = source_rows(&state);
+                self.source_snapshot = Some(state.sources.clone());
+                self.source_account = state.me;
+                self.source_ready = ready;
+                self.source_generation += 1;
+                self.source_query = state.page.query.search.clone();
+            }
+        } else {
+            self.source_snapshot = None;
+            self.source_rows.clear();
+        }
+        let sources = &self.source_rows;
+        let playlists = if *screen == data::Screen::Playlists {
+            playlist_indices(&state)
+        } else {
+            Vec::new()
+        };
         let count = match screen {
-            data::Screen::Sources => state.sources.len() + 1,
-            data::Screen::Playlists => state.playlists.len(),
+            data::Screen::Sources => sources.len(),
+            data::Screen::Playlists => playlists.len(),
             _ => state.page.total,
         };
         let mut need_page = None;
         let mut artwork_ids = Vec::new();
+        let mut source_photo_ids = Vec::new();
+        if self.row_icons.len() > 128 {
+            self.row_icons.clear();
+        }
+        if self.playlist_art.len() > 128 {
+            self.playlist_art.clear();
+        }
+        if self.source_layout.len() > 128 {
+            self.source_layout.clear();
+        }
         while let Some(step) = self.view.draw_walk(cx, scope, walk).step() {
             if let Some(mut list) = step.as_portal_list().borrow_mut() {
-                list.set_item_range(cx, 0, count.max(1));
+                list.set_item_range(cx, 0, count.max(1) + 1);
                 while let Some(index) = list.next_visible_item(cx) {
                     if index >= count.max(1) {
+                        let mut end = list.item(cx, index, id!(End));
+                        let height = if self.reserve_dock { 150.0 } else { 16.0 };
+                        script_apply_eval!(cx,end,{height:#(height)});
+                        end.draw_all_unscoped(cx);
                         continue;
                     }
                     if count == 0 {
                         let item = list.item(cx, index, id!(Empty));
-                        item.label(cx, ids!(title)).set_text(
+                        let (title, subtitle) = if !state.page.query.search.is_empty()
+                            || *screen == data::Screen::OnDevice
+                        {
+                            ("No results", "Try another search or source.")
+                        } else {
+                            match screen {
+                                data::Screen::Favorites => (
+                                    "Keep what you love",
+                                    "Tap the heart next to a song to find it here.",
+                                ),
+                                data::Screen::Playlists => {
+                                    ("No playlists yet.", "Create a playlist for your music.")
+                                }
+                                data::Screen::Playlist(_) => (
+                                    "Add some music?",
+                                    "Choose several songs from your library at once.",
+                                ),
+                                data::Screen::Profile(id) => (
+                                    "No music available on this profile",
+                                    if *id == state.me {
+                                        "Add songs to your profile in Telegram, then refresh this list."
+                                    } else {
+                                        "The profile may have no songs, or its privacy settings may hide them from you."
+                                    },
+                                ),
+                                data::Screen::PlaylistEditor(_) => (
+                                    "All available tracks are already in this playlist, or your library is empty.",
+                                    "",
+                                ),
+                                data::Screen::Sources => (
+                                    "Connect Telegram",
+                                    "Import audio files or connect Telegram.",
+                                ),
+                                _ => (
+                                    "Your next favorite song starts here.",
+                                    "Import audio files or connect Telegram.",
+                                ),
+                            }
+                        };
+                        item.label(cx, ids!(title))
+                            .set_text(cx, &crate::i18n::tr(&state.language, title));
+                        item.label(cx, ids!(subtitle))
+                            .set_text(cx, &crate::i18n::tr(&state.language, subtitle));
+                        item.widget(cx, ids!(subtitle))
+                            .set_visible(cx, !subtitle.is_empty());
+                        let editor = matches!(screen, data::Screen::PlaylistEditor(_));
+                        item.widget(cx, ids!(empty_library))
+                            .set_visible(cx, !editor && *screen != data::Screen::Favorites);
+                        item.widget(cx, ids!(empty_favorite))
+                            .set_visible(cx, *screen == data::Screen::Favorites);
+                        item.widget(cx, ids!(empty_add))
+                            .set_visible(cx, matches!(screen, data::Screen::Playlist(_)));
+                        item.widget(cx, ids!(empty_profile)).set_visible(
                             cx,
-                            &crate::i18n::tr(
-                                &state.language,
-                                "Your next favorite song starts here.",
-                            ),
+                            matches!(screen, data::Screen::Profile(_))
+                                && state.page.query.search.is_empty(),
                         );
-                        item.label(cx, ids!(subtitle)).set_text(
+                        item.widget(cx, ids!(empty_add))
+                            .set_text(cx, &crate::i18n::tr(&state.language, "Add recordings"));
+                        item.widget(cx, ids!(empty_profile))
+                            .set_text(cx, &crate::i18n::tr(&state.language, "Open in Telegram"));
+                        let mut label = item.widget(cx, ids!(title));
+                        let font = if editor { 12.0 } else { 16.5 };
+                        script_apply_eval!(cx,label,{draw_text.text_style.font_size:#(font)});
+                        let library_empty =
+                            matches!(screen, data::Screen::Music | data::Screen::Sources)
+                                && state.page.query.search.is_empty();
+                        item.widget(cx, ids!(empty_connect)).set_visible(
                             cx,
-                            &crate::i18n::tr(
-                                &state.language,
-                                "Import audio files or connect Telegram.",
-                            ),
+                            library_empty && state.auth.kind != "authorizationStateReady",
                         );
+                        item.widget(cx, ids!(empty_import))
+                            .set_visible(cx, library_empty && *screen != data::Screen::Sources);
+                        item.widget(cx, ids!(empty_connect))
+                            .set_text(cx, &crate::i18n::tr(&state.language, "Connect Telegram"));
+                        item.widget(cx, ids!(empty_import))
+                            .set_text(cx, &crate::i18n::tr(&state.language, "Import audio files"));
                         item.draw_all_unscoped(cx);
                         continue;
                     }
                     match screen {
+                        data::Screen::Queue => {
+                            let item = list.item(cx, index, id!(QueueEntry));
+                            if let Some(track) = index
+                                .checked_sub(state.page.offset)
+                                .and_then(|i| state.page.tracks.get(i))
+                            {
+                                item.label(cx, ids!(title)).set_text(cx, &track.title);
+                                item.label(cx, ids!(artist))
+                                    .set_text(cx, &subtitle(&state.language, track));
+                                let current =
+                                    track.queue_position == Some(state.playback.queue_index);
+                                let light = state.settings["theme"] == "light";
+                                let color = if current {
+                                    if light {
+                                        vec4(0.075, 0.482, 0.541, 1.)
+                                    } else {
+                                        vec4(0.345, 0.788, 0.824, 1.)
+                                    }
+                                } else if light {
+                                    vec4(0.114, 0.188, 0.196, 1.)
+                                } else {
+                                    vec4(0.945, 0.965, 0.953, 1.)
+                                };
+                                let mut title = item.widget(cx, ids!(title));
+                                script_apply_eval!(cx,title,{draw_text.color:#(color)});
+                                item.widget(cx, ids!(queue_up))
+                                    .set_visible(cx, state.playback.order != data::Order::Shuffle);
+                                item.widget(cx, ids!(queue_up)).set_disabled(cx, index == 0);
+                            } else {
+                                need_page = Some(index.saturating_sub(32));
+                            }
+                            item.draw_all_unscoped(cx);
+                        }
                         data::Screen::Sources => {
+                            if let Some(SourceEntry::Heading(title)) = sources.get(index) {
+                                let item = list.item(cx, index, id!(SourceHeading));
+                                item.label(cx, ids!(title))
+                                    .set_text(cx, &crate::i18n::tr(&state.language, title));
+                                item.draw_all_unscoped(cx);
+                                continue;
+                            }
                             let item = list.item(cx, index, id!(Source));
-                            if index == 0 {
+                            let (source, position, length) = match sources.get(index) {
+                                Some(SourceEntry::Source {
+                                    index,
+                                    position,
+                                    length,
+                                }) => (state.sources.get(*index), *position, *length),
+                                _ => (None, 0, 1),
+                            };
+                            if self.source_layout.get(&item.widget_uid())
+                                != Some(&(index, self.source_generation))
+                            {
+                                self.source_layout
+                                    .insert(item.widget_uid(), (index, self.source_generation));
+                                let first = if position == 0 { 1.0 } else { 0.0 };
+                                let last = if position + 1 == length { 1.0 } else { 0.0 };
+                                let height = if source.is_none() { 76.0 } else { 64.0 };
+                                let offset = position as f64 * 64.;
+                                let group_height = length as f64 * height;
+                                let accent = if source.is_none() { 1.0 } else { 0.0 };
+                                let mut row = item.clone();
+                                script_apply_eval!(cx,row,{height:#(height) draw_bg +:{first:#(first) last:#(last) group_offset:#(offset) group_height:#(group_height) accent:#(accent)}});
+                            }
+                            if let Some(source) = source {
+                                source_photo_ids.push((source.id, source.profile));
+                                item.label(cx, ids!(cover.initials))
+                                    .set_text(cx, &initials(&source.title));
+                                item.label(cx, ids!(title)).set_text(cx, &source.title);
+                                item.label(cx, ids!(subtitle)).set_text(
+                                    cx,
+                                    &format!(
+                                        "{}{}",
+                                        crate::i18n::tracks(&state.language, source.count),
+                                        if source.profile {
+                                            crate::i18n::tr(&state.language, " · In library")
+                                        } else {
+                                            "".into()
+                                        }
+                                    ),
+                                );
+                                set_image(&item, cx, ids!(cover.art), &source.photo);
+                                set_icon(
+                                    &item,
+                                    cx,
+                                    ids!(select),
+                                    include_str!("../resources/more.svg"),
+                                );
+                            } else {
+                                source_photo_ids.push((state.me, true));
+                                let own =
+                                    state.sources.iter().find(|s| s.profile && s.id == state.me);
+                                let name = own.map(|s| initials(&s.title)).unwrap_or_else(|| {
+                                    crate::i18n::tr(&state.language, "Me").into_owned()
+                                });
+                                item.label(cx, ids!(cover.initials)).set_text(cx, &name);
                                 item.label(cx, ids!(title))
                                     .set_text(cx, &crate::i18n::tr(&state.language, "My profile"));
                                 item.label(cx, ids!(subtitle)).set_text(
                                     cx,
                                     &crate::i18n::tr(&state.language, "Music in Telegram"),
                                 );
-                                item.widget(cx, ids!(select)).set_visible(cx, false);
-                            } else if let Some(source) = state.sources.get(index - 1) {
-                                item.label(cx, ids!(title)).set_text(cx, &source.title);
-                                item.label(cx, ids!(subtitle)).set_text(
+                                set_icon(
+                                    &item,
                                     cx,
-                                    &format!(
-                                        "{} · {}",
-                                        crate::i18n::tracks(&state.language, source.count),
-                                        crate::i18n::tr(
-                                            &state.language,
-                                            if source.profile { "Profile" } else { "Chat" }
-                                        )
-                                    ),
+                                    ids!(select),
+                                    include_str!("../resources/chevron.svg"),
                                 );
-                                item.widget(cx, ids!(select)).set_visible(cx, true);
-                                item.widget(cx, ids!(select))
-                                    .set_text(cx, if source.selected { "−" } else { "+" });
-                                set_image(&item, cx, ids!(cover.art), &source.photo);
+                                set_image(
+                                    &item,
+                                    cx,
+                                    ids!(cover.art),
+                                    own.map(|s| s.photo.as_str()).unwrap_or(""),
+                                );
                             }
                             item.draw_all_unscoped(cx);
                         }
                         data::Screen::Playlists => {
                             let item = list.item(cx, index, id!(Playlist));
-                            if let Some(playlist) = state.playlists.get(index) {
+                            if let Some(playlist) = playlists
+                                .get(index)
+                                .and_then(|index| state.playlists.get(*index))
+                            {
                                 item.label(cx, ids!(title)).set_text(cx, &playlist.name);
                                 item.label(cx, ids!(subtitle)).set_text(
                                     cx,
                                     &crate::i18n::tracks(&state.language, playlist.count),
                                 );
+                                if self.playlist_art.get(&item.widget_uid())
+                                    != Some(&playlist.covers)
+                                {
+                                    self.playlist_art
+                                        .insert(item.widget_uid(), playlist.covers.clone());
+                                    let artwork =
+                                        playlist.covers.iter().any(|cover| !cover.path.is_empty());
+                                    item.widget(cx, ids!(single))
+                                        .set_visible(cx, artwork && playlist.covers.len() == 1);
+                                    item.widget(cx, ids!(mosaic))
+                                        .set_visible(cx, artwork && playlist.covers.len() > 1);
+                                    if let Some(cover) = playlist.covers.first() {
+                                        set_image(&item, cx, ids!(single.art), &cover.path);
+                                        set_cover(&item, cx, ids!(single), &cover.title);
+                                    }
+                                    for (index, path) in
+                                        [ids!(art0), ids!(art1), ids!(art2), ids!(art3)]
+                                            .iter()
+                                            .enumerate()
+                                    {
+                                        let widget = item.widget(cx, *path);
+                                        if let Some(cover) = playlist.covers.get(index) {
+                                            set_cover(&item, cx, *path, &cover.title);
+                                            set_image(&widget, cx, ids!(art), &cover.path);
+                                        } else {
+                                            set_image(&widget, cx, ids!(art), "");
+                                        }
+                                    }
+                                }
                             }
                             item.draw_all_unscoped(cx);
                         }
@@ -613,13 +1232,89 @@ impl Widget for Catalog {
                                     artwork_ids.push(track.id.clone());
                                 }
                                 item.label(cx, ids!(title)).set_text(cx, &track.title);
-                                item.label(cx, ids!(artist)).set_text(cx, track.subtitle());
-                                item.label(cx, ids!(duration))
-                                    .set_text(cx, &data::seconds(track.duration as f64));
-                                item.widget(cx, ids!(favorite))
-                                    .set_text(cx, if track.liked { "♥" } else { "♡" });
+                                item.label(cx, ids!(artist))
+                                    .set_text(cx, &subtitle(&state.language, track));
+                                item.label(cx, ids!(duration)).set_text(
+                                    cx,
+                                    &if track.duration > 0 {
+                                        data::seconds(track.duration as f64)
+                                    } else {
+                                        "—".into()
+                                    },
+                                );
+                                let favorite = item.widget(cx, ids!(favorite));
+                                let light = state.settings["theme"] == "light";
+                                let playing = state
+                                    .playback
+                                    .track
+                                    .as_ref()
+                                    .is_some_and(|t| t.id == track.id);
+                                let selected = self.selection.contains(&track.id);
+                                let flags = u8::from(playing) | u8::from(selected) * 2;
+                                if self.row_icons.get(&favorite.widget_uid()).is_none_or(
+                                    |(title, liked, theme, current)| {
+                                        title != &track.title
+                                            || *liked != track.liked
+                                            || *theme != light
+                                            || *current != flags
+                                    },
+                                ) {
+                                    self.row_icons.insert(
+                                        favorite.widget_uid(),
+                                        (track.title.clone(), track.liked, light, flags),
+                                    );
+                                    let color =
+                                        vec4(0.08, 0.48, 0.54, if selected { 0.14 } else { 0.0 });
+                                    let mut highlight = item.widget(cx, ids!(highlight));
+                                    script_apply_eval!(cx,highlight,{draw_bg.color:#(color)});
+                                    let color = if playing {
+                                        if light {
+                                            vec4(0.075, 0.482, 0.541, 1.)
+                                        } else {
+                                            vec4(0.345, 0.788, 0.824, 1.)
+                                        }
+                                    } else if light {
+                                        vec4(0.114, 0.188, 0.196, 1.)
+                                    } else {
+                                        vec4(0.945, 0.965, 0.953, 1.)
+                                    };
+                                    let mut title = item.widget(cx, ids!(title));
+                                    script_apply_eval!(cx,title,{draw_text.color:#(color)});
+                                    let mut check = item.widget(cx, ids!(checkbox));
+                                    let checked = if selected { 1.0 } else { 0.0 };
+                                    script_apply_eval!(cx,check,{draw_bg.checked:#(checked)});
+                                    set_icon(
+                                        &item,
+                                        cx,
+                                        ids!(favorite),
+                                        if track.liked {
+                                            include_str!("../resources/favorite.svg")
+                                        } else {
+                                            include_str!("../resources/favorite_border.svg")
+                                        },
+                                    );
+                                    set_cover(&item, cx, ids!(cover), &track.title);
+                                    if let Some(mut button) = favorite.borrow_mut::<Button>() {
+                                        button.draw_icon.color = if track.liked {
+                                            if light {
+                                                vec4(0.72, 0.278, 0.314, 1.)
+                                            } else {
+                                                vec4(1.0, 0.635, 0.635, 1.0)
+                                            }
+                                        } else if state.settings["theme"] == "light" {
+                                            vec4(0.349, 0.396, 0.459, 1.)
+                                        } else {
+                                            vec4(0.690, 0.722, 0.765, 1.)
+                                        };
+                                    }
+                                }
+                                item.widget(cx, ids!(saved))
+                                    .set_visible(cx, track.saved || track.imported());
                                 item.widget(cx, ids!(selection))
-                                    .set_visible(cx, self.selection.contains(&track.id));
+                                    .set_visible(cx, self.selecting);
+                                item.widget(cx, ids!(favorite))
+                                    .set_visible(cx, !self.selecting);
+                                item.widget(cx, ids!(more)).set_visible(cx, !self.selecting);
                                 set_image(&item, cx, ids!(cover.art), &track.art);
                             } else {
                                 item.label(cx, ids!(title))
@@ -655,10 +1350,32 @@ impl Widget for Catalog {
         {
             self.artwork_ids = artwork_ids;
         }
+        if state.auth.kind == "authorizationStateReady"
+            && source_photo_ids != self.source_photo_ids
+            && client
+                .commands
+                .try_send(data::Command::SourcePhotos(source_photo_ids.clone()))
+                .is_ok()
+        {
+            self.source_photo_ids = source_photo_ids;
+        }
         DrawStep::done()
     }
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
+    }
+}
+
+impl Catalog {
+    pub fn refresh_photos(&mut self) {
+        self.source_photo_ids.clear();
+    }
+    pub fn refresh_style(&mut self) {
+        self.requested = None;
+        self.row_icons.clear();
+        self.playlist_art.clear();
+        self.source_layout.clear();
+        self.source_photo_ids.clear();
     }
 }
 
@@ -672,30 +1389,224 @@ pub fn set_image(ui: &WidgetRef, cx: &mut Cx, path: &[LiveId], image: &str) {
     }
 }
 
+#[derive(Default)]
+struct IconCache {
+    clock: u64,
+    glyphs: HashMap<WidgetUid, (&'static str, u64)>,
+}
+
+thread_local! {
+    // No widget references are retained. Recent use keeps persistent controls
+    // alive in this bounded cache while virtual rows come and go.
+    static ICONS: RefCell<IconCache> = RefCell::default();
+}
+
+fn apply_icon(uid: WidgetUid, icon: &mut DrawSvg, svg: &'static str) -> bool {
+    let changed = ICONS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        cache.clock = cache.clock.wrapping_add(1);
+        let clock = cache.clock;
+        let previous = cache.glyphs.get(&uid).map(|(source, _)| *source);
+        let changed = icon.svg.is_some()
+            || icon.svg_doc.is_none()
+            || previous.is_none_or(|previous| !std::ptr::eq(previous, svg));
+        if previous.is_none() && cache.glyphs.len() >= 1024 {
+            if let Some(oldest) = cache
+                .glyphs
+                .iter()
+                .min_by_key(|(_, (_, used))| *used)
+                .map(|(id, _)| *id)
+            {
+                cache.glyphs.remove(&oldest);
+            }
+        }
+        cache.glyphs.insert(uid, (svg, clock));
+        changed
+    });
+    if changed {
+        icon.svg = None;
+        icon.load_from_str(svg);
+    }
+    changed
+}
+
+pub fn set_icon(ui: &WidgetRef, cx: &mut Cx, path: &[LiveId], svg: &'static str) {
+    let widget = ui.widget(cx, path);
+    let uid = widget.widget_uid();
+    let changed = if let Some(mut button) = widget.borrow_mut::<Button>() {
+        apply_icon(uid, &mut button.draw_icon, svg)
+    } else if let Some(mut button) = widget.borrow_mut::<GlassButton>() {
+        apply_icon(uid, &mut button.draw_icon, svg)
+    } else {
+        false
+    };
+    if changed {
+        widget.redraw(cx);
+    }
+}
+
+pub fn refresh_icon(ui: &WidgetRef, cx: &mut Cx, path: &[LiveId]) {
+    let uid = ui.widget(cx, path).widget_uid();
+    let source = ICONS.with(|cache| cache.borrow().glyphs.get(&uid).map(|(source, _)| *source));
+    if let Some(source) = source {
+        set_icon(ui, cx, path, source);
+    }
+}
+
+pub fn set_cover(ui: &WidgetRef, cx: &mut Cx, path: &[LiveId], title: &str) {
+    let hash = title
+        .encode_utf16()
+        .fold(0i32, |hash, c| hash.wrapping_mul(31).wrapping_add(c as i32));
+    let hue = (i64::from(hash).abs() % 6) as f64;
+    let mut cover = ui.widget(cx, path);
+    script_apply_eval!(cx,cover,{draw_bg.hue:#(hue)});
+}
+
+pub fn initials(title: &str) -> String {
+    title
+        .split_whitespace()
+        .take(2)
+        .filter_map(|word| word.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect()
+}
+
+pub fn subtitle<'a>(language: &str, track: &'a data::Track) -> std::borrow::Cow<'a, str> {
+    if track.artist.is_empty() && track.imported() {
+        crate::i18n::tr(language, "From device")
+    } else {
+        std::borrow::Cow::Borrowed(track.subtitle())
+    }
+}
+
 #[derive(Script, ScriptHook, Widget)]
 pub struct Choices {
     #[deref]
     view: View,
+    #[live]
+    layout_mode: u32,
     #[rust]
-    pub labels: Vec<String>,
+    pub rows: Vec<ChoiceRow>,
+    #[rust]
+    requested: Vec<(i64, bool)>,
+}
+
+#[derive(Default)]
+pub struct ChoiceRow {
+    pub title: String,
+    pub subtitle: String,
+    pub photo: String,
+    pub key: Option<(i64, bool)>,
+    pub heading: bool,
+    pub library: bool,
+    pub checked: bool,
+    pub glass: bool,
+    pub radio: bool,
+}
+
+impl Choices {
+    pub fn refresh_photos(&mut self) {
+        self.requested.clear();
+    }
 }
 
 impl Widget for Choices {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        let client = runtime::start();
+        let state = client.snapshot.load_full();
+        let mut keys = Vec::new();
         while let Some(step) = self.view.draw_walk(cx, scope, walk).step() {
             if let Some(mut list) = step.as_portal_list().borrow_mut() {
-                list.set_item_range(cx, 0, self.labels.len());
+                list.set_item_range(cx, 0, self.rows.len());
                 while let Some(index) = list.next_visible_item(cx) {
-                    if index >= self.labels.len() {
+                    if index >= self.rows.len() {
                         continue;
                     }
-                    let item = list.item(cx, index, id!(Choice));
-                    if let Some(label) = self.labels.get(index) {
-                        item.widget(cx, ids!(choice)).set_text(cx, label);
+                    let row = &self.rows[index];
+                    let template = if row.heading {
+                        id!(Heading)
+                    } else if self.layout_mode == 1 {
+                        id!(Chip)
+                    } else if self.layout_mode == 2 {
+                        id!(Quick)
+                    } else {
+                        id!(Choice)
+                    };
+                    let item = list.item(cx, index, template);
+                    item.label(cx, ids!(title)).set_text(cx, &row.title);
+                    if !row.heading {
+                        if self.layout_mode != 1
+                            && let Some(key) = row.key
+                        {
+                            keys.push(key);
+                        }
+                        item.widget(cx, ids!(checked))
+                            .set_visible(cx, row.checked && !row.radio);
+                        item.widget(cx, ids!(radio)).set_visible(cx, row.radio);
+                        let mut radio = item.widget(cx, ids!(radio));
+                        let checked = if row.checked { 1.0 } else { 0.0 };
+                        script_apply_eval!(cx,radio,{draw_bg.checked:#(checked)});
+                        item.widget(cx, ids!(surface)).set_visible(cx, row.glass);
+                        if row.glass {
+                            let first = if index == 0 || self.rows[index - 1].heading || index == 1
+                            {
+                                1.0
+                            } else {
+                                0.0
+                            };
+                            let last = if index == 0
+                                || self.rows.get(index + 1).is_none_or(|r| r.heading)
+                            {
+                                1.0
+                            } else {
+                                0.0
+                            };
+                            let mut surface = item.widget(cx, ids!(surface));
+                            script_apply_eval!(cx,surface,{draw_bg +:{first:#(first) last:#(last) accent:#(checked)}});
+                        }
+                        let mut highlight = item.widget(cx, ids!(highlight));
+                        let color = vec4(
+                            0.08,
+                            0.48,
+                            0.54,
+                            if row.checked && !row.glass { 0.12 } else { 0.0 },
+                        );
+                        script_apply_eval!(cx,highlight,{draw_bg.color:#(color)});
+                        item.widget(cx, ids!(subtitle))
+                            .set_visible(cx, !row.subtitle.is_empty());
+                        item.label(cx, ids!(subtitle)).set_text(cx, &row.subtitle);
+                        item.widget(cx, ids!(avatar))
+                            .set_visible(cx, row.key.is_some());
+                        item.widget(cx, ids!(library)).set_visible(cx, row.library);
+                        if self.layout_mode == 1 {
+                            let mut chip = item.clone();
+                            let active = if row.checked { 1.0 } else { 0.0 };
+                            script_apply_eval!(cx,chip,{draw_bg.accent:#(active)});
+                        }
+                        let photo = row
+                            .key
+                            .and_then(|key| state.avatar_paths.get(&key))
+                            .unwrap_or(&row.photo);
+                        set_image(&item, cx, ids!(avatar.art), photo);
+                        item.label(cx, ids!(avatar.initials))
+                            .set_text(cx, &initials(&row.title));
                     }
                     item.draw_all_unscoped(cx);
                 }
             }
+        }
+        if keys.is_empty() {
+            // Folder chips and ordinary menus share Choices with avatar rows.
+            // They must not cancel another visible list's avatar interests.
+            self.requested.clear();
+        } else if state.auth.kind == "authorizationStateReady"
+            && keys != self.requested
+            && client
+                .commands
+                .try_send(data::Command::SourcePhotos(keys.clone()))
+                .is_ok()
+        {
+            self.requested = keys;
         }
         DrawStep::done()
     }

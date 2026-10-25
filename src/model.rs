@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     path::Path,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -101,6 +102,8 @@ pub struct Source {
     pub count: usize,
     pub complete: bool,
     pub forum: bool,
+    #[serde(default)]
+    pub kind: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -115,6 +118,14 @@ pub struct Playlist {
     pub uid: String,
     pub name: String,
     pub count: usize,
+    #[serde(default)]
+    pub covers: Vec<Artwork>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Artwork {
+    pub title: String,
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +139,7 @@ pub enum Screen {
     Sources,
     Profile(i64),
     Queue,
+    PlaylistEditor(Option<i64>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -244,6 +256,13 @@ pub struct Snapshot {
     pub sources: Arc<Vec<Source>>,
     pub playlists: Arc<Vec<Playlist>>,
     pub choices: Arc<Vec<Source>>,
+    pub avatar_paths: Arc<HashMap<(i64, bool), String>>,
+    pub selection_ids: Arc<Vec<String>>,
+    pub selection_query: Query,
+    pub selection_revision: u64,
+    pub selection_error: String,
+    pub playlist_saved_id: i64,
+    pub playlist_save_revision: u64,
     pub choices_scope: String,
     pub folders: Arc<Vec<Folder>>,
     pub playback: Playback,
@@ -256,6 +275,9 @@ pub struct Snapshot {
     pub transfer_progress: f64,
     pub sync: String,
     pub storage_bytes: i64,
+    pub cache_size: Option<(u64, u64)>,
+    pub cache_loading: bool,
+    pub cache_error: String,
     pub storage_count: usize,
     pub profile_member: Option<bool>,
     pub profile_member_id: String,
@@ -267,6 +289,10 @@ pub enum Command {
     Query(Query, usize),
     Page(usize),
     Artwork(Vec<String>),
+    SourcePhotos(Vec<(i64, bool)>),
+    CacheInfo,
+    SelectAll(Query),
+    ClearSelection,
     StartTelegram,
     AuthSubmit {
         kind: String,
@@ -299,7 +325,11 @@ pub enum Command {
     QueueRemove(usize),
     QueueMove(usize, usize),
     Favorite(Vec<String>, bool),
-    PlaylistCreate(String),
+    PlaylistSave {
+        playlist: Option<i64>,
+        name: String,
+        ids: Vec<String>,
+    },
     PlaylistRename(i64, String),
     PlaylistDelete(i64),
     PlaylistAdd(i64, Vec<String>),
@@ -332,6 +362,8 @@ pub enum Command {
 
 #[derive(Debug)]
 pub enum Notice {
+    SourcePhotos(u64, Vec<(i64, bool, String)>),
+    CacheInfo(i64, Result<(u64, u64), String>),
     Catalog,
     Indexed(u64, Option<String>),
     Status(String),

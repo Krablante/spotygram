@@ -38,8 +38,9 @@ python -B tools/build-rust.py
 Windows and macOS packaging also need Pillow (`python3 -m pip install Pillow==12.0.0`). The
 packager creates the app icon, builds the native executable, bundles Makepad
 resources and pinned TDLib/libmpv libraries, and ad hoc signs the macOS app.
-Linux's private audio dependencies exclude libstdc++ and libgcc so the graphics
-driver uses the host's C++ runtime.
+Linux's private audio dependencies exclude libstdc++, libgcc and the X11,
+XCB, Wayland and xkbcommon libraries. The graphics driver and window system use
+the host's matching libraries; bundled audio dependencies cannot replace them.
 The macOS app keeps native libraries in `Contents/Frameworks` and Makepad
 resources/licenses in `Contents/Resources`, so bundle signing treats them correctly.
 

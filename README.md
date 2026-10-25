@@ -13,11 +13,11 @@ app remains on [`main`](https://github.com/Krablante/spotygram/tree/main).
 Rust previews use `rust-v…` prerelease tags and never become GitHub's latest stable
 release. Desktop packages contain no Java runtime.
 
-[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.1.0)
+[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.0)
 · [User guide](docs/usage.md) · [Build from source](docs/build.md)
 · [Verification and limits](docs/verification.md)
 
-<p align="center"><img src="docs/screenshots/rust-desktop-light.png" alt="Rust desktop preview in light appearance with a 10,001-track verification catalog" width="70%"> <img src="docs/screenshots/rust-android-dark.png" alt="Rust Android player in dark appearance" width="27%"></p>
+<p align="center"><img src="docs/screenshots/rust-desktop-light.png" alt="Rust desktop preview in light appearance with a 10,007-track verification catalog" width="70%"> <img src="docs/screenshots/rust-android-light.png" alt="Rust Android library in light appearance" width="27%"></p>
 
 ## Install and start
 
@@ -55,8 +55,10 @@ volume and speed remain local to each app.
 Search and sort the library, filter its sources, save favorites and make
 playlists. The catalog reads pages from SQLite and draws visible rows instead
 of retaining every song's metadata in the interface. Covers decode for their
-displayed size. English and Russian, light and dark appearances, glass controls
-and the original photographed Takopi identity are retained.
+displayed size. The 0.2 interface follows the Kotlin layouts: compact rows,
+Roboto typography, original header stickers, vector icons, a shared glass
+navigation capsule and moving tab lens. English and Russian and both light and
+dark appearances are available.
 
 The small player opens the full player and queue. Playback supports normal,
 reverse, shuffle and random order, three repeat modes, and speed from **0.3× to
@@ -66,8 +68,11 @@ controls; Android has a foreground media service and lock-screen controls.
 
 Use a song's menu to download it, add it to a playlist or Telegram profile, or
 send it to a chat. Sending requires confirmation and rechecks the recipient's
-permissions. The recipient chooser includes chat folders and forum topics.
-Queue and playlist menus offer **Move up / Move down**.
+permissions. The recipient chooser includes chat folders, forum topics, pinned
+recipients and recent successful recipients. Its sender/caption summary stays
+beside Send.
+Queue rows have move-up and remove buttons; playlist recordings have **Move up /
+Move down** in their menus.
 
 Imports are copied into app-owned storage. Explicit downloads stay saved.
 **Do not keep played tracks** allows older temporary Telegram playback copies

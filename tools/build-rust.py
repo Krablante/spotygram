@@ -19,7 +19,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = tomllib.loads((ROOT / "Cargo.toml").read_text())["package"]["version"]
 MAKEPAD_REV = "44ecb822b48106fa76bde4dfd309e5a8a7ff1932"
-WIDGET_FONTS = ("IBMPlexSans-Text.ttf", "IBMPlexSans-SemiBold.ttf", "IBMPlexSans-Italic.ttf",
+WIDGET_FONTS = ("RobotoFlex.ttf", "IBMPlexSans-Text.ttf", "IBMPlexSans-SemiBold.ttf", "IBMPlexSans-Italic.ttf",
                 "IBMPlexSans-BoldItalic.ttf", "fa-solid-900.ttf", "LXGWWenKaiRegular.ttf",
                 "LXGWWenKaiBold.ttf", "NotoColorEmoji.ttf")
 sys.dont_write_bytecode = True
@@ -134,14 +134,16 @@ def native_dependencies(target, state):
     source = module.prepare(target, state)
     if not target.startswith("linux"):
         return source
-    # Mesa/LLVM must use the host C++ ABI. The audio bundle's older libstdc++
-    # prevents current Radeon/Vulkan drivers from loading (GLIBCXX_3.4.32).
+    # Mesa and the window system must share the host ABI. The audio bundle's
+    # older C++ runtime blocks Radeon drivers; its old Xlib also breaks EGL/X11.
     destination = state / "rust/native" / target
-    identity = (source / ".complete").read_text() + "\nhost-cxx-runtime-v1"
+    identity = (source / ".complete").read_text() + "\nhost-graphics-runtime-v2"
     marker = destination / ".complete"
     if not marker.is_file() or marker.read_text() != identity:
         reset_owned(destination, state / "rust")
-        copy_tree(source, destination, ignore=shutil.ignore_patterns("libstdc++.so*", "libgcc_s.so*"))
+        copy_tree(source, destination, ignore=shutil.ignore_patterns(
+            "libstdc++.so*", "libgcc_s.so*", "libX11*", "libXau*", "libXdmcp*",
+            "libXext*", "libXfixes*", "libxcb*", "libwayland*", "libxkbcommon*"))
         marker.write_text(identity)
     return destination
 
@@ -266,6 +268,7 @@ def android(state, output, env, abis):
     copy_tree(upstream / "tools/cargo_makepad/src/android/res", generated / "res")
     reset_owned(generated / "assets/makepad", output)
     resources(generated / "assets/makepad", upstream)
+    reset_owned(generated / "assets/licenses", output)
     notices(generated / "assets/licenses", upstream, env)
     targets = {"arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android", "aarch64"),
                "x86_64": ("x86_64-linux-android", "x86_64-linux-android", "x86_64")}
