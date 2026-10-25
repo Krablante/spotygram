@@ -403,6 +403,7 @@ pub fn tr<'a>(language: &str, text: &'a str) -> Cow<'a, str> {
         "Send recording" => "Отправить запись",
         "Confirm" => "Подтвердить",
         "Playback speed" => "Скорость воспроизведения",
+        "Speed" => "Скорость",
         "Playback order" => "Порядок воспроизведения",
         "Repeat" => "Повтор",
         "In order" => "По порядку",

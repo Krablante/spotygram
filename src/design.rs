@@ -61,6 +61,7 @@ script_mod! {
             group_offset:uniform(0.0)
             group_height:uniform(0.0)
             diffusion:uniform(0.10)
+            relief:uniform(1.0)
             corner_radius:12.0 blur_level:1.0
             lensing_strength:8.0 lensing_width:12.0 diffraction_strength:0.55
             shadow_color:#x00000012 shadow_radius:5.0 shadow_offset:vec2(0.0,2.0)
@@ -125,17 +126,17 @@ script_mod! {
                 var material=mix(backdrop,tint,self.diffusion);
                 material=mix(material,self.accent_color.rgb,self.accent*0.14);
                 let y=clamp((local.y+self.group_offset)/max(max(size.y,self.group_height),1.0),0.0,1.0);
-                material=mix(material,vec3(1.0),mix(0.26,0.10,self.dark)*(1.0-y)*(1.0-y));
-                material=material*(1.0-y*mix(0.035,0.12,self.dark));
-                let shadow=(1.0-smoothstep(0.0,3.5,depth))*max(normal.y,0.0)*mix(0.12,0.20,self.dark)*edge_alpha;
+                material=mix(material,vec3(1.0),mix(0.26,0.10,self.dark)*(1.0-y)*(1.0-y)*self.relief);
+                material=material*(1.0-y*mix(0.035,0.12,self.dark)*self.relief);
+                let shadow=(1.0-smoothstep(0.0,3.5,depth))*max(normal.y,0.0)*mix(0.12,0.20,self.dark)*edge_alpha*self.relief;
                 sdf.fill_keep(vec4(material*(1.0-shadow),1.0));
-                sdf.stroke(vec4(mix(vec3(0.46,0.57,0.58),vec3(0.88),self.dark),mix(0.28,0.20,self.dark)*edge_alpha),0.75);
+                sdf.stroke(vec4(mix(vec3(0.46,0.57,0.58),vec3(0.88),self.dark),mix(0.28,0.20,self.dark)*edge_alpha*self.relief),0.75);
                 sdf.box(p.x+1.2,p.y+1.2,size.x-2.4,size.y-2.4,max(radius-0.6,0.5));
                 let outer=mix(0.90,0.40,self.dark)*(0.45+0.55*abs(1.0-y*2.0));
-                sdf.stroke(vec4(1.0,1.0,1.0,outer*edge_alpha),0.8);
+                sdf.stroke(vec4(1.0,1.0,1.0,outer*edge_alpha*self.relief),0.8);
                 sdf.box(p.x+2.6,p.y+2.6,size.x-5.2,size.y-5.2,max(radius-1.3,0.5));
                 let rim=self.optical_rim(y);
-                sdf.stroke(vec4(rim.rgb,rim.a*edge_alpha),mix(0.8,0.5,self.dark));
+                sdf.stroke(vec4(rim.rgb,rim.a*edge_alpha*self.relief),mix(0.8,0.5,self.dark));
                 let shade=self.outer_shadow(shape,sdf.result.a)*0.08;
                 return (sdf.result+vec4(0.0,0.0,0.0,shade))*self.layer_opacity;
             }
@@ -233,6 +234,49 @@ script_mod! {
     }
     mod.spotygram.InlineGlass = mod.spotygram.Glass{padding:Inset{left:12 right:12 top:0 bottom:0}}
     mod.spotygram.InlineIcon = mod.spotygram.InlineGlass {width:48 padding:12 text:""}
+    mod.spotygram.SpeedStep = mod.spotygram.PlainIcon {
+        draw_bg +:{
+            dark:uniform(theme.spotygram_dark)
+            ink:uniform(theme.color_text)
+            paper:uniform(theme.color_bg_app)
+            pixel:fn(){
+                let sdf=Sdf2d.viewport(self.pos*self.rect_size);
+                let center=self.rect_size*0.5;
+                let radius=min(center.x,center.y)-1.0;
+                let y=clamp(self.pos.y,0.0,1.0);
+                let light=mix(vec3(1.0),self.paper.rgb,mix(0.28,0.70,y));
+                let face=mix(light,mix(self.paper.rgb,self.ink.rgb,mix(0.08,0.035,y)),self.dark);
+                let tint=mix(face,self.ink.rgb,self.dark*0.045+self.hover*0.04+self.down*0.08);
+                sdf.circle(center.x,center.y,radius);
+                sdf.fill_keep(vec4(tint,mix(0.62,0.92,self.dark)*(1.0-self.disabled*0.45)));
+                sdf.stroke(vec4(self.ink.rgb,mix(0.10,0.16,self.dark)+self.focus*0.45),0.5+self.focus*0.25);
+                sdf.circle(center.x,center.y,radius-1.0);
+                sdf.stroke(vec4(1.0,1.0,1.0,mix(0.65,0.09,self.dark)*(1.0-y)),0.5);
+                return sdf.result;
+            }
+        }
+    }
+    mod.spotygram.SpeedPreset = mod.spotygram.InlineGlass {
+        width:Fill height:48 padding:2
+        draw_text +:{
+            accent:uniform(0.0)
+            active:uniform(theme.color_primary)
+            get_color:fn(){return mix(self.color,self.active,self.accent);}
+        }
+        draw_bg +:{
+            pixel:fn(){
+                let sdf=Sdf2d.viewport(self.pos*self.rect_size);
+                let size=self.rect_size;
+                let active=self.accent;
+                let ink=mix(self.color.rgb,self.accent_color.rgb,active);
+                sdf.box(0.5,0.5,size.x-1.0,size.y-1.0,(size.y-1.0)*0.25);
+                sdf.fill_keep(vec4(ink,active*mix(0.13,0.22,self.dark)+self.hover*0.04+self.down*0.07));
+                sdf.stroke(vec4(ink,mix(0.20,0.40,self.dark)*(1.0-active)+self.focus*0.6),0.5+self.focus*0.25);
+                return sdf.result;
+            }
+            color:theme.color_text
+        }
+    }
     mod.spotygram.Flat = ButtonFlatter {
         height:52 width:Fill margin:0 spacing:16
         padding:Inset{left:12 right:12 top:8 bottom:8}

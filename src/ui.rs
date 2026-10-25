@@ -15,16 +15,18 @@ script_mod! {
     mod.spotygram.DrawMediaBar = set_type_default() do #(DrawMediaBar::script_shader(vm)){
         ..mod.draw.DrawQuad
         progress:0.0
+        inset:6.0
+        focus:0.0
         fill:uniform(theme.color_primary)
         ink:uniform(theme.color_text)
         track:uniform(mix(theme.color_bg_app,theme.color_text,0.2))
         pixel:fn(){
             let sdf=Sdf2d.viewport(self.pos*self.rect_size);
             let y=self.rect_size.y*0.5;
-            let span=max(self.rect_size.x-12.0,1.0);
-            let x=6.0+clamp(self.progress,0.0,1.0)*span;
-            sdf.box(6.0,y-2.0,span,4.0,2.0);sdf.fill(self.track);
-            sdf.box(6.0,y-2.0,max(x-6.0,0.01),4.0,2.0);sdf.fill(self.fill);
+            let span=max(self.rect_size.x-self.inset*2.0,1.0);
+            let x=self.inset+clamp(self.progress,0.0,1.0)*span;
+            sdf.box(self.inset,y-2.0,span,4.0,2.0);sdf.fill(self.track);
+            sdf.box(self.inset,y-2.0,max(x-self.inset,0.01),4.0,2.0);sdf.fill(self.fill);
             sdf.circle(x,y,5.0);sdf.fill(self.ink);
             return sdf.result;
         }
@@ -32,6 +34,26 @@ script_mod! {
     mod.spotygram.Slider = #(MediaSlider::register_widget(vm)){
         width:Fill height:32 min:0.0 max:1.0 step:0.0
         draw_bg:mod.spotygram.DrawMediaBar{}
+    }
+    mod.spotygram.SpeedSlider = mod.spotygram.Slider {
+        height:48
+        draw_bg +:{
+            inset:14.0
+            paper:uniform(theme.color_bg_app)
+            track:mix(theme.color_bg_app,theme.color_text,0.10)
+            pixel:fn(){
+                let sdf=Sdf2d.viewport(self.pos*self.rect_size);
+                let y=self.rect_size.y*0.5;
+                let span=max(self.rect_size.x-self.inset*2.0,1.0);
+                let x=self.inset+clamp(self.progress,0.0,1.0)*span;
+                sdf.box(self.inset,y-2.5,span,5.0,1.25);sdf.fill(self.track);
+                sdf.box(self.inset,y-2.5,max(x-self.inset,0.01),5.0,1.25);sdf.fill(self.fill);
+                sdf.circle(x,y,14.0);sdf.fill(vec4(self.fill.rgb,self.focus*0.15));
+                sdf.circle(x,y,12.0);sdf.fill(self.paper);
+                sdf.circle(x,y,9.0);sdf.fill(self.fill);
+                return sdf.result;
+            }
+        }
     }
 
     mod.spotygram.CatalogBase = #(Catalog::register_widget(vm))
@@ -601,19 +623,21 @@ script_mod! {
                         choices_body := mod.spotygram.Choices{visible:false}
                         queue_summary := mod.spotygram.Caption{visible:false height:Fit max_lines:3}
                         queue_catalog := mod.spotygram.Catalog{visible:false height:360 reserve_dock:false}
-                         speed_body := View{visible:false width:Fill height:Fit flow:Down spacing:12
-                             View{width:Fill height:48 flow:Right align:Align{y:0.5}
-                                 speed_minus := mod.spotygram.InlineIcon{draw_icon.svg:crate_resource("self:resources/remove.svg")}
-                                 speed_value := mod.spotygram.Title{text:"1×" align:Center}
-                                 speed_plus := mod.spotygram.InlineIcon{draw_icon.svg:crate_resource("self:resources/add.svg")}
-                             }
-                            speed_slider := mod.spotygram.Slider{min:#(data::MIN_PLAYBACK_SPEED) max:#(data::MAX_PLAYBACK_SPEED) step:#(data::PLAYBACK_SPEED_STEP)}
+                        speed_body := View{visible:false width:Fill height:Fit flow:Down spacing:4 padding:Inset{bottom:4}
+                            View{width:Fill height:60 align:Center
+                                View{width:Fit height:48 flow:Right spacing:24 align:Align{y:0.5}
+                                    speed_minus := mod.spotygram.SpeedStep{draw_icon.svg:crate_resource("self:resources/remove.svg")}
+                                    speed_value := mod.spotygram.Title{width:88 height:Fit text:"1×" align:Center draw_text.text_style.font_size:19.5}
+                                    speed_plus := mod.spotygram.SpeedStep{draw_icon.svg:crate_resource("self:resources/add.svg")}
+                                }
+                            }
+                            speed_slider := mod.spotygram.SpeedSlider{min:#(data::MIN_PLAYBACK_SPEED) max:#(data::MAX_PLAYBACK_SPEED) step:#(data::PLAYBACK_SPEED_STEP)}
                             View{width:Fill height:48 flow:Right spacing:6
-                                 speed_slow := mod.spotygram.InlineGlass{width:Fill padding:4 text:"0.5×"}
-                                 speed_normal := mod.spotygram.InlineGlass{width:Fill padding:4 text:"1×"}
-                                 speed_fast := mod.spotygram.InlineGlass{width:Fill padding:4 text:"1.5×"}
-                                 speed_double := mod.spotygram.InlineGlass{width:Fill padding:4 text:"2×"}
-                                 speed_triple := mod.spotygram.InlineGlass{width:Fill padding:4 text:"3×"}
+                                speed_slow := mod.spotygram.SpeedPreset{text:"0.5×"}
+                                speed_normal := mod.spotygram.SpeedPreset{text:"1×"}
+                                speed_fast := mod.spotygram.SpeedPreset{text:"1.5×"}
+                                speed_double := mod.spotygram.SpeedPreset{text:"2×"}
+                                speed_triple := mod.spotygram.SpeedPreset{text:"3×"}
                             }
                         }
                     }
@@ -641,6 +665,10 @@ pub struct DrawMediaBar {
     draw_super: DrawQuad,
     #[live]
     progress: f32,
+    #[live(6.0)]
+    inset: f32,
+    #[live]
+    focus: f32,
 }
 
 /// A music slider: a tap sets an absolute value and never opens a numeric keyboard.
@@ -818,8 +846,9 @@ impl MediaSlider {
         }
     }
     fn pointer(&mut self, cx: &mut Cx, position: Vec2d, rect: Rect) {
-        let fraction =
-            ((position.x - rect.pos.x - 6.0) / (rect.size.x - 12.0).max(1.0)).clamp(0.0, 1.0);
+        let inset = self.draw_bg.inset as f64;
+        let fraction = ((position.x - rect.pos.x - inset) / (rect.size.x - inset * 2.0).max(1.0))
+            .clamp(0.0, 1.0);
         self.assign(cx, self.min + (self.max - self.min) * fraction);
     }
 }
@@ -829,10 +858,19 @@ impl Widget for MediaSlider {
         self.draw_bg.progress = ((self.value - self.min) / (self.max - self.min).max(f64::EPSILON))
             .clamp(0.0, 1.0) as f32;
         self.draw_bg.draw_walk(cx, walk);
+        cx.add_nav_stop(self.draw_bg.area(), NavRole::Slider, Inset::default());
         DrawStep::done()
     }
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _: &mut Scope) {
         match event.hits(cx, self.draw_bg.area()) {
+            Hit::KeyFocus(_) => {
+                self.draw_bg.focus = 1.0;
+                self.draw_bg.redraw(cx);
+            }
+            Hit::KeyFocusLost(_) => {
+                self.draw_bg.focus = 0.0;
+                self.draw_bg.redraw(cx);
+            }
             Hit::FingerDown(e) if e.device.is_primary_hit() => {
                 self.dragging = true;
                 cx.claim_finger_drag(e.digit_id);

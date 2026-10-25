@@ -6,6 +6,44 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.6 speed menu
+
+The previous speed menu spread its step controls across the panel and rendered
+presets with heavy glass rims. Its 152-point body was also limited to a 150-point
+scroll viewport. The revised menu centers −/+ beside the value, uses outlined
+presets and a 24-point thumb, and reserves the complete 168-point body including
+its bottom padding. Header and value text align with their neighboring buttons.
+
+The final Linux release was inspected on Radeon through Wayland/Vulkan and
+Xwayland/OpenGL, in both themes and languages, with narrow windows down to 280 px.
+The five presets fit without clipping, including the Russian 3,95× value.
+Five rapid + taps advance 1× to exactly 1.25×. Slider input, presets, Tab/Shift+Tab,
+arrow keys, Home/End, the 0.3×/4× limits and their dimmed controls were exercised.
+A genuine Ogg advanced from 2:09 to 2:16 through libmpv with null output at 1.05×;
+Pause and Quit saved that speed and position.
+
+Swipe dismissal exposed a separate existing bug: dragging changed the enclosing
+glass layer's padding, while reopening reset only its inner positioning view.
+The next panel could therefore show only its backdrop. Dragging now uses the
+inner view too. On the rebuilt Linux package, a short drag returns to the exact
+original bounds; dismissing with a longer drag or an outside click and reopening
+retains the complete panel. Pressed-button frames and the restored paused 1.05×
+player were inspected after restarting.
+
+The signed x86-64 APK updated 0.2.5 on the Android 16 / API-36 emulator; the final
+rebuilt APK was reinstalled without clearing data. Version 0.2.6-rust / 1008 keeps
+the 10,007-row catalog, favorite and local preferences. Inspected frames cover
+both themes, portrait/landscape, preset selection, slider taps/drags and both
+limits. Five rapid + taps reach 1.25× from 1×; five − taps return to 1×. System
+Back, a short sheet drag and swipe dismissal followed by reopening were checked.
+Media3 reported PLAYING at 1.05× while a genuine Ogg advanced; Pause, explicit Quit
+and a fresh process restored 0:18 and 1.05× without autoplay.
+
+Formatting, Cargo checks and application lint pass. Both APKs pass signature and
+16-KiB ZIP-alignment checks with the existing certificate. These are offline
+verification profiles; physical phones, speaker output and authenticated Telegram
+operations remain outside this UI change's coverage.
+
 ## 0.2.5 playback lifecycle
 
 On 0.2.4, a normal pause lasting over 20 minutes resumed on the API-36 emulator.

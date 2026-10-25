@@ -336,7 +336,7 @@ impl App {
                     bottom: -self.sheet_offset,
                     ..Default::default()
                 };
-                let mut layer = self.ui.widget(cx, ids!(panel_layer));
+                let mut layer = self.ui.widget(cx, ids!(panel_position));
                 script_apply_eval!(cx,layer,{padding:#(padding)});
             }
             return true;
@@ -924,7 +924,7 @@ impl App {
             Dialog::ClearCache => "Clear music cache",
             Dialog::Logout => "Sign out",
             Dialog::DeletePlaylist(_) => "Delete playlist",
-            Dialog::Speed => "Playback speed",
+            Dialog::Speed => "Speed",
             Dialog::Order => "Playback order",
             Dialog::Repeat => "Repeat",
             Dialog::BookmarkThreshold => "Bookmark threshold",
@@ -1543,7 +1543,7 @@ impl App {
                     } else {
                         0.0
                     };
-                    script_apply_eval!(cx,button,{draw_bg.accent:#(active)});
+                    script_apply_eval!(cx,button,{draw_bg.accent:#(active) draw_text.accent:#(active)});
                 }
             }
             Dialog::Order => {
@@ -2609,10 +2609,37 @@ impl App {
         let panel_padding = Inset {
             left: inset,
             right: inset,
-            top: inset,
-            bottom: inset,
+            top: if self.dialog == Dialog::Speed {
+                8.0
+            } else {
+                inset
+            },
+            bottom: if self.dialog == Dialog::Speed {
+                16.0
+            } else {
+                inset
+            },
         };
-        script_apply_eval!(cx,panel,{width:#(panel_width) padding:#(panel_padding) draw_bg.layer_opacity:#(opacity)});
+        let speed_panel = self.dialog == Dialog::Speed;
+        let mut title = self.ui.widget(cx, ids!(panel_title));
+        let title_height = if speed_panel {
+            Size::fit()
+        } else {
+            Size::fill()
+        };
+        let title_lines: usize = if speed_panel { 1 } else { 2 };
+        let title_size = if speed_panel { 13.5 } else { 15.0 };
+        script_apply_eval!(cx,title,{height:#(title_height) max_lines:#(title_lines) draw_text.text_style.font_size:#(title_size)});
+        let spacing = if speed_panel { 4.0 } else { 10.0 };
+        let relief = if speed_panel { 0.40 } else { 1.0 };
+        let diffusion = if speed_panel {
+            if self.dark == Some(true) { 0.38 } else { 0.58 }
+        } else if self.dark == Some(true) {
+            0.38
+        } else {
+            0.32
+        };
+        script_apply_eval!(cx,panel,{width:#(panel_width) padding:#(panel_padding) spacing:#(spacing) draw_bg +:{layer_opacity:#(opacity) relief:#(relief) diffusion:#(diffusion)}});
         if self.dialog == Dialog::Track {
             let height = if wide_panel { 48.0 } else { 56.0 };
             let font = if wide_panel { 10.5 } else { 12.0 };
@@ -2695,7 +2722,7 @@ impl App {
         script_apply_eval!(cx,layer,{align:#(align) padding:#(padding)});
         self.visible(cx, ids!(drag_handle), !wide_panel && !auth);
         let mut panel_scroll = self.ui.widget(cx, ids!(panel_scroll));
-        let mut chrome = inset * 2.0;
+        let mut chrome = panel_padding.top + panel_padding.bottom;
         for (path, size) in [
             (ids!(drag_handle), 16.0),
             (ids!(panel_header), 48.0),
@@ -2705,7 +2732,7 @@ impl App {
             (ids!(panel_footer), 48.0),
         ] {
             if self.ui.widget(cx, path).visible() {
-                chrome += size + 10.0;
+                chrome += size + spacing;
             }
         }
         let available = (height - if wide_panel { 48.0 } else { 0.0 } - chrome).max(56.);
@@ -2723,7 +2750,7 @@ impl App {
             | Dialog::Filter
             | Dialog::Queue => available.min(if wide_panel { 380. } else { height * 0.65 }),
             Dialog::Auth => available.min(560.),
-            Dialog::Speed => available.min(150.),
+            Dialog::Speed => available.min(168.),
             _ => available.min(260.),
         };
         if let Some(space) = anchor_space {
@@ -4072,7 +4099,7 @@ impl AppMain for App {
                 }
             }
         }
-        if self.settings_open {
+        if self.settings_open || self.dialog == Dialog::Speed {
             let path = if self.dialog == Dialog::Settings {
                 ids!(settings_page).as_slice()
             } else {

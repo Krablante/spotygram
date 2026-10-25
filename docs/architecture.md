@@ -83,6 +83,15 @@ so rapid taps do not depend on when the UI receives the next snapshot.
 Slider changes apply to the engine immediately and coalesce their queue-state
 writes for 250 ms. Pause, track changes and Quit checkpoint the current values.
 
+The speed panel keeps its step buttons beside a fixed-width value, with outlined
+presets and a 48-point slider hit area. Slider drawing and pointer mapping share
+the same inset, keeping its thumb inside the control at both limits. Its scroll
+height includes the complete body and bottom padding. The panel reduces optical
+relief locally while retaining the existing shared capture and blur.
+Sheet dragging moves the inner `panel_position` view, the same view reset by
+ordinary layout. Moving the enclosing glass layer instead leaves a stale offset
+after dismissal and can hide the next opened panel.
+
 Small source avatars load serially at low priority for bounded visible requests.
 Hiding the app cancels that work. The source-photo table and bounded directory
 image cache are local and account-scoped. Select all reads matching IDs on the

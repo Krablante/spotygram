@@ -72,6 +72,10 @@ reverse, shuffle without repeats within a pass, and independent random draws.
 
 Speed ranges from 0.3× to 4× in 0.05 steps, using the slider or −/+. The circular
 speed button is tinted whenever playback differs from 1×; the 1× preset resets it.
+The selected preset is highlighted. On desktop, Tab reaches the slider; arrow
+keys change one step, and Home/End select the minimum/maximum.
+
+<img src="screenshots/rust-speed-menu.png" alt="The Android speed menu in light and dark appearances, with outlined presets and centered step controls" width="860">
 
 <img src="screenshots/rust-desktop-player-dark.png" alt="The shared desktop player in dark appearance" width="860">
 

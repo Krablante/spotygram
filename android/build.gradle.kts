@@ -18,8 +18,8 @@ android {
         applicationId = "app.spotygram.rust"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1007
-        versionName = "0.2.5-rust"
+        versionCode = 1008
+        versionName = "0.2.6-rust"
     }
     signingConfigs {
         create("release") {
