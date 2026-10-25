@@ -177,25 +177,18 @@ script_mod! {
             Playlist := View {
                 width:Fill height:76 flow:Right spacing:12 align:Align{y:0.5} padding:Inset{left:20 right:12}
                 playlist_cover := RoundedView{width:56 height:56 flow:Overlay align:Center draw_bg +:{border_radius:8.0 color:mix(theme.color_bg_app,theme.color_text,0.08)}
-                    mod.spotygram.Mark{width:24 height:24 draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/order.svg")}}
+                    placeholder := mod.spotygram.Mark{width:24 height:24 draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/order.svg")}}
                     single := mod.spotygram.Cover{visible:false width:Fill height:Fill draw_bg.border_radius:16.0 art.draw_bg.border_radius:8.0}
                     mosaic := View{visible:false width:Fill height:Fill flow:Down
                         View{width:Fill height:28 flow:Right
-                            art0 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
-                            art1 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
+                            art0 := mod.spotygram.PlaylistTile{}
+                            art1 := mod.spotygram.PlaylistTile{draw_bg.tile:vec2(1.0,0.0) art.draw_bg.tile:vec2(1.0,0.0)}
                         }
                         View{width:Fill height:28 flow:Right
-                            art2 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
-                            art3 := mod.spotygram.Cover{width:28 height:28 draw_bg.border_radius:0.0 note.width:12 note.height:12 art.draw_bg.border_radius:0.0}
+                            art2 := mod.spotygram.PlaylistTile{draw_bg.tile:vec2(0.0,1.0) art.draw_bg.tile:vec2(0.0,1.0)}
+                            art3 := mod.spotygram.PlaylistTile{draw_bg.tile:vec2(1.0,1.0) art.draw_bg.tile:vec2(1.0,1.0)}
                         }
                     }
-                    View{width:Fill height:Fill show_bg:true draw_bg +:{color:theme.color_bg_app pixel:fn(){
-                        let p=self.pos*self.rect_size;
-                        let q=abs(p-self.rect_size*0.5)-(self.rect_size*0.5-vec2(16.0));
-                        let d=min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-16.0;
-                        let alpha=smoothstep(-0.5,0.5,d);
-                        return vec4(self.color.rgb*alpha,alpha);
-                    }}}
                 }
                 View{width:Fill height:Fill flow:Overlay
                     open := ButtonFlatter{width:Fill height:Fill text:""}
@@ -246,7 +239,7 @@ script_mod! {
             content := View {
                 width:Fill height:Fill flow:Overlay align:Align{x:0.5}
                 page := View{width:Fill max_width:720 height:Fill flow:Down spacing:0
-                header := View{width:Fill height:48 padding:Inset{left:16 right:12} flow:Right spacing:8 align:Align{y:0.5}
+                header := View{width:Fill height:56 padding:Inset{left:16 right:16 top:4 bottom:4} flow:Right spacing:8 align:Align{y:0.5}
                     // All stickers have at least six transparent source pixels
                     // at every edge. Clip that empty margin to prevent Vulkan
                     // sampler-edge streaks without cropping the visible art.
@@ -254,7 +247,7 @@ script_mod! {
                     brand := Label{width:Fill text:"spotygram" draw_text.color:theme.color_text draw_text.text_style:theme.font_bold{font_size:12}}
                     settings := mod.spotygram.Icon{text:"" padding:12 icon_walk:Walk{width:24 height:24} draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/settings.svg")}}
                 }
-                heading_row := View{width:Fill height:48 padding:Inset{left:16 right:4} flow:Right align:Align{y:0.5} spacing:8
+                heading_row := View{width:Fill height:64 padding:Inset{left:16 right:16 top:8 bottom:8} flow:Right align:Align{y:0.5} spacing:8
                     back := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
                     favorite_heading := View{visible:false width:24 height:24
                         mod.spotygram.Mark{width:Fill height:Fill draw_icon +:{color:theme.color_text svg:crate_resource("self:resources/favorite.svg")}}
@@ -275,24 +268,24 @@ script_mod! {
                         profile_disconnect := mod.spotygram.Flat{visible:false width:Fit height:40 text:"In library" padding:0 spacing:6 icon_walk:Walk{width:18 height:18} draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/check.svg")} icon_end_walk:Walk{width:18 height:18} draw_icon_end +:{color:theme.color_primary svg:crate_resource("self:resources/down.svg")} draw_text.color:theme.color_primary}
                     }
                 }
-                search_shell := View{width:Fill height:56 padding:Inset{left:16 right:16 top:4 bottom:4} flow:Overlay
+                search_shell := View{width:Fill height:60 padding:Inset{left:16 right:16 top:6 bottom:6} flow:Overlay
                     mod.spotygram.Surface{width:Fill height:48 flow:Right align:Align{y:0.5} padding:Inset{left:16 right:4}
                         mod.spotygram.Mark{width:20 height:20 draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/search.svg")}}
                         search := mod.spotygram.Input{empty_text:"Search music"}
                     }
                 }
                 music_controls := View{width:Fill height:Fit flow:Down spacing:0
-                    filters := View{width:Fill height:54 padding:Inset{left:16 right:16 top:3 bottom:3} flow:Right spacing:8
+                    filters := View{width:Fill height:60 padding:Inset{left:16 right:16 top:6 bottom:6} flow:Right spacing:12
                         View{width:Fill height:48 flow:Overlay
                             mod.spotygram.Surface{width:Fill height:Fill
-                                source_filter := mod.spotygram.Preference{height:48 row.height:48 row.padding:Inset{left:16 right:16} row.leading.width:20 row.leading.height:20 row.leading.mark.draw_icon.svg:crate_resource("self:resources/library.svg") row.labels.title.draw_text.text_style:theme.font_bold{font_size:10.5} row.labels.detail.visible:false row.arrow.width:18 row.arrow.height:18 row.arrow.mark.draw_icon.svg:crate_resource("self:resources/dropdown.svg")}
+                                source_filter := mod.spotygram.Preference{height:48 row.height:48 row.padding:Inset{left:16 right:16} row.leading.width:20 row.leading.height:20 row.leading.mark.draw_icon.svg:crate_resource("self:resources/library.svg") row.labels.title.max_lines:1 row.labels.title.draw_text.text_style:theme.font_bold{font_size:10.5} row.labels.detail.visible:false row.arrow.width:18 row.arrow.height:18 row.arrow.mark.draw_icon.svg:crate_resource("self:resources/dropdown.svg")}
                             }
                         }
                         on_device := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/offline.svg")}
                         sort := mod.spotygram.PlainIcon{draw_icon +:{color:theme.color_text_meta svg:crate_resource("self:resources/sort.svg")}}
                     }
-                    View{width:Fill height:54 padding:Inset{left:16 right:16 top:3 bottom:3} flow:Right spacing:8
-                        play_all := mod.spotygram.Glass{width:Fill text:"Play all" draw_bg.accent:1.0 draw_icon.svg:crate_resource("self:resources/play.svg")}
+                    View{width:Fill height:60 padding:Inset{left:16 right:16 top:6 bottom:6} flow:Right spacing:12
+                        play_all := mod.spotygram.Glass{width:Fill text:"Play all" draw_text +:{max_lines:2 text_overflow:TextOverflow.Ellipsis} draw_bg.accent:1.0 draw_icon.svg:crate_resource("self:resources/play.svg")}
                         library_order := mod.spotygram.Icon{draw_icon +:{color:theme.color_primary svg:crate_resource("self:resources/shuffle.svg")}}
                         select_mode := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/checklist.svg")}
                     }
@@ -310,11 +303,11 @@ script_mod! {
                 notice := mod.spotygram.Caption{visible:false height:Fit max_lines:3 margin:Inset{left:8 right:8 top:2 bottom:2}}
                 catalog := mod.spotygram.Catalog{}
                 }
-                dock := View{width:Fill max_width:720 height:Fill flow:Down padding:Inset{left:12 right:12 bottom:6} spacing:6
+                dock := View{width:Fill max_width:720 height:Fill flow:Down padding:Inset{left:12 right:12 bottom:10} spacing:10
                 Filler{}
-                player_dock := View{width:Fill height:56 flow:Overlay visible:false
+                player_dock := View{width:Fill height:64 flow:Overlay visible:false
                     glass.Layer{width:Fill height:Fill
-                        mod.spotygram.CapturedSurface{width:Fill height:Fill flow:Right spacing:4 padding:Inset{left:7 right:4 top:4 bottom:4} align:Align{y:0.5} draw_bg +:{corner_radius:14.0 diffusion:0.32 environment:0.0 blur_level:4.5}
+                        mod.spotygram.CapturedSurface{width:Fill height:Fill flow:Right spacing:4 padding:Inset{left:10 right:8 top:8 bottom:8} align:Align{y:0.5} draw_bg +:{corner_radius:16.0 diffusion:0.32 environment:0.0 blur_level:4.5}
                             mini_cover := mod.spotygram.Cover{width:44 height:44}
                             View{width:Fill height:Fill flow:Overlay
                                 show_player := ButtonFlatter{width:Fill height:Fill text:""}
@@ -353,7 +346,7 @@ script_mod! {
                 Filler{}
                 player_reflection := mod.spotygram.Reflection{}
             }
-            View{width:Fill max_width:1000 height:Fill flow:Down spacing:16
+            player_layout := View{width:Fill max_width:1000 height:Fill flow:Down spacing:16
             View{width:Fill height:56 flow:Right align:Align{y:0.5}
                 player_close := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/down.svg")}
                 View{width:Fill height:Fit flow:Down align:Center spacing:4
@@ -371,22 +364,22 @@ script_mod! {
                 }
                 player_details := View{width:Fill max_width:520 height:Fit flow:Down spacing:0
                     View{width:Fill height:Fit flow:Right spacing:10 align:Align{y:0.5}
-                        View{width:Fill height:Fit flow:Down spacing:6
+                        player_metadata := View{width:Fill height:Fit flow:Down spacing:6
                             player_title := mod.spotygram.Title{height:Fit max_lines:2 draw_text.text_style.font_size:21 text:""}
                             player_artist := mod.spotygram.Body{draw_text.color:theme.color_text_meta text:""}
                         }
                         player_favorite := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/favorite_border.svg")}
                     }
                     player_notice := mod.spotygram.Caption{visible:false height:Fit max_lines:3 margin:Inset{top:8}}
-                    View{width:Fill height:16}
+                    player_seek_space := View{width:Fill height:16}
                     seek := mod.spotygram.Slider{min:0.0 max:1.0 step:0.0}
-                    View{width:Fill height:20 flow:Right
+                    player_times := View{width:Fill height:20 flow:Right
                         elapsed := mod.spotygram.Caption{width:Fill text:"0:00"}
                         duration := mod.spotygram.Caption{width:Fit text:"0:00"}
                     }
-                    View{width:Fill height:100 padding:Inset{top:12 bottom:12} flow:Overlay
+                    player_transport := View{width:Fill height:108 padding:Inset{top:12 bottom:12} flow:Overlay
                         glass.Layer{width:Fill height:Fill
-                            mod.spotygram.Surface{width:Fill height:76 flow:Right padding:Inset{left:4 right:4 top:6 bottom:6} spacing:0 align:Align{y:0.5} draw_bg.corner_radius:19.0
+                            mod.spotygram.Surface{width:Fill height:84 flow:Right padding:Inset{left:4 right:4 top:10 bottom:10} spacing:0 align:Align{y:0.5} draw_bg.corner_radius:21.0
                                 order := mod.spotygram.PlainIcon{width:Fill padding:12 draw_icon.svg:crate_resource("self:resources/order.svg")}
                                 player_previous := mod.spotygram.PlainIcon{width:Fill padding:8 icon_walk:Walk{width:32 height:32} draw_icon.svg:crate_resource("self:resources/previous.svg")}
                                 player_play := mod.spotygram.InlineIcon{width:64 height:64 padding:11 icon_walk:Walk{width:42 height:42} draw_icon.svg:crate_resource("self:resources/play.svg") draw_bg +:{border_radius:32.0 color:mix(theme.color_bg_app,theme.color_primary,0.16)}}
@@ -395,12 +388,12 @@ script_mod! {
                             }
                         }
                     }
-                    View{width:Fill height:56 padding:Inset{top:4 bottom:4} flow:Right spacing:8
-                        player_save := mod.spotygram.Glass{width:Fill padding:8 spacing:5 text:"Save on device" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/download.svg")}
+                    player_actions := View{width:Fill height:60 padding:Inset{top:6 bottom:6} flow:Right spacing:12
+                        player_save := mod.spotygram.Glass{width:Fill padding:8 spacing:5 text:"Save on device" draw_text +:{max_lines:2 text_overflow:TextOverflow.Ellipsis} icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/download.svg")}
                         speed := mod.spotygram.Glass{width:48 padding:0 text:"1×" draw_bg.accent_color:mix(#x086d79,#x58c9d2,theme.spotygram_dark)}
-                        queue := mod.spotygram.Glass{width:Fill padding:8 spacing:5 text:"Queue" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/queue.svg")}
+                        queue := mod.spotygram.Glass{width:Fill padding:8 spacing:5 text:"Queue" draw_text +:{max_lines:2 text_overflow:TextOverflow.Ellipsis} icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/queue.svg")}
                     }
-                    volume_row := View{width:Fill height:44 flow:Right align:Align{y:0.5} spacing:8
+                    volume_row := View{width:Fill height:48 flow:Right align:Align{y:0.5} spacing:8
                         mute := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/volume.svg")}
                         volume := mod.spotygram.Slider{min:0.0 max:100.0 step:1.0}
                         volume_label := mod.spotygram.Caption{width:56 text:"100%"}
@@ -440,7 +433,7 @@ script_mod! {
             settings_shell := View{width:Fill max_width:960 height:Fill padding:Inset{left:16 right:16 top:8 bottom:16} flow:Down spacing:16
                 settings_header := View{width:Fill height:48 flow:Right spacing:8 align:Align{y:0.5}
                     settings_done := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/back.svg")}
-                    settings_title := mod.spotygram.Title{height:Fill align:Align{x:0.0 y:0.5} text:"Settings" draw_text.text_style.font_size:18}
+                    settings_title := mod.spotygram.Title{align:Align{x:0.0 y:0.5} text:"Settings" draw_text.text_style.font_size:18}
                 }
                 settings_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
                 settings_layout := View{width:Fill height:Fill flow:Right spacing:24
@@ -550,7 +543,7 @@ script_mod! {
                     panel_header := View{width:Fill height:48 flow:Right align:Align{y:0.5} spacing:10
                         auth_back := mod.spotygram.Icon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
                         panel_back := mod.spotygram.PlainIcon{visible:false draw_icon.svg:crate_resource("self:resources/back.svg")}
-                    panel_title := mod.spotygram.Title{height:Fill align:Align{x:0.0 y:0.5} max_lines:2 draw_text.text_style.font_size:15 text:"Settings"}
+                    panel_title := mod.spotygram.Title{align:Align{x:0.0 y:0.5} max_lines:2 draw_text.text_style.font_size:15 text:"Settings"}
                         panel_close := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/close.svg")}
                     }
                     panel_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
@@ -648,7 +641,7 @@ script_mod! {
                         send_settings := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/settings.svg")}
                     }
                     panel_footer := View{visible:false width:Fill height:Fit flow:Right spacing:8
-                        panel_cancel := mod.spotygram.Flat{visible:false width:Fill text:"Cancel"}
+                        panel_cancel := mod.spotygram.Flat{visible:false width:Fill height:48 text:"Cancel" label_align:Center}
                         panel_confirm := mod.spotygram.InlineGlass{visible:false width:Fill text:"Confirm"}
                     }
                 }
@@ -1309,6 +1302,11 @@ impl Widget for Catalog {
                                         .insert(item.widget_uid(), playlist.covers.clone());
                                     let artwork =
                                         playlist.covers.iter().any(|cover| !cover.path.is_empty());
+                                    let placeholder = !artwork;
+                                    item.widget(cx, ids!(playlist_cover.placeholder))
+                                        .set_visible(cx, placeholder);
+                                    let mut cover = item.widget(cx, ids!(playlist_cover));
+                                    script_apply_eval!(cx,cover,{show_bg:#(placeholder)});
                                     item.widget(cx, ids!(single))
                                         .set_visible(cx, artwork && playlist.covers.len() == 1);
                                     item.widget(cx, ids!(mosaic))
@@ -1614,9 +1612,33 @@ pub struct ChoiceRow {
     pub checked: bool,
     pub glass: bool,
     pub radio: bool,
+    pub group: (usize, usize),
 }
 
 impl Choices {
+    pub fn set_rows(&mut self, mut rows: Vec<ChoiceRow>) {
+        // Compute the shared contour once when choices change, never by
+        // scanning the directory for each visible row during drawing.
+        let mut start = 0;
+        while start < rows.len() {
+            if rows[start].heading || !rows[start].glass {
+                start += 1;
+                continue;
+            }
+            let mut end = start + 1;
+            if start != 0 {
+                while end < rows.len() && !rows[end].heading && rows[end].glass {
+                    end += 1;
+                }
+            }
+            for (position, row) in rows[start..end].iter_mut().enumerate() {
+                row.group = (position, end - start);
+            }
+            start = end;
+        }
+        self.rows = rows;
+    }
+
     pub fn refresh_photos(&mut self) {
         self.requested.clear();
     }
@@ -1660,21 +1682,13 @@ impl Widget for Choices {
                         script_apply_eval!(cx,radio,{draw_bg.checked:#(checked)});
                         item.widget(cx, ids!(surface)).set_visible(cx, row.glass);
                         if row.glass {
-                            let first = if index == 0 || self.rows[index - 1].heading || index == 1
-                            {
-                                1.0
-                            } else {
-                                0.0
-                            };
-                            let last = if index == 0
-                                || self.rows.get(index + 1).is_none_or(|r| r.heading)
-                            {
-                                1.0
-                            } else {
-                                0.0
-                            };
+                            let (position, length) = row.group;
+                            let first = if position == 0 { 1.0 } else { 0.0 };
+                            let last = if position + 1 == length { 1.0 } else { 0.0 };
+                            let offset = position as f64 * 56.0;
+                            let height = length as f64 * 56.0;
                             let mut surface = item.widget(cx, ids!(surface));
-                            script_apply_eval!(cx,surface,{draw_bg +:{first:#(first) last:#(last) accent:#(checked)}});
+                            script_apply_eval!(cx,surface,{draw_bg +:{first:#(first) last:#(last) group_offset:#(offset) group_height:#(height) accent:#(checked)}});
                         }
                         let mut highlight = item.widget(cx, ids!(highlight));
                         let color = vec4(

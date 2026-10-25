@@ -14,7 +14,7 @@ script_mod! {
     mod.spotygram.Mark = Icon{icon_walk:Walk{width:Fill height:Fill}}
     // Makepad uses points: 12 pt renders at the reference 16 sp size at 1x.
     mod.spotygram.Title = Label {
-        width:Fill height:32 padding:0 max_lines:1 text_overflow:Ellipsis
+        width:Fill height:Fit padding:0 max_lines:1 text_overflow:Ellipsis
         draw_text +:{color:theme.color_text text_style:theme.font_bold{font_size:18 line_spacing:1.0}}
     }
     mod.spotygram.Body = Label {
@@ -105,10 +105,11 @@ script_mod! {
                 let size=self.sdf_rect_size;
                 let local=self.pos*self.rect_size3-p;
                 let cap=mix(self.first,self.last,step(size.y*0.5,local.y));
-                let radius=max(0.0,self.corner_radius*cap);
                 let side=max(1.0-smoothstep(0.0,5.0,local.x),smoothstep(size.x-5.0,size.x,local.x));
                 let edge_alpha=max(cap,side);
-                sdf.box(p.x,p.y,size.x,size.y,radius);
+                let group_y=p.y-self.group_offset;
+                let group_height=max(size.y,self.group_height);
+                sdf.box(p.x,group_y,size.x,group_height,self.corner_radius);
                 let shape=sdf.shape;
                 let depth=max(-shape,0.0);
                 let normal=self.rounded_edge_normal(shape);
@@ -131,10 +132,10 @@ script_mod! {
                 let shadow=(1.0-smoothstep(0.0,3.5,depth))*max(normal.y,0.0)*mix(0.12,0.20,self.dark)*edge_alpha*self.relief;
                 sdf.fill_keep(vec4(material*(1.0-shadow),1.0));
                 sdf.stroke(vec4(mix(vec3(0.46,0.57,0.58),vec3(0.88),self.dark),mix(0.28,0.20,self.dark)*edge_alpha*self.relief),0.75);
-                sdf.box(p.x+1.2,p.y+1.2,size.x-2.4,size.y-2.4,max(radius-0.6,0.5));
+                sdf.box(p.x+1.2,group_y+1.2,size.x-2.4,group_height-2.4,max(self.corner_radius-0.6,0.5));
                 let outer=mix(0.90,0.40,self.dark)*(0.45+0.55*abs(1.0-y*2.0));
                 sdf.stroke(vec4(1.0,1.0,1.0,outer*edge_alpha*self.relief),0.8);
-                sdf.box(p.x+2.6,p.y+2.6,size.x-5.2,size.y-5.2,max(radius-1.3,0.5));
+                sdf.box(p.x+2.6,group_y+2.6,size.x-5.2,group_height-5.2,max(self.corner_radius-1.3,0.5));
                 let rim=self.optical_rim(y);
                 sdf.stroke(vec4(rim.rgb,rim.a*edge_alpha*self.relief),mix(0.8,0.5,self.dark));
                 let shade=self.outer_shadow(shape,sdf.result.a)*0.08;
@@ -172,10 +173,14 @@ script_mod! {
                 let local=(self.pos-vec2(0.5))*size/(1.0-self.down*0.03)+size*0.5;
                 let sdf=Sdf2d.viewport(local);
                 let cap=mix(self.first,self.last,step(size.y*0.5,local.y));
-                let radius=mix(self.border_radius*0.5,self.corner_radius,step(0.0,self.corner_radius))*cap;
+                let radius=mix(self.border_radius*0.5,self.corner_radius,step(0.0,self.corner_radius));
                 let side=max(1.0-smoothstep(0.0,5.0,local.x),smoothstep(size.x-5.0,size.x,local.x));
                 let seal=max(cap,side);
-                sdf.box(0.0,0.0,size.x,size.y,max(radius,0.0));
+                // Adjacent rows share one contour. Their internal edges must
+                // stay opaque, including the antialiasing support outside a row.
+                let group_y=-self.group_offset;
+                let group_height=max(size.y,self.group_height);
+                sdf.box(0.0,group_y,size.x,group_height,max(radius,0.0));
                 let shape=sdf.shape;
                 let depth=max(-sdf.shape,0.0);
                 let gradient=vec2(dFdx(sdf.shape),dFdy(sdf.shape));
@@ -199,9 +204,9 @@ script_mod! {
                 material=mix(reference,material,self.dark);
                 sdf.fill_keep(vec4(material*(1.0-shadow),1.0));
                 sdf.stroke(vec4(mix(vec3(0.46,0.57,0.58),vec3(0.88),self.dark),mix(0.28,0.20,self.dark)*seal),0.75);
-                sdf.box(1.2,1.2,size.x-2.4,size.y-2.4,max(radius-0.6,0.5));
+                sdf.box(1.2,group_y+1.2,size.x-2.4,group_height-2.4,max(radius-0.6,0.5));
                 sdf.stroke(vec4(1.0,1.0,1.0,mix(0.90,0.40,self.dark)*(0.45+0.55*abs(1.0-y*2.0))*seal),0.8);
-                sdf.box(2.6,2.6,size.x-5.2,size.y-5.2,max(radius-1.3,0.5));
+                sdf.box(2.6,group_y+2.6,size.x-5.2,group_height-5.2,max(radius-1.3,0.5));
                 let rim=self.optical_rim(y);
                 sdf.stroke(vec4(rim.rgb,rim.a*seal),mix(1.2,0.5,self.dark));
                 if self.loading>0.0 {
@@ -353,9 +358,7 @@ script_mod! {
             border_radius:10.0
             hue:instance(0.0)
             base_color:uniform(theme.color_bg_app)
-            pixel:fn(){
-                let sdf=Sdf2d.viewport(self.pos*self.rect_size);
-                sdf.box(0.0,0.0,self.rect_size.x,self.rect_size.y,self.border_radius*0.5);
+            cover_color:fn()->vec3{
                 var a=vec3(0.282,0.435,0.569);
                 var b=vec3(0.447,0.788,0.529);
                 if self.hue>0.5 {a=vec3(0.655,0.373,0.337);b=vec3(0.345,0.788,0.824);}
@@ -366,13 +369,46 @@ script_mod! {
                 let t=clamp((self.pos.x+self.pos.y)*0.5,0.0,1.0);
                 let mid=mix(a,self.base_color.rgb,0.16);
                 let end=mix(self.base_color.rgb,b,0.72);
-                let color=mix(mix(a,mid,clamp(t*2.0,0.0,1.0)),end,clamp(t*2.0-1.0,0.0,1.0));
-                sdf.fill(vec4(color,1.0));
+                return mix(mix(a,mid,clamp(t*2.0,0.0,1.0)),end,clamp(t*2.0-1.0,0.0,1.0));
+            }
+            pixel:fn(){
+                let sdf=Sdf2d.viewport(self.pos*self.rect_size);
+                sdf.box(0.0,0.0,self.rect_size.x,self.rect_size.y,self.border_radius*0.5);
+                sdf.fill(vec4(self.cover_color(),1.0));
                 return sdf.result;
             }
         }
         note := mod.spotygram.Mark{width:20 height:20 draw_icon +:{color:#xffffff99 svg:crate_resource("self:resources/music.svg")}}
         art := Image{width:Fill height:Fill fit:ImageFit.CropToFill downscale_to_drawn_size:true draw_bg +:{border_radius:5.0}}
+    }
+    // Clip each tile to the same 56 pt cover, keeping its exterior transparent
+    // over the page's changing backdrop instead of painting a flat corner mask.
+    mod.spotygram.PlaylistTile = mod.spotygram.Cover{width:28 height:28
+        draw_bg:mod.spotygram.Cover.draw_bg{
+            border_radius:0.0 tile:uniform(vec2(0.0))
+            pixel:fn(){
+                let p=(self.pos+self.tile)*self.rect_size;
+                let q=abs(p-self.rect_size)-(self.rect_size-vec2(16.0));
+                let d=min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-16.0;
+                // Only the outside contour is antialiased. Fading the tile's
+                // own rectangle exposes a cross through the mosaic interior.
+                return vec4(self.cover_color(),1.0)*(1.0-smoothstep(-0.5,0.5,d));
+            }
+        }
+        note.width:12 note.height:12
+        art := Image{width:Fill height:Fill fit:ImageFit.CropToFill downscale_to_drawn_size:true
+            draw_bg +:{
+                tile:uniform(vec2(0.0))
+                pixel:fn(){
+                    let p=(self.pos+self.tile)*self.rect_size;
+                    let q=abs(p-self.rect_size)-(self.rect_size-vec2(16.0));
+                    let d=min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-16.0;
+                    let mask=1.0-smoothstep(-0.5,0.5,d);
+                    let color=mix(self.get_color(),vec4(0.2,0.2,0.2,1.0),self.async_load);
+                    return Pal.premul(vec4(color.rgb,color.a*self.opacity*mask));
+                }
+            }
+        }
     }
     mod.spotygram.Reflection = View{width:320 height:240 flow:Overlay show_bg:true
         draw_bg:mod.spotygram.Cover.draw_bg{

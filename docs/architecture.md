@@ -30,6 +30,33 @@ apply. Keep the halo within the geometry: truncating a Gaussian with visible
 alpha exposes square edges around circular buttons and rounded panels. This
 does not require another capture, texture or render pass.
 
+Header actions share the same right inset, with space between their 48-point hit
+areas. Library controls and floating panels also reserve room for the glass halo;
+nested playback buttons have their own inset. Header labels use their measured
+text height so row alignment centers the glyphs beside buttons. Grouped source
+rows draw slices of one full-height contour, avoiding antialiased horizontal
+seams. The source chooser prepares group bounds when its rows change, keeping
+directory scans out of drawing. Playlist mosaic tiles clip their own pixels to
+the outer rounded cover; painting the page's flat base color over the corners
+would expose square patches on its gradient background.
+Tiles stay opaque at their internal edges and antialias only the cover's exterior.
+The placeholder icon/background is hidden while artwork is shown, preventing it
+from appearing through a mosaic's center.
+
+Responsive layout owns source-action visibility, so catalog updates cannot show
+both the compact and wide action rows. Below 360 points the mini-player omits
+Previous to keep its title and speed readable; Previous remains in the full
+player. Narrow button labels have bounded widths, and the saved-file caption is
+recomputed from the current recording when width or language changes.
+Narrow dialog footers stack their 48-point actions and include the complete
+footer height in the scroll budget. Sign-in hides the previous workspace;
+workspace visibility is updated for both snapshot and dialog changes so captured
+dock/navigation layers cannot appear over the full-screen sign-in background.
+Short landscape players use a single-line title and compact spacing while keeping
+button and slider hit areas. Popup scroll budgets use their actual fixed chrome;
+if the complete speed menu fits the viewport but cannot stay anchored, the wide
+popup centers instead of cutting off its presets.
+
 Dynamic SVGs retain their parsed document and GPU mesh until the glyph changes.
 A bounded cache restores the desired glyph after style reloads, including hidden
 controls. Drawing an unchanged row must not request another frame for its icon.

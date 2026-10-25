@@ -168,6 +168,7 @@ pub fn tr<'a>(language: &str, text: &'a str) -> Cow<'a, str> {
         "Refresh library" => "Обновить медиатеку",
         "Queue" => "Очередь",
         "On device" => "На устройстве",
+        "Saved" => "Сохранено",
         "Download" => "Скачать",
         "Keep on device" => "Сохранить",
         "Profile music" => "Музыка профиля",

@@ -62,6 +62,8 @@ Playlist menus also offer renaming and deletion. Recording menus support
 membership and Move up/down for the chosen entry.
 Search, source filtering and sorting apply before Play all creates a new queue.
 
+<img src="screenshots/rust-playlists.png" alt="Android Playlists in light and dark appearances, with aligned header actions and rounded mosaic covers" width="860">
+
 ## Playback and storage
 
 Tap a recording to play. The mini-player opens the full player. Tap or drag the

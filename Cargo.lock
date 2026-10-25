@@ -2764,7 +2764,7 @@ dependencies = [
 
 [[package]]
 name = "spotygram-rust"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "arc-swap",

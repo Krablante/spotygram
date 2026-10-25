@@ -513,6 +513,7 @@ impl App {
         self.sheet_drag = None;
         self.sheet_offset = 0.;
         self.dialog = Dialog::None;
+        self.update_workspace_visibility(cx, self.snapshot().playback.track.is_some());
         self.panel_wide = None;
         self.panel_anchor = None;
         self.visible(cx, ids!(overlay), false);
@@ -829,6 +830,7 @@ impl App {
     fn configure_dialog(&mut self, cx: &mut Cx) {
         let state = self.snapshot();
         let dialog = self.dialog.clone();
+        self.update_workspace_visibility(cx, state.playback.track.is_some());
         if dialog == Dialog::Settings {
             self.visible(cx, ids!(overlay), false);
             settings::select(&self.ui, cx, self.settings_section);
@@ -1657,55 +1659,58 @@ impl App {
                     .and_then(|(chat, _, _)| self.choices.iter().position(|(id, _)| id == chat)),
                 _ => None,
             };
-            widget.rows = self
-                .choices
-                .iter()
-                .enumerate()
-                .map(|(index, (id, s))| {
-                    let source = if matches!(dialog, Dialog::Chats | Dialog::Recipients) {
-                        state.choices.get(index)
-                    } else if dialog == Dialog::Filter && *id > 0 {
-                        self.filter_sources.get(*id as usize - 1)
-                    } else {
-                        None
-                    };
-                    let title = if matches!(
-                        dialog,
-                        Dialog::Sort
-                            | Dialog::Order
-                            | Dialog::Repeat
-                            | Dialog::PlaylistActions(_)
-                            | Dialog::AddSource
-                    ) || dialog == Dialog::Filter && (*id <= 0 || s == "My profile")
-                    {
-                        crate::i18n::tr(&state.language, s).into_owned()
-                    } else {
-                        s.trim_start_matches("✓  ")
-                            .trim_end_matches("  ›")
-                            .to_owned()
-                    };
-                    ui::ChoiceRow {
-                        title,
-                        subtitle: source
-                            .map(|source| {
-                                if dialog == Dialog::Filter {
-                                    crate::i18n::tracks(&state.language, source.count)
-                                } else {
-                                    crate::i18n::tr(&state.language, &source.kind).into_owned()
-                                }
-                            })
-                            .unwrap_or_default(),
-                        photo: source.map(|s| s.photo.clone()).unwrap_or_default(),
-                        key: source.map(|s| (s.id, s.profile)),
-                        heading: dialog == Dialog::Filter && *id < 0,
-                        library: dialog == Dialog::Filter && *id == 0,
-                        checked: selected == Some(index)
-                            || dialog == Dialog::Chats && source.is_some_and(|s| s.selected),
-                        glass: dialog == Dialog::Filter,
-                        radio: matches!(dialog, Dialog::Recipients | Dialog::Topics(..)),
-                    }
-                })
-                .collect();
+            widget.set_rows(
+                self.choices
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (id, s))| {
+                        let source = if matches!(dialog, Dialog::Chats | Dialog::Recipients) {
+                            state.choices.get(index)
+                        } else if dialog == Dialog::Filter && *id > 0 {
+                            self.filter_sources.get(*id as usize - 1)
+                        } else {
+                            None
+                        };
+                        let title = if matches!(
+                            dialog,
+                            Dialog::Sort
+                                | Dialog::Order
+                                | Dialog::Repeat
+                                | Dialog::PlaylistActions(_)
+                                | Dialog::AddSource
+                        ) || dialog == Dialog::Filter
+                            && (*id <= 0 || s == "My profile")
+                        {
+                            crate::i18n::tr(&state.language, s).into_owned()
+                        } else {
+                            s.trim_start_matches("✓  ")
+                                .trim_end_matches("  ›")
+                                .to_owned()
+                        };
+                        ui::ChoiceRow {
+                            title,
+                            subtitle: source
+                                .map(|source| {
+                                    if dialog == Dialog::Filter {
+                                        crate::i18n::tracks(&state.language, source.count)
+                                    } else {
+                                        crate::i18n::tr(&state.language, &source.kind).into_owned()
+                                    }
+                                })
+                                .unwrap_or_default(),
+                            photo: source.map(|s| s.photo.clone()).unwrap_or_default(),
+                            key: source.map(|s| (s.id, s.profile)),
+                            heading: dialog == Dialog::Filter && *id < 0,
+                            library: dialog == Dialog::Filter && *id == 0,
+                            checked: selected == Some(index)
+                                || dialog == Dialog::Chats && source.is_some_and(|s| s.selected),
+                            glass: dialog == Dialog::Filter,
+                            radio: matches!(dialog, Dialog::Recipients | Dialog::Topics(..)),
+                            ..Default::default()
+                        }
+                    })
+                    .collect(),
+            );
             widget.redraw(cx);
         }
         let input = self.ui.text_input(cx, ids!(panel_input));
@@ -2016,11 +2021,6 @@ impl App {
                 ui::set_image(&self.ui, cx, ids!(profile_avatar.art), &source.photo);
             }
         }
-        self.visible(
-            cx,
-            ids!(collection_controls),
-            *screen == data::Screen::Sources,
-        );
         let active_tab = match screen {
             data::Screen::Favorites => 1,
             data::Screen::Playlists | data::Screen::Playlist(_) => 2,
@@ -2092,30 +2092,7 @@ impl App {
         self.visible(cx, ids!(player_notice), !player_notice.is_empty());
         self.text(cx, ids!(player_notice), player_notice);
         let active = playback.track.is_some();
-        self.visible(cx, ids!(settings_page), self.settings_open);
-        self.visible(cx, ids!(player_dock), active && !self.settings_open);
-        self.visible(
-            cx,
-            ids!(full_player),
-            !self.settings_open && self.editor.is_none() && self.full_player && active,
-        );
-        if self.settings_open || self.editor.is_some() || !self.full_player || !active {
-            self.ui.touch_scroll(cx, ids!(player_columns)).stop_motion();
-        }
-        self.visible(
-            cx,
-            ids!(main),
-            !self.settings_open && self.editor.is_none() && (!self.full_player || !active),
-        );
-        self.visible(
-            cx,
-            ids!(playlist_editor),
-            !self.settings_open && self.editor.is_some(),
-        );
-        for path in [ids!(mini_play), ids!(previous), ids!(next)] {
-            self.visible(cx, path, active);
-        }
-        self.visible(cx, ids!(previous), active);
+        self.update_workspace_visibility(cx, active);
         if let Some(track) = &playback.track {
             if old
                 .as_ref()
@@ -2124,25 +2101,7 @@ impl App {
                     t.id != track.id || t.path != track.path || t.temporary != track.temporary
                 })
             {
-                let local = !track.path.is_empty();
-                self.text(
-                    cx,
-                    ids!(player_save),
-                    if track.temporary {
-                        "Keep on device"
-                    } else if local {
-                        "On device"
-                    } else {
-                        "Download"
-                    },
-                );
-                self.ui
-                    .widget(cx, ids!(player_save))
-                    .set_disabled(cx, local && !track.temporary);
-                let size = if local && !track.temporary { 0.0 } else { 20.0 };
-                let mut button = self.ui.widget(cx, ids!(player_save));
-                let icon_walk = Walk::fixed(size, size);
-                script_apply_eval!(cx,button,{icon_walk:#(icon_walk)});
+                self.layout(cx);
             }
             self.text(
                 cx,
@@ -2509,6 +2468,34 @@ impl App {
         );
     }
 
+    fn update_workspace_visibility(&mut self, cx: &mut Cx, active: bool) {
+        let auth = self.dialog == Dialog::Auth;
+        self.visible(cx, ids!(settings_page), self.settings_open && !auth);
+        self.visible(
+            cx,
+            ids!(player_dock),
+            active && !self.settings_open && !auth,
+        );
+        self.visible(
+            cx,
+            ids!(full_player),
+            !auth && !self.settings_open && self.editor.is_none() && self.full_player && active,
+        );
+        if auth || self.settings_open || self.editor.is_some() || !self.full_player || !active {
+            self.ui.touch_scroll(cx, ids!(player_columns)).stop_motion();
+        }
+        self.visible(
+            cx,
+            ids!(main),
+            !auth && !self.settings_open && self.editor.is_none() && (!self.full_player || !active),
+        );
+        self.visible(
+            cx,
+            ids!(playlist_editor),
+            !auth && !self.settings_open && self.editor.is_some(),
+        );
+    }
+
     fn layout(&mut self, cx: &mut Cx) {
         let mut root_widget = self.ui.widget(cx, ids!(root));
         let padding = Inset {
@@ -2558,17 +2545,102 @@ impl App {
         self.visible(cx, ids!(bottom_nav), !wide);
         self.visible(cx, ids!(brand), true);
         self.visible(cx, ids!(volume_row), cfg!(not(target_os = "android")));
-        self.visible(cx, ids!(previous), self.snapshot().playback.track.is_some());
+        let compact_dock = width < 360.;
+        self.visible(cx, ids!(previous), !compact_dock);
+        self.visible(cx, ids!(source_filter.row.leading), width >= 320.);
+        let filter_inset = if width < 320. { 12.0 } else { 16.0 };
+        let filter_padding = Inset {
+            left: filter_inset,
+            right: filter_inset,
+            ..Default::default()
+        };
+        let mut filter = self.ui.widget(cx, ids!(source_filter));
+        script_apply_eval!(cx,filter,{row.padding:#(filter_padding)});
+        let controls_width = 44. + 48. + 40. + 12. + if compact_dock { 0. } else { 44. };
         let artist_width = ((width - if wide { 96.0 } else { 0.0 }).min(720.0)
-            - 233.0
+            - 24.0 // Dock margins.
+            - 18.0 // Surface padding.
+            - 10.0 // Text padding.
+            - controls_width
             - if (self.snapshot().playback.speed - 1.0).abs() > 0.001 {
-                44.0
+                49.0 // Speed and its gap.
             } else {
                 0.0
             })
         .max(24.0);
         let mut mini_artist = self.ui.widget(cx, ids!(mini_artist));
         script_apply_eval!(cx,mini_artist,{max_width:#(artist_width)});
+        let play_label = Walk {
+            width: if width < 320. {
+                Size::fill()
+            } else {
+                Size::fit()
+            },
+            height: Size::fit(),
+            ..Default::default()
+        };
+        let play_align = Align {
+            x: if width < 320. { 0.5 } else { 0.0 },
+            y: 0.0,
+        };
+        let mut play_all = self.ui.widget(cx, ids!(play_all));
+        script_apply_eval!(cx,play_all,{label_walk:#(play_label) label_align:#(play_align)});
+        let compact_player = width < 360.;
+        let button_font = if width < 320. { 9.0 } else { 10.5 };
+        let queue_icon = if compact_player { 0.0 } else { 20.0 };
+        let queue_walk = Walk::fixed(queue_icon, queue_icon);
+        let queue_spacing = if compact_player { 0.0 } else { 5.0 };
+        let queue_label = Walk {
+            width: if compact_player {
+                Size::fill()
+            } else {
+                Size::fit()
+            },
+            height: Size::fit(),
+            ..Default::default()
+        };
+        let queue_align = Align {
+            x: if compact_player { 0.5 } else { 0.0 },
+            y: 0.0,
+        };
+        let mut queue = self.ui.widget(cx, ids!(queue));
+        script_apply_eval!(cx,queue,{icon_walk:#(queue_walk) spacing:#(queue_spacing) label_walk:#(queue_label) label_align:#(queue_align) draw_text.text_style.font_size:#(button_font)});
+        if let Some(track) = &self.snapshot().playback.track {
+            let saved = !track.path.is_empty() && !track.temporary;
+            self.text(
+                cx,
+                ids!(player_save),
+                if track.temporary {
+                    "Keep on device"
+                } else if saved {
+                    if compact_player { "Saved" } else { "On device" }
+                } else {
+                    "Download"
+                },
+            );
+            self.ui
+                .widget(cx, ids!(player_save))
+                .set_disabled(cx, saved);
+            let icon = if saved || compact_player { 0.0 } else { 20.0 };
+            let icon_walk = Walk::fixed(icon, icon);
+            let spacing = if icon == 0.0 { 0.0 } else { 5.0 };
+            let bounded_label = compact_player || track.temporary;
+            let label_walk = Walk {
+                width: if bounded_label {
+                    Size::fill()
+                } else {
+                    Size::fit()
+                },
+                height: Size::fit(),
+                ..Default::default()
+            };
+            let label_align = Align {
+                x: if bounded_label { 0.5 } else { 0.0 },
+                y: 0.0,
+            };
+            let mut button = self.ui.widget(cx, ids!(player_save));
+            script_apply_eval!(cx,button,{icon_walk:#(icon_walk) spacing:#(spacing) label_walk:#(label_walk) label_align:#(label_align) draw_text.text_style.font_size:#(button_font)});
+        }
         let mut panel = self.ui.widget(cx, ids!(panel));
         let alert = matches!(
             self.dialog,
@@ -2622,13 +2694,13 @@ impl App {
         };
         let speed_panel = self.dialog == Dialog::Speed;
         let mut title = self.ui.widget(cx, ids!(panel_title));
-        let title_height = if speed_panel {
-            Size::fit()
-        } else {
-            Size::fill()
-        };
+        let title_height = Size::fit();
         let title_lines: usize = if speed_panel { 1 } else { 2 };
-        let title_size = if speed_panel { 13.5 } else { 15.0 };
+        let title_size = if speed_panel || panel_width < 300. {
+            13.5
+        } else {
+            15.0
+        };
         script_apply_eval!(cx,title,{height:#(title_height) max_lines:#(title_lines) draw_text.text_style.font_size:#(title_size)});
         let spacing = if speed_panel { 4.0 } else { 10.0 };
         let relief = if speed_panel { 0.40 } else { 1.0 };
@@ -2721,6 +2793,22 @@ impl App {
         }
         script_apply_eval!(cx,layer,{align:#(align) padding:#(padding)});
         self.visible(cx, ids!(drag_handle), !wide_panel && !auth);
+        let stacked_footer = panel_width - panel_padding.left - panel_padding.right < 340.;
+        let footer_flow = if stacked_footer {
+            Flow::Down
+        } else {
+            Flow::right()
+        };
+        let mut footer = self.ui.widget(cx, ids!(panel_footer));
+        script_apply_eval!(cx,footer,{flow:#(footer_flow)});
+        let footer_height = if stacked_footer
+            && self.ui.widget(cx, ids!(panel_cancel)).visible()
+            && self.ui.widget(cx, ids!(panel_confirm)).visible()
+        {
+            104.0
+        } else {
+            48.0
+        };
         let mut panel_scroll = self.ui.widget(cx, ids!(panel_scroll));
         let mut chrome = panel_padding.top + panel_padding.bottom;
         for (path, size) in [
@@ -2729,7 +2817,7 @@ impl App {
             (ids!(panel_error), 60.0),
             (ids!(manage_sources), 52.0),
             (ids!(send_options), 48.0),
-            (ids!(panel_footer), 48.0),
+            (ids!(panel_footer), footer_height),
         ] {
             if self.ui.widget(cx, path).visible() {
                 chrome += size + spacing;
@@ -2754,7 +2842,21 @@ impl App {
             _ => available.min(260.),
         };
         if let Some(space) = anchor_space {
-            available = available.min((space - 110.).max(60.));
+            available = available.min((space - chrome).max(60.));
+        }
+        let viewport_height =
+            (self.size.y - self.safe.top - self.safe.bottom.max(self.keyboard_height))
+                .min(bounds.size.y)
+                .max(0.0);
+        if speed_panel && available < 168.0 && viewport_height >= chrome + 168.0 {
+            // The fixed speed body must not lose its presets just to stay
+            // anchored. A short window can fit the complete centered popup.
+            available = 168.0;
+            if wide_panel {
+                let align = Align { x: 0.5, y: 0.5 };
+                let padding = Inset::default();
+                script_apply_eval!(cx,layer,{align:#(align) padding:#(padding)});
+            }
         }
         // Keep the panel header and confirmation outside the scrolling viewport.
         let fit = Size::fit();
@@ -2782,6 +2884,56 @@ impl App {
         script_apply_eval!(cx,queue,{height:#(queue_height)});
         let mut columns = self.ui.widget(cx, ids!(player_columns));
         let wide_player = width >= 600. && width > height;
+        let short_player = wide_player && height < 480.;
+        let player_padding = Inset {
+            left: 20.0,
+            right: 20.0,
+            bottom: if short_player { 8.0 } else { 12.0 },
+            ..Default::default()
+        };
+        let mut player = self.ui.widget(cx, ids!(full_player));
+        script_apply_eval!(cx,player,{padding:#(player_padding)});
+        let column_gap = if short_player { 8.0 } else { 16.0 };
+        let mut player_layout = self.ui.widget(cx, ids!(player_layout));
+        script_apply_eval!(cx,player_layout,{spacing:#(column_gap)});
+        let metadata_gap = if short_player { 2.0 } else { 6.0 };
+        let mut metadata = self.ui.widget(cx, ids!(player_metadata));
+        script_apply_eval!(cx,metadata,{spacing:#(metadata_gap)});
+        let artist_height = if short_player {
+            Size::fit()
+        } else {
+            Size::Fixed(22.0)
+        };
+        let mut artist = self.ui.widget(cx, ids!(player_artist));
+        script_apply_eval!(cx,artist,{height:#(artist_height)});
+        let seek_space = if short_player { 0.0 } else { 16.0 };
+        let mut spacer = self.ui.widget(cx, ids!(player_seek_space));
+        script_apply_eval!(cx,spacer,{height:#(seek_space)});
+        let time_height = if short_player { 16.0 } else { 20.0 };
+        let mut times = self.ui.widget(cx, ids!(player_times));
+        script_apply_eval!(cx,times,{height:#(time_height)});
+        let transport_padding = if short_player { 4.0 } else { 12.0 };
+        let transport_inset = Inset {
+            top: transport_padding,
+            bottom: transport_padding,
+            ..Default::default()
+        };
+        let transport_height = 84.0 + transport_padding * 2.0;
+        let mut transport = self.ui.widget(cx, ids!(player_transport));
+        script_apply_eval!(cx,transport,{height:#(transport_height) padding:#(transport_inset)});
+        let action_padding = if short_player { 4.0 } else { 6.0 };
+        let action_inset = Inset {
+            top: action_padding,
+            bottom: action_padding,
+            ..Default::default()
+        };
+        let action_height = 48.0 + action_padding * 2.0;
+        let mut actions = self.ui.widget(cx, ids!(player_actions));
+        script_apply_eval!(cx,actions,{height:#(action_height) padding:#(action_inset)});
+        let title_lines: usize = if short_player { 1 } else { 2 };
+        let title_size = if short_player { 18.0 } else { 21.0 };
+        let mut title = self.ui.widget(cx, ids!(player_title));
+        script_apply_eval!(cx,title,{max_lines:#(title_lines) draw_text.text_style.font_size:#(title_size)});
         let flow = if wide_player {
             Flow::right()
         } else {
@@ -2794,7 +2946,7 @@ impl App {
         } else {
             (width - 48.)
                 .min(height * 0.42)
-                .min((height - 390. - if cfg!(target_os = "android") { 0. } else { 48. }).max(96.))
+                .min((height - 406. - if cfg!(target_os = "android") { 0. } else { 48. }).max(96.))
                 .min(340.)
         };
         script_apply_eval!(cx,art,{width:#(size) height:#(size)});

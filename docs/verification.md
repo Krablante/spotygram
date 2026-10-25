@@ -6,6 +6,63 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.7 layout and surface audit
+
+The 0.2.6 Playlists header reproduced touching Settings/Add circles with different
+right insets. The audit also found square background patches around playlist
+covers, horizontal seams in source groups, displaced dialog headings and cramped
+playback surfaces. Shared rows now reserve space for their glass halos, headings
+use measured text height, source rows share one contour and mosaic tiles clip
+their own pixels over the gradient background.
+Enlarged Android mosaic frames also exposed a cross from antialiased tile
+rectangles and the placeholder beneath them. Tile interiors now stay opaque,
+with antialiasing only at the cover's exterior; artwork hides the placeholder.
+
+Narrow-window inspection exposed overflowing source/button labels and a crowded
+mini-player. Compact layouts keep source names on one line and preserve the
+recording title and speed by omitting the mini-player's Previous button. The full
+player retains Previous. Its saved-file label follows the current recording,
+width and language. Wide Sources no longer shows two sets of actions. Narrow
+confirmation dialogs stack their buttons and reserve their full height. The
+full-screen sign-in page hides the preceding workspace and its floating layers.
+
+Radeon/OpenGL release frames were inspected in both themes and languages at
+280×640, 390×812 and 1100×820. Coverage includes Music, Favorites, Playlists and its
+editor/actions, Sources and an offline profile, the full player, source chooser,
+queue, order/repeat/speed panels, all Settings sections, duration editing and the
+sign-in page. Placeholder, single-image, three-part and four-part playlist covers
+were inspected. A temporary offline profile passed playlist creation with ordered
+membership and renaming through the stacked footer. Sign-in opened from Sources
+and Settings and returned to the correct visible workspace without losing its
+state. The compact saved caption also updated correctly when resizing and changing
+language. No profile or media fixture is included in the source or packages.
+
+The extracted Linux archive was checked against its SHA-256 before launch. Its
+genuine Ogg advanced from 0:28 to 0:39 at 1.05× through libmpv with null output;
+Pause and explicit Quit completed cleanly. Formatting and Cargo checks pass;
+the pinned Makepad workspace still prints its duplicate-package notices.
+
+The final x86-64 APK was installed over the existing API-36 profile without
+clearing its 10,007 recordings, favorite or playlists. Version 0.2.7-rust / 1009
+was confirmed in Android's package state. Actual frames cover both themes,
+playlist mosaics, source groups, the player, queue, Settings and sign-in return.
+Renaming with Gboard completed through the stacked footer above the keyboard;
+General and Player settings remain readable at 200% system font size.
+
+Landscape inspection found the player's lower actions clipped at 800×360 logical
+points. A short landscape layout reduces spacing while retaining 48-point actions
+and the 64-point Play button. The speed popup uses its measured chrome budget and
+falls back to centering when anchoring would crop presets. Final APK frames at
+800×360 show all player actions and the entire speed menu; portrait restores its
+normal spacing. A genuine Ogg advanced from 0:21 to 0:27 at 1.05×, then Pause,
+explicit Quit and a fresh process restored that position without autoplay.
+
+Both final APKs pass signature and 16-KiB ZIP-alignment checks with the existing
+certificate; the ARM64 build and Android release lint also pass.
+
+Physical phones, speaker output and authenticated Telegram operations were not
+part of this offline visual audit.
+
 ## 0.2.6 speed menu
 
 The previous speed menu spread its step controls across the panel and rendered
