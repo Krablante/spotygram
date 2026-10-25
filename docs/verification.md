@@ -37,6 +37,17 @@ application lint, signature verification and 16-KiB ZIP alignment with the exist
 signing certificate. These checks use offline verification profiles and do not
 establish production-account or physical-phone behavior.
 
+Formatting and `cargo check --locked -j2` pass. All four desktop package jobs and
+native-engine checks passed in [CI](https://github.com/Krablante/spotygram/actions/runs/40179232813);
+both macOS bundles passed strict ad hoc signature verification. Apple Silicon
+Metal startup/settings frames were inspected. Hosted Intel frames remained blank;
+the exact x64 archive rendered those scenes in the [Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40179962902).
+The Windows runner's graphics probe remained blocked with `0x887a0004`. Its exact
+archive passed Wine/DXVK checks on Radeon: both player appearances, 1×/1.05× tint,
+five rapid + steps to 1.25×, Queue, genuine Ogg playback through libmpv with null
+output and pause. These compatibility checks do not prove physical Windows/Intel
+GPU behavior or speaker output.
+
 ## 0.2.2 glass edges
 
 The owner's square gray marks reproduce around the circular player Close button
