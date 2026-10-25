@@ -87,6 +87,12 @@ confirmed snapshot's boundary. Discovery failures and inaccessible remembered
 storage produce retries instead of silently creating replacement storage.
 FLOOD_WAIT delays survive restart.
 
+Discovery skips inaccessible unrelated channels at the chat, supergroup and full
+info steps, matching the stable client. Other failures remain retryable; missing
+remembered storage is never silently replaced. Read cloud records reach the UI
+before outgoing sends or maintenance. A change to the connected source identities
+also schedules indexing, so first-time restoration does not require a manual refresh.
+
 The stable app and Rust preview can read the same cloud library. Their local
 databases and Telegram sessions are independent; cloud edits intentionally
 propagate between them.

@@ -1467,6 +1467,14 @@ impl Core {
                 self.refresh()?;
                 self.publish();
             }
+            Notice::CloudLibrary { sources_changed } => {
+                self.store.revision += 1;
+                self.refresh()?;
+                if sources_changed {
+                    self.start_index()?;
+                }
+                self.publish();
+            }
             Notice::Indexed(generation, error) => {
                 if generation == self.index_generation {
                     self.index_job = None;

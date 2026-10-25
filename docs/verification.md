@@ -6,6 +6,35 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.1 synchronization recovery
+
+The owner reported `Sync will retry: 400: Supergroup not found`. The 0.2.0
+discovery loop handled an inaccessible chat but aborted on inaccessible
+supergroup metadata. A controlled TDLib response reproduced that exact status
+in the packaged 0.2.0 interface, leaving zero imported sync records and sources.
+
+The 0.2.1 checks use the real release application's worker, SQLite store and GPU
+interface with a temporary native transport override. No production account or
+remote channel is modified. The responses include an existing format-3 snapshot,
+an inaccessible supergroup and an inaccessible full-info request. Checks cover:
+
+- Skipping both unavailable candidates and reading the existing storage without
+  creating another channel. Sources, a favorite, playlist membership/order and
+  Russian/light appearance restore in the previous profile without a data reset.
+- Automatic indexing after source restoration. The snapshot contains one track
+  descriptor; the source query adds a second recording without a manual refresh.
+- Applying the read snapshot even when an outgoing send fails. The pending local
+  Wi-Fi preference stays pending and retains its value; imported records remain
+  visible and source indexing still runs.
+- A missing remembered storage reports an error and does not create or send to
+  a replacement. A metadata `500` remains a retryable failure, rather than being
+  silently treated as an unavailable candidate.
+
+This reproduces the reported failure and exercises recovery through the actual
+application. It does not establish live authenticated synchronization on the
+owner's phone or replace the remaining account checks below. The temporary
+transport, profiles and configuration are not shipped.
+
 ## 0.2.0 visual migration
 
 The visual reference is stable Spotygram 0.28.0: its Compose layouts, design

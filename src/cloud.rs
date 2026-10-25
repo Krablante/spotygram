@@ -70,7 +70,6 @@ impl Cloud {
                         .notices
                         .send(Notice::Sync("Library up to date".into()))
                         .await;
-                    let _ = cloud.notices.send(Notice::Catalog).await;
                 }
                 Err(error) => {
                     failures = (failures + 1).min(5);
@@ -127,10 +126,16 @@ impl Cloud {
             }
         }
         self.heads.clear();
+        let sources = self.index_sources()?;
         let rooms = self.rooms.clone();
         for room in &rooms {
             self.read(*room).await?;
         }
+        self.notices
+            .send(Notice::CloudLibrary {
+                sources_changed: sources != self.index_sources()?,
+            })
+            .await?;
         for (index, room) in rooms.iter().enumerate() {
             self.finish_cleanup(*room).await?;
             let through = self.meta_number(&format!("through2/{room}"))?;
@@ -195,6 +200,15 @@ impl Cloud {
         Ok(sync::meta(&self.store.db, key)?.parse().unwrap_or(0))
     }
 
+    fn index_sources(&self) -> Result<HashSet<(i64, bool)>> {
+        let mut statement = self.store.db.prepare(
+            "SELECT id,0 FROM sources UNION ALL SELECT id,1 FROM profiles WHERE selected=1",
+        )?;
+        Ok(statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+
     fn protocol(&self, message: &Value) -> bool {
         let caption = message["content"]["caption"]["text"]
             .as_str()
@@ -238,8 +252,7 @@ impl Cloud {
             }
         }
         let mut rooms = Vec::new();
-        self.inspected.extend(candidates.iter().copied());
-        for id in candidates {
+        for &id in &candidates {
             let chat = match self
                 .td
                 .request(json!({"@type":"getChat","chat_id":id}))
@@ -254,17 +267,27 @@ impl Cloud {
                 continue;
             }
             let group = number(&chat["type"], "supergroup_id");
-            let info = self
+            let info = match self
                 .td
                 .request(json!({"@type":"getSupergroup","supergroup_id":group}))
-                .await?;
+                .await
+            {
+                Ok(value) => value,
+                Err(error) if inaccessible(&error) => continue,
+                Err(error) => return Err(error),
+            };
             if kind(&info["status"]) != "chatMemberStatusCreator" {
                 continue;
             }
-            let full = self
+            let full = match self
                 .td
                 .request(json!({"@type":"getSupergroupFullInfo","supergroup_id":group}))
-                .await?;
+                .await
+            {
+                Ok(value) => value,
+                Err(error) if inaccessible(&error) => continue,
+                Err(error) => return Err(error),
+            };
             let description = string(&full, "description");
             if !description.starts_with("spotygram-storage/") {
                 continue;
@@ -279,6 +302,7 @@ impl Cloud {
                 rooms.push(id);
             }
         }
+        self.inspected.extend(candidates);
         if rooms.is_empty() {
             ensure!(
                 remembered == 0,

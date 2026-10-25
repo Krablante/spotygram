@@ -369,6 +369,7 @@ pub enum Notice {
     Status(String),
     Error(String),
     Sync(String),
+    CloudLibrary { sources_changed: bool },
     Choices(u64, Vec<Source>),
     Profile(i64),
     ProfileMember(String, bool),
