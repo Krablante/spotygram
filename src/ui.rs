@@ -433,7 +433,7 @@ script_mod! {
                     panel_error := mod.spotygram.Body{visible:false height:Fit max_lines:3 draw_text.color:mix(#xb84750,#xffa2a2,theme.spotygram_dark)}
                     panel_scroll := mod.spotygram.TouchScroll{width:Fill height:Fit flow:Down spacing:12
                         auth_mark := View{visible:false width:Fill height:132 flow:Down spacing:12 align:Center
-                            auth_photo := Image{width:64 height:64 fit:ImageFit.Smallest src:crate_resource("self:resources/spotygram_mark.png")}
+                            auth_photo := Image{width:64 height:64 fit:ImageFit.Smallest draw_bg +:{border_size:1.0 border_color:#x00000000} src:crate_resource("self:resources/spotygram_mark.png")}
                             auth_name := Label{text:"spotygram" draw_text.color:theme.color_text draw_text.text_style:theme.font_bold{font_size:21}}
                         }
                         auth_heading := mod.spotygram.Body{visible:false height:Fit max_lines:2 draw_text.text_style:theme.font_bold{font_size:16.5} text:"Connect Telegram"}

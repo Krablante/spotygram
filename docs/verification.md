@@ -6,6 +6,42 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.2 glass edges
+
+The owner's square gray marks reproduce around the circular player Close button
+and the speed capsule in the packaged 0.2.1 interface. The shared outer shadow
+retained visible alpha at its rectangular draw boundary, and stationary surfaces
+and buttons also clipped their own drawing to their layout bounds.
+
+Both glass shaders now end the contour shadow smoothly within their geometry.
+Stationary surfaces and glass buttons allow their existing outer padding to draw;
+ancestor scrolling clips remain active. Rounded faces, optical rims, dimensions
+and the shared capture/blur path remain in place. The transparent sign-in image
+also masks its empty edge, as the header stickers already do, to avoid sampler
+streaks.
+
+The Linux release was inspected on Radeon 680M through native Wayland/Vulkan
+and Xwayland/OpenGL. Before/after enlarged crops cover the reported circular
+button and speed capsule. Checks also cover light/dark appearance, hover and
+press, the 10,007-row library, grouped source panels, playlist editor, settings,
+language, speed and queue panels, and the 390×812 responsive player and sheets.
+The shadow follows the rounded contour without the former rectangular corner
+marks. `cargo fmt --all -- --check` and `cargo check --locked -j2` pass; Cargo
+still reports the pinned Makepad workspace's duplicate-package notices.
+
+The signed x86-64 APK updated 0.2.1 in place on the Android 16 / API-36 emulator
+with Radeon-backed OpenGL. Version 0.2.2-rust / 1004 retained the 10,007-row
+library, favorite, Russian/dark appearance, 2× speed and paused position 2:19.
+Actual frames cover both themes, library, grouped sources, playlist editor,
+player, settings, speed and queue sheets. A settings swipe starting over the
+enabled resume toggle scrolled without changing it; returning to the top kept
+its state. No Makepad script/shader error or application crash appeared.
+Both ABIs pass application lint, signature verification and 16-KiB ZIP alignment;
+the signing certificate matches 0.2.1.
+
+These are rendering and interaction checks. The account and physical-device
+coverage limits below still apply.
+
 ## 0.2.1 synchronization recovery
 
 The owner reported `Sync will retry: 400: Supergroup not found`. The 0.2.0

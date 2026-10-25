@@ -90,6 +90,14 @@ script_mod! {
                 if t<2.0 {return mix(cyan,shade,t-1.0);}
                 return mix(shade,bottom,t-2.0);
             }
+            outer_shadow:fn(shape:float,coverage:float)->float{
+                // The quad has 4 pt of padding. A Gaussian alone still has
+                // visible alpha there and exposes its rectangular boundary.
+                // End the halo smoothly within that support on every surface.
+                let distance=max(shape,0.0);
+                let fade=1.0-smoothstep(1.0,4.0,distance);
+                return exp(-distance*distance/12.0)*fade*(1.0-coverage);
+            }
             pixel:fn(){
                 let sdf=Sdf2d.viewport(self.pos*self.rect_size3);
                 let p=self.sdf_rect_pos;
@@ -128,7 +136,7 @@ script_mod! {
                 sdf.box(p.x+2.6,p.y+2.6,size.x-5.2,size.y-5.2,max(radius-1.3,0.5));
                 let rim=self.optical_rim(y);
                 sdf.stroke(vec4(rim.rgb,rim.a*edge_alpha),mix(0.8,0.5,self.dark));
-                let shade=exp(-max(shape,0.0)*max(shape,0.0)/12.0)*(1.0-sdf.result.a)*0.08;
+                let shade=self.outer_shadow(shape,sdf.result.a)*0.08;
                 return (sdf.result+vec4(0.0,0.0,0.0,shade))*self.layer_opacity;
             }
         }
@@ -138,7 +146,7 @@ script_mod! {
     // Stationary controls refract the same analytic light field as Prism.
     // They need no scene capture or blur pyramid while the catalog scrolls.
     mod.spotygram.Surface = View {
-        width:Fill height:Fit show_bg:true
+        width:Fill height:Fit show_bg:true clip_x:false clip_y:false
         draw_bg +:{
             color:theme.color_bg_app
             base_color:uniform(theme.color_bg_app)
@@ -152,6 +160,7 @@ script_mod! {
             loading:uniform(0.0) anim_time:uniform(0.0) loading_color:uniform(theme.color_text)
             environment_color:mod.spotygram.CapturedSurface.draw_bg.environment_color
             optical_rim:mod.spotygram.CapturedSurface.draw_bg.optical_rim
+            outer_shadow:mod.spotygram.CapturedSurface.draw_bg.outer_shadow
             vertex:fn(){
                 let position=self.clip_and_transform_vertex(self.rect_pos-vec2(4.0),self.rect_size+vec2(8.0));
                 self.pos=(self.pos*(self.rect_size+vec2(8.0))-vec2(4.0))/self.rect_size;
@@ -200,12 +209,13 @@ script_mod! {
                     sdf.arc_round_caps(c.x,c.y,min(size.x,size.y)*0.23,a,a+4.712389,2.0);
                     sdf.fill(vec4(self.loading_color.rgb,self.loading));
                 }
-                let shade=exp(-max(shape,0.0)*max(shape,0.0)/12.0)*(1.0-sdf.result.a)*0.07*seal;
+                let shade=self.outer_shadow(shape,sdf.result.a)*0.07*seal;
                 return sdf.result+vec4(0.0,0.0,0.0,shade);
             }
         }
     }
     mod.spotygram.Glass = ButtonFlat {
+        clip_x:false clip_y:false
         height:48 margin:0 padding:Inset{left:16 right:16 top:0 bottom:0} spacing:7
         text:"" align:Center label_walk:Walk{width:Fit height:Fit}
         draw_bg:mod.spotygram.Surface.draw_bg{}

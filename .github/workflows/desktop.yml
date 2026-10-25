@@ -172,6 +172,14 @@ jobs:
                               time.sleep(1)
                       shutil.copy2(grab['png'],evidence/f'interface-{index}.png')
                   shutil.copy2(evidence/'interface-2.png',evidence/'interface.png')
+                  # Exercise the captured glass shader as well as stationary controls.
+                  with urllib.request.urlopen('http://127.0.0.1:46871/snap?q=settings',timeout=5) as response:
+                      settings=[node for node in json.load(response)['s'] if node['i']=='settings']
+                  if len(settings)!=1: raise RuntimeError('Settings control is unavailable')
+                  x,y,width,height=settings[0]['r']
+                  with urllib.request.urlopen(f'http://127.0.0.1:46871/click?x={x+width/2}&y={y+height/2}&wait=1&if_user_seq=0',timeout=10) as response: response.read()
+                  with urllib.request.urlopen('http://127.0.0.1:46871/g',timeout=15) as response: settings_grab=json.load(response)
+                  shutil.copy2(settings_grab['png'],evidence/'settings.png')
                   for endpoint in ('snap','log'):
                       with urllib.request.urlopen('http://127.0.0.1:46871/'+endpoint,timeout=5) as response:
                           (evidence/(endpoint+'.json')).write_bytes(response.read())

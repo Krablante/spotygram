@@ -23,6 +23,13 @@ closed panels do not leave separate button overlays. Sliders accept absolute
 taps, drags and keyboard input without opening a numeric keyboard. Tab animation
 stops when it settles; changing a header sticker does not wake cloud sync.
 
+Both glass shaders share a contour-based outer shadow with a smooth cutoff
+inside the quad's padding. Glass controls and stationary surfaces allow that
+padding to draw outside their own layout bounds; ancestor scrolling clips still
+apply. Keep the halo within the geometry: truncating a Gaussian with visible
+alpha exposes square edges around circular buttons and rounded panels. This
+does not require another capture, texture or render pass.
+
 Dynamic SVGs retain their parsed document and GPU mesh until the glyph changes.
 A bounded cache restores the desired glyph after style reloads, including hidden
 controls. Drawing an unchanged row must not request another frame for its icon.
