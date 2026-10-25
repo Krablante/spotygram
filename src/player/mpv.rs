@@ -11,7 +11,7 @@ use std::{
     ptr,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     thread,
 };
@@ -87,12 +87,14 @@ impl Api {
 struct StreamContext {
     media: ArcSwapOption<Media>,
     notices: mpsc::Sender<Notice>,
+    waiting: Arc<AtomicUsize>,
 }
 struct Stream {
     reader: Mutex<Reader>,
     cancelled: Arc<AtomicBool>,
     generation: u64,
     notices: mpsc::Sender<Notice>,
+    waiting: Arc<AtomicUsize>,
 }
 
 pub struct Mpv {
@@ -115,6 +117,7 @@ impl Mpv {
             context: Box::new(StreamContext {
                 media: ArcSwapOption::empty(),
                 notices: notices.clone(),
+                waiting: Arc::new(AtomicUsize::new(0)),
             }),
             generation: Arc::new(AtomicU64::new(0)),
             stop: Arc::new(AtomicBool::new(false)),
@@ -324,6 +327,9 @@ impl Mpv {
             &["seek", &position.max(0.).to_string(), "absolute+exact"],
         )
     }
+    pub fn waiting(&self) -> bool {
+        self.context.waiting.load(Ordering::Acquire) != 0
+    }
     fn command_id(&self, id: u64, arguments: &[&str]) -> Result<()> {
         let strings = arguments
             .iter()
@@ -402,6 +408,7 @@ unsafe extern "C" fn open_stream(
         cancelled,
         generation,
         notices: context.notices.clone(),
+        waiting: context.waiting.clone(),
     });
     unsafe {
         *info = StreamInfo {
@@ -420,7 +427,18 @@ unsafe extern "C" fn read_stream(cookie: *mut c_void, buffer: *mut c_char, size:
     let bytes = unsafe {
         std::slice::from_raw_parts_mut(buffer as *mut u8, size.min(usize::MAX as u64) as usize)
     };
-    match stream.reader.lock().unwrap().read(bytes) {
+    let mut waiting = false;
+    let result = stream.reader.lock().unwrap().read_interruptible(bytes, || {
+        if !waiting {
+            stream.waiting.fetch_add(1, Ordering::AcqRel);
+            waiting = true;
+        }
+        false
+    });
+    if waiting {
+        stream.waiting.fetch_sub(1, Ordering::AcqRel);
+    }
+    match result {
         Ok(count) => count as i64,
         Err(error) => {
             eprintln!("Audio reader: {error}");

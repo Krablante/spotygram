@@ -54,6 +54,14 @@ window-close handler. Its replacement preserved requested playback during both
 preparation and actual decoding, and exited cleanly when paused. Inspected frames
 retain the original caption geometry and player surfaces.
 
+A partial-file seek exposed a separate libmpv stall: moving back to available
+bytes left the old range read alive and the clock frozen until its timeout.
+The final revision reopened only while a range read was waiting. Returning to
+available bytes resumed decoding (inspected frames advance from 1:09 to 1:12),
+and Pause removed the stalled audio threads. Two seeks with the full file
+available retained the same audio-events, demux and output threads. Loading now
+uses the artist line, keeping the seek bar and controls stationary.
+
 Normal/reverse order, shuffle without repeats, repeat-one/all, random history,
 removing/reordering queue entries and deleting the last item were exercised with
 real short recordings. Pause cannot be undone by a stale EOF. Exact paused

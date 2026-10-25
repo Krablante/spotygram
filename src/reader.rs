@@ -49,9 +49,6 @@ impl Reader {
         self.requested_at = -1;
         Ok(offset)
     }
-    pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize> {
-        self.read_interruptible(buffer, || false)
-    }
     pub fn read_interruptible(
         &mut self,
         buffer: &mut [u8],

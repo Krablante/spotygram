@@ -144,6 +144,8 @@ or reordering queue entries clears positional shuffle/history data; restore vali
 An EOF arriving after an accepted Pause cannot start the next recording.
 Desktop caption and system window-close actions share one lifetime handler, and OS
 media controls follow playback intent during buffering. Explicit Quit stops the worker and engine.
+The loading label temporarily occupies the artist line, so buffering cannot move
+the seek bar or transport controls under the pointer.
 
 Android registers its session with `MediaSessionService` so Media3 manages the
 notification and foreground lifetime. The service can be reclaimed after a pause.
@@ -174,6 +176,10 @@ readers before releasing ExoPlayer. Media3 does not repeat an already exhausted
 native read timeout, and libmpv reader failures reach Rust directly. Playback can
 rebind a known remote file without scanning its entire profile; send/profile
 operations keep their permission-refresh path.
+libmpv reports active range waits through a small atomic counter. A seek during
+such a wait cancels the old engine and reopens at the requested position; ordinary
+seeks retain the decoder and buffers. Pause also cancels stalled desktop reads
+instead of leaving a timed-out prefetch alive.
 
 Imports are app-owned copies. Android first copies a content URI into private
 staging storage and then moves it into import storage. No external original is

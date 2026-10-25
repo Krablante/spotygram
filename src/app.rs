@@ -2088,13 +2088,7 @@ impl App {
         self.visible(cx, ids!(notice), !notice.is_empty());
         self.text(cx, ids!(notice), notice);
         let playback = &state.playback;
-        let player_notice = if !state.error.is_empty() {
-            state.error.as_str()
-        } else if playback.buffering {
-            "Loading audio…"
-        } else {
-            ""
-        };
+        let player_notice = state.error.as_str();
         self.visible(cx, ids!(player_notice), !player_notice.is_empty());
         self.text(cx, ids!(player_notice), player_notice);
         let active = playback.track.is_some();
@@ -2199,7 +2193,11 @@ impl App {
             self.text(
                 cx,
                 ids!(player_artist),
-                &ui::subtitle(&state.language, track),
+                &if playback.buffering {
+                    crate::i18n::tr(&state.language, "Loading audio…")
+                } else {
+                    ui::subtitle(&state.language, track)
+                },
             );
             self.text(
                 cx,

@@ -83,6 +83,16 @@ impl Engine {
             crate::android::player(serde_json::json!({"action":"seek","position":position.max(0.)}))
         }
     }
+    pub fn waiting(&self) -> bool {
+        #[cfg(not(target_os = "android"))]
+        {
+            self.inner.waiting()
+        }
+        #[cfg(target_os = "android")]
+        {
+            false
+        }
+    }
     pub fn stop(&self) -> Result<()> {
         #[cfg(not(target_os = "android"))]
         {

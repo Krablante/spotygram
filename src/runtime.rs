@@ -222,10 +222,10 @@ impl Core {
                     if let Some(authorization)=self.td.as_ref().and_then(|td|td.authorization_update()){
                         if let Err(error)=self.native_event(authorization).await{self.state.error=error.to_string();self.publish();}
                     }
-                    let playback_command=matches!(&command,Command::Play(..)|Command::PlayAll|Command::PlayQueue(..)|Command::Resume|Command::Pause|Command::Toggle|Command::Next|Command::Previous);
+                    let playback_command=matches!(&command,Command::Play(..)|Command::PlayAll|Command::PlayQueue(..)|Command::Resume|Command::Pause|Command::Toggle|Command::Next|Command::Previous|Command::Seek(..));
                     let previous_generation=self.generation;
                     if let Err(error)=self.command(command).await{
-                        if playback_command{if self.generation!=previous_generation || self.state.playback.buffering{let _=self.engine_event(EngineEvent::Failed(self.generation,error.to_string()));}else{self.intent=self.state.playback.playing;}}
+                        if playback_command{if self.generation!=previous_generation || self.state.playback.buffering || self.engine.is_none(){let _=self.engine_event(EngineEvent::Failed(self.generation,error.to_string()));}else{self.intent=self.state.playback.playing;}}
                         self.state.error=error.to_string();self.publish();
                     }
                 },
@@ -728,8 +728,13 @@ impl Core {
             } else if self.loaded_generation == self.generation {
                 self.engine.as_ref().unwrap().pause(false)?;
             }
-        } else if self.engine.is_some() && self.loaded_generation != self.generation {
-            // Preparing audio must remain cancellable from both the UI and OS controls.
+        } else if self
+            .engine
+            .as_ref()
+            .is_some_and(|engine| self.loaded_generation != self.generation || engine.waiting())
+        {
+            // Cancel preparation and stalled desktop range reads, including
+            // prefetch after Ready. Pausing must not leave a timed-out read alive.
             self.generation += 1;
             self.loaded_generation = 0;
             self.preparing_deadline = None;
@@ -1114,7 +1119,15 @@ impl Core {
             Command::Seek(position) => {
                 ensure!(position.is_finite(), "Invalid playback position");
                 let position = position.clamp(0., self.state.playback.duration.max(0.));
-                if self.loaded_generation == self.generation {
+                if self.engine.as_ref().is_some_and(Engine::waiting) {
+                    // libmpv cannot execute a new seek while its demuxer is
+                    // blocked inside the old range read. Reopen only that case;
+                    // ordinary seeks keep their existing decoder and buffers.
+                    if let Some(engine) = self.engine.take() {
+                        engine.stop()?;
+                    }
+                    self.start_load(Some(position))?;
+                } else if self.loaded_generation == self.generation {
                     if let Some(engine) = &self.engine {
                         engine.seek(position)?;
                     }
