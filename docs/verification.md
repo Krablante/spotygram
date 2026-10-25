@@ -41,6 +41,8 @@ The extracted Linux archive was checked against its SHA-256 before launch. Its
 genuine Ogg advanced from 0:28 to 0:39 at 1.05× through libmpv with null output;
 Pause and explicit Quit completed cleanly. Formatting and Cargo checks pass;
 the pinned Makepad workspace still prints its duplicate-package notices.
+The same final archive rendered mosaic covers and source groups through
+Wayland/Vulkan on Radeon; its actual frames were inspected too.
 
 The final x86-64 APK was installed over the existing API-36 profile without
 clearing its 10,007 recordings, favorite or playlists. Version 0.2.7-rust / 1009
@@ -60,8 +62,22 @@ explicit Quit and a fresh process restored that position without autoplay.
 Both final APKs pass signature and 16-KiB ZIP-alignment checks with the existing
 certificate; the ARM64 build and Android release lint also pass.
 
-Physical phones, speaker output and authenticated Telegram operations were not
-part of this offline visual audit.
+All four desktop builds and native-engine checks passed in
+[CI](https://github.com/Krablante/spotygram/actions/runs/40231098138). Both macOS
+bundles passed strict ad hoc signature verification. The Windows runner's
+first-adapter probe remained blocked with `0x887a0004`. Its exact archive, checked
+against its SHA-256, rendered both themes, mosaic covers, source groups and the
+wide/narrow player through Wine/DXVK on Radeon. A genuine Ogg advanced from 0:28
+to 0:42 at 1.05× with null output, then paused and quit cleanly.
+
+Apple Silicon Metal library and Settings frames were inspected. Hosted Intel
+captures remained blank; the same x64 archive rendered both screens in the
+[Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40231915485),
+whose actual frames were also inspected.
+
+Physical phones, native Windows/Intel GPU behavior, speaker output, Windows
+system-media controls and authenticated Telegram operations were not established
+by this offline visual audit.
 
 ## 0.2.6 speed menu
 
