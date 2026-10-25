@@ -23,6 +23,8 @@ an inaccessible supergroup and an inaccessible full-info request. Checks cover:
   Russian/light appearance restore in the previous profile without a data reset.
 - Automatic indexing after source restoration. The snapshot contains one track
   descriptor; the source query adds a second recording without a manual refresh.
+  A separate profile-only snapshot also restores its subscription and loads its
+  profile audio without a connected chat.
 - Applying the read snapshot even when an outgoing send fails. The pending local
   Wi-Fi preference stays pending and retains its value; imported records remain
   visible and source indexing still runs.
@@ -34,6 +36,21 @@ This reproduces the reported failure and exercises recovery through the actual
 application. It does not establish live authenticated synchronization on the
 owner's phone or replace the remaining account checks below. The temporary
 transport, profiles and configuration are not shipped.
+
+The signed x86-64 APK updated 0.2.0 in place on the Android 16 / API-36 emulator.
+The 10,007-row library, favorite, Russian/dark appearance, current recording,
+paused position 2:19 and speed 2× remained intact. Installed version 0.2.1-rust /
+1003 and actual frames were checked; no Makepad/AndroidRuntime errors appeared.
+Both APK ABIs passed application lint, signature verification and 16-KiB ZIP
+alignment. Their certificate matches 0.2.0.
+
+All four desktop packages and native-engine loading passed in [CI](https://github.com/Krablante/spotygram/actions/runs/40153036648).
+Apple Silicon Metal and the exact Intel archive's [Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40153909786)
+produced visually inspected frames. Native hosted Intel frames remained blank;
+the Windows adapter probe remained blocked with `0x887a0004`. The exact Windows
+archive rendered through Wine/DXVK on Radeon and passed real Ogg import, libmpv
+null-output playback, seeking to 1:27 and pause. These remain compatibility checks,
+not physical Windows/Intel GPU or phone account evidence.
 
 ## 0.2.0 visual migration
 
