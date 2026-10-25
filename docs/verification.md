@@ -6,6 +6,37 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.3 player controls
+
+The lower player row follows the stable Compose reference: a 48-dp circular
+speed button, equal-width side buttons, 8-dp gaps and the rounded QueueMusic
+glyph. Non-1× speed uses the reference accent and secondary text colors.
+Commands and restored queue values use the same 0.05 grid over 0.3–4×.
+
+The packaged Linux interface was inspected through Radeon-backed Vulkan and
+OpenGL in both appearances, with responsive checks at 390×812 and 320×720,
+including Download, On device, Queue, hover/press and the 1× reset.
+1× → 1.05× → 1.1× → 1.05× works, as do slider input, presets, the 0.3×/4× limits
+and their disabled controls. Russian comma and English decimal labels fit inside
+the circle. A genuine Ogg played through libmpv with null output at 1.05×;
+restart retained the value and paused position. The previous contour-shadow fix
+remains intact in the inspected frames.
+
+Rapid Android taps exposed a second issue: five + presses could advance only
+three steps because the UI reused an older snapshot. Relative −/+ commands now
+apply sequentially to the worker's current speed. Five rapid + presses on desktop
+and Android advance exactly from 1× to 1.25×; five Android − presses return to 1×.
+
+The signed APK updated 0.2.2 in place on the Android 16 / API-36 emulator and the
+final rebuilt package was reinstalled without clearing data. Version 0.2.3-rust /
+1005 retained the 10,007-row catalog, favorite, language, theme and playback state.
+Actual frames cover both themes, 1× reset, 1.05× and 3.95× labels, speed limits and
+Queue. Media3 advanced the genuine Ogg at 1.05×; restart retained 1.05× and pause
+at 2:28. No Makepad script/shader failure or app crash appeared. Both APKs pass
+application lint, signature verification and 16-KiB ZIP alignment with the existing
+signing certificate. These checks use offline verification profiles and do not
+establish production-account or physical-phone behavior.
+
 ## 0.2.2 glass edges
 
 The owner's square gray marks reproduce around the circular player Close button

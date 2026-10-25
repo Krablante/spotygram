@@ -703,7 +703,7 @@ impl Store {
             .query_map([], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
         queue.index = queue.index.min(queue.ids.len().saturating_sub(1));
-        queue.speed = queue.speed.clamp(0.3, 4.);
+        queue.speed = playback_speed_step(queue.speed);
         queue.volume = queue.volume.clamp(0., 100.);
         if queue.shuffled.len() != queue.ids.len() {
             queue.shuffled.clear();

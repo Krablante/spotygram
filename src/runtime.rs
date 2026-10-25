@@ -671,6 +671,15 @@ impl Core {
         Ok(())
     }
 
+    fn set_speed(&mut self, value: f64) -> Result<()> {
+        ensure!(value.is_finite(), "Invalid playback speed");
+        self.queue.speed = playback_speed_step(value);
+        if let Some(engine) = &self.engine {
+            engine.speed(self.queue.speed)?;
+        }
+        self.store.save_queue(&self.queue, false)
+    }
+
     async fn command(&mut self, command: Command) -> Result<()> {
         if !matches!(
             &command,
@@ -1036,12 +1045,10 @@ impl Core {
                 self.save_checkpoint(true)?;
             }
             Command::Speed(value) => {
-                ensure!(value.is_finite(), "Invalid playback speed");
-                self.queue.speed = value.clamp(0.3, 4.);
-                if let Some(engine) = &self.engine {
-                    engine.speed(self.queue.speed)?;
-                }
-                self.store.save_queue(&self.queue, false)?;
+                self.set_speed(value)?;
+            }
+            Command::SpeedStep(steps) => {
+                self.set_speed(self.queue.speed + f64::from(steps) * PLAYBACK_SPEED_STEP)?;
             }
             Command::Volume(value) => {
                 ensure!(value.is_finite(), "Invalid volume");

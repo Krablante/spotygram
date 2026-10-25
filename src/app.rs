@@ -1570,6 +1570,22 @@ impl App {
                 self.ui
                     .media_slider(cx, ids!(speed_slider))
                     .set_value(cx, state.playback.speed);
+                for (id, disabled) in [
+                    (
+                        ids!(speed_minus),
+                        state.playback.speed <= data::MIN_PLAYBACK_SPEED,
+                    ),
+                    (
+                        ids!(speed_plus),
+                        state.playback.speed >= data::MAX_PLAYBACK_SPEED,
+                    ),
+                ] {
+                    let button = self.ui.widget(cx, id);
+                    button.set_disabled(cx, disabled);
+                    if let Some(mut button) = button.borrow_mut::<Button>() {
+                        button.draw_icon.opacity = if disabled { 0.38 } else { 1.0 };
+                    }
+                }
                 for (id, value) in [
                     (ids!(speed_slow), 0.5),
                     (ids!(speed_normal), 1.0),
@@ -2244,6 +2260,20 @@ impl App {
                 .as_ref()
                 .is_none_or(|s| s.playback.speed != playback.speed)
             {
+                let changed = (playback.speed - 1.).abs() > 0.001;
+                let accent = if changed { 1.0 } else { 0.0 };
+                let light = state.settings["theme"] == "light";
+                let color = match (changed, light) {
+                    (true, true) => vec4(0.075, 0.482, 0.541, 1.),
+                    (true, false) => vec4(0.541, 0.867, 0.902, 1.),
+                    (false, true) => vec4(0.114, 0.188, 0.196, 1.),
+                    (false, false) => vec4(0.945, 0.965, 0.953, 1.),
+                };
+                let mut button = self.ui.widget(cx, ids!(speed));
+                script_apply_eval!(cx, button, {
+                    draw_bg.accent:#(accent)
+                    draw_text +:{color:#(color) color_hover:#(color) color_down:#(color) color_focus:#(color)}
+                });
                 self.layout(cx);
             }
             self.text(cx, ids!(volume_label), &format!("{:.0}%", playback.volume));
@@ -3446,10 +3476,10 @@ impl MatchEvent for App {
             }
         }
         if self.click(cx, actions, ids!(speed_minus)) {
-            self.send(cx, C::Speed((state.playback.speed - 0.1).max(0.3)));
+            self.send(cx, C::SpeedStep(-1));
         }
         if self.click(cx, actions, ids!(speed_plus)) {
-            self.send(cx, C::Speed((state.playback.speed + 0.1).min(4.0)));
+            self.send(cx, C::SpeedStep(1));
         }
         if self
             .ui

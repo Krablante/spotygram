@@ -373,9 +373,9 @@ script_mod! {
                         }
                     }
                     View{width:Fill height:56 padding:Inset{top:4 bottom:4} flow:Right spacing:8
-                        player_save := mod.spotygram.Glass{width:Fill padding:8 text:"Save on device" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/download.svg")}
-                        speed := mod.spotygram.Glass{width:64 padding:8 text:"1×"}
-                        queue := mod.spotygram.Glass{width:Fill padding:8 text:"Queue" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/order.svg")}
+                        player_save := mod.spotygram.Glass{width:Fill padding:8 spacing:5 text:"Save on device" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/download.svg")}
+                        speed := mod.spotygram.Glass{width:48 padding:0 text:"1×" draw_bg.accent_color:mix(#x086d79,#x58c9d2,theme.spotygram_dark)}
+                        queue := mod.spotygram.Glass{width:Fill padding:8 spacing:5 text:"Queue" icon_walk:Walk{width:20 height:20} draw_icon.svg:crate_resource("self:resources/queue.svg")}
                     }
                     volume_row := View{width:Fill height:44 flow:Right align:Align{y:0.5} spacing:8
                         mute := mod.spotygram.PlainIcon{draw_icon.svg:crate_resource("self:resources/volume.svg")}
@@ -545,7 +545,7 @@ script_mod! {
                                  speed_value := mod.spotygram.Title{text:"1×" align:Center}
                                  speed_plus := mod.spotygram.InlineIcon{draw_icon.svg:crate_resource("self:resources/add.svg")}
                              }
-                            speed_slider := mod.spotygram.Slider{min:0.3 max:4.0 step:0.05}
+                            speed_slider := mod.spotygram.Slider{min:#(data::MIN_PLAYBACK_SPEED) max:#(data::MAX_PLAYBACK_SPEED) step:#(data::PLAYBACK_SPEED_STEP)}
                             View{width:Fill height:48 flow:Right spacing:6
                                  speed_slow := mod.spotygram.InlineGlass{width:Fill padding:4 text:"0.5×"}
                                  speed_normal := mod.spotygram.InlineGlass{width:Fill padding:4 text:"1×"}

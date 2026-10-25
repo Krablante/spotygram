@@ -14,7 +14,7 @@ Kotlin-версия остаётся в [`main`](https://github.com/Krablante/sp
 Тестовые выпуски используют теги `rust-v…` и помечаются как prerelease. Они не
 становятся последним стабильным релизом GitHub. Java runtime в desktop-пакетах нет.
 
-[Скачать тестовую Rust-версию](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.2)
+[Скачать тестовую Rust-версию](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.3)
 · [Как пользоваться](docs/usage.ru.md) · [Собрать из исходников](docs/build.ru.md)
 · [Проверки и ограничения](docs/verification.ru.md)
 

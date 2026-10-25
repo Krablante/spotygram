@@ -57,6 +57,10 @@ cache entries while retaining current artwork. Playback clock updates reach the
 full player at most four times per second; hidden UI does not receive those
 redraws. Position checkpoints are written at five-second intervals and on
 meaningful playback transitions. Sound controls do not reload the catalog.
+`model.rs` defines the shared 0.3–4× range and 0.05 speed grid; commands and queue
+restore use the same rounding before passing the value to either audio engine.
+−/+ commands carry relative steps; the worker applies them to its current speed
+so rapid taps do not depend on when the UI receives the next snapshot.
 
 Small source avatars load serially at low priority for bounded visible requests.
 Hiding the app cancels that work. The source-photo table and bounded directory

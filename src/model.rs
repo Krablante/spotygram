@@ -198,6 +198,15 @@ pub enum Repeat {
     One,
 }
 
+pub const MIN_PLAYBACK_SPEED: f64 = 0.3;
+pub const MAX_PLAYBACK_SPEED: f64 = 4.0;
+pub const PLAYBACK_SPEED_STEP: f64 = 0.05;
+
+pub fn playback_speed_step(value: f64) -> f64 {
+    let ticks = 1.0 / PLAYBACK_SPEED_STEP;
+    ((value * ticks).round() / ticks).clamp(MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Queue {
@@ -317,6 +326,7 @@ pub enum Command {
     Previous,
     Seek(f64),
     Speed(f64),
+    SpeedStep(i8),
     Volume(f64),
     Mute,
     Order(Order),

@@ -70,6 +70,9 @@ or open Queue over the player. Queue rows have direct play, move-up and remove c
 including repeated occurrences of the same song. Available orders are forward,
 reverse, shuffle without repeats within a pass, and independent random draws.
 
+Speed ranges from 0.3× to 4× in 0.05 steps, using the slider or −/+. The circular
+speed button is tinted whenever playback differs from 1×; the 1× preset resets it.
+
 <img src="screenshots/rust-desktop-player-dark.png" alt="The shared desktop player in dark appearance" width="860">
 
 <img src="screenshots/rust-android-dark.png" alt="The same player on Android in dark appearance" width="300">
