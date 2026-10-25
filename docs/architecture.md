@@ -200,9 +200,13 @@ native jobs. Java stops both services, finishes the task and exits the process;
 relaunching must initialize fresh native singletons rather than reuse a closed client.
 
 Makepad's Android Java/resources compile as the `makepad-platform` dependency
-from its pinned checkout, outside the source tree. Staging adds one version guard
-around `InputDevice.isEnabled`, which Android 26 lacks; the upstream checkout
-stays intact. Application lint checks the app-owned adapter, which disables unused
+from its pinned checkout, outside the source tree. Staging guards
+`InputDevice.isEnabled`, which Android 26 lacks, and adds the protected
+`shouldShutdownNativeRuntime` activity hook. The app disables that terminal
+shutdown: destroying the activity releases its UI while service workers remain
+alive, and a later activity attaches to the existing runtime. Android still owns
+cached-process reclamation; explicit Quit performs the cleanup described above.
+The upstream checkout stays intact. Application lint checks the app-owned adapter, which disables unused
 MIDI discovery. Ordinary text/key input remains available. Predictive Back uses Makepad's
 existing callback and the application's shared panel navigation.
 

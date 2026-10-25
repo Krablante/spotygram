@@ -62,6 +62,37 @@ and Pause removed the stalled audio threads. Two seeks with the full file
 available retained the same audio-events, demux and output threads. Loading now
 uses the artist line, keeping the seek bar and controls stationary.
 
+Removing the Android task during buffering exposed Makepad's terminal activity
+shutdown: the process exited despite a foreground playback service. The staged
+activity hook now separates UI destruction from worker lifetime. On the final
+APK, the task was swiped away while Media3 reported BUFFERING, then bytes were
+delivered: the same process reported PLAYING at 1.05× with a foreground service.
+Launching a new activity restored the live player. Stopping the service while
+paused retained the activity process; one Play restored its position and speed.
+The noisy-audio event paused it. Seeking to an unavailable range and then back
+changed BUFFERING to PLAYING within the two-second observation interval; controls
+kept their geometry.
+
+The ordinary signed APK was restored after controlled transport checks. Version
+0.2.5-rust / 1007 retained the original 10,007-row offline catalog, favorite,
+Russian/dark preferences, 1.05× and paused queue. Genuine local Vorbis advanced
+from the restored position; Pause, explicit Quit and a fresh-process restart
+retained it without autoplay. Both APKs pass application lint, signature checks
+with the previous certificate and 16-KiB ZIP alignment. Formatting and Cargo
+checks pass; the pinned Makepad workspace still prints its duplicate-package notices.
+
+All four desktop archives and native-engine checks passed in
+[CI](https://github.com/Krablante/spotygram/actions/runs/40207994473).
+Apple Silicon Metal frames were inspected. Hosted Intel frames were blank; its
+exact archive rendered in the [Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40209807728).
+Both macOS bundles passed strict ad hoc signature checks. The Windows runner's
+first-adapter graphics probe remained blocked with `0x887a0004`. Downloaded Linux
+and Windows archives passed genuine one-hour Opus playback, long seeking, 1.05×,
+pause checkpoints and exit on Radeon through OpenGL and Wine/DXVK respectively;
+Windows restart restored pause and speed. These are the CI archives, with hashes
+verified before extraction. Subsequent source changes affect only the Android
+activity adapter/staging and documentation; desktop source is unchanged.
+
 Normal/reverse order, shuffle without repeats, repeat-one/all, random history,
 removing/reordering queue entries and deleting the last item were exercised with
 real short recordings. Pause cannot be undone by a stale EOF. Exact paused
@@ -69,6 +100,7 @@ position and bookmarks were inspected in SQLite. The paused libmpv event thread
 showed unchanged context-switch counters between observations; its old half-second
 polling wait has been removed.
 
+Wine and Rosetta checks do not establish physical Windows/Intel GPU behavior.
 Verification profiles, controlled responses and media stay outside the source and
 release packages. Production Telegram exchange, the owner's physical phone and
 speaker/Bluetooth output remain outside these checks.

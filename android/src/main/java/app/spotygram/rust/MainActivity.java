@@ -12,6 +12,9 @@ import org.json.JSONArray;
 import dev.makepad.android.MakepadActivity;
 
 public final class MainActivity extends MakepadActivity {
+    // The activity owns its surface, not the music/transfer workers. Explicit
+    // Quit closes those workers before PlatformBridge exits the process.
+    @Override protected boolean shouldShutdownNativeRuntime() { return false; }
     private static final int IMPORT_AUDIO = 319;
     private static final String SHARE_HANDLED = "app.spotygram.rust.shareHandled";
     private static final java.util.concurrent.ExecutorService imports = Executors.newSingleThreadExecutor();

@@ -258,13 +258,23 @@ def android(state, output, env, abis):
     reset_owned(generated / "res", output)
     copy_tree(upstream / "tools/cargo_makepad/src/android/java", generated / "java")
     # API 26 has physical keyboards but no InputDevice.isEnabled (added in 27).
-    # Keep the pinned checkout intact; this one guard belongs to our staged adapter.
+    # Keep the pinned checkout intact; compatibility/lifetime hooks belong to
+    # our staged Java adapter.
     activity = generated / "java/dev/makepad/android/MakepadActivity.java"
     code = activity.read_text()
     old = "&& device.isEnabled()"
     if code.count(old) != 1:
         raise RuntimeError("Review the Makepad API-26 keyboard compatibility guard")
-    activity.write_text(code.replace(old, "&& (Build.VERSION.SDK_INT < 27 || device.isEnabled())"))
+    code = code.replace(old, "&& (Build.VERSION.SDK_INT < 27 || device.isEnabled())")
+    anchor = "    @Override\n    protected void onDestroy() {"
+    destroy = "if (!isRecreating) {\n            MakepadNative.activityOnDestroy();"
+    if code.count(anchor) != 1 or code.count(destroy) != 1:
+        raise RuntimeError("Review the Makepad activity/service lifetime hook")
+    code = code.replace(anchor,
+        "    protected boolean shouldShutdownNativeRuntime() { return true; }\n\n" + anchor)
+    code = code.replace(destroy,
+        "if (!isRecreating && shouldShutdownNativeRuntime()) {\n            MakepadNative.activityOnDestroy();")
+    activity.write_text(code)
     copy_tree(upstream / "tools/cargo_makepad/src/android/res", generated / "res")
     reset_owned(generated / "assets/makepad", output)
     resources(generated / "assets/makepad", upstream)
