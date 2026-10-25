@@ -44,6 +44,22 @@ Formatting, Cargo checks and application lint pass. Both APKs pass signature and
 verification profiles; physical phones, speaker output and authenticated Telegram
 operations remain outside this UI change's coverage.
 
+The extracted Linux release archive also opened the player and revised menu.
+The Windows runner's required Direct3D adapter probe remained blocked with
+`0x887a0004`. Its exact CI archive, checked against its SHA-256, rendered both menu
+themes through Wine/DXVK on Radeon. Presets, five rapid + steps to 1.25× and a
+genuine Ogg advancing from 0:09 to 0:18 at 1.05× with null output passed. Apple
+Silicon Metal startup and Settings frames were inspected. Wine checks do not
+establish physical Windows GPU or system-media-control behavior.
+
+All four desktop archives and native-engine checks passed in
+[CI](https://github.com/Krablante/spotygram/actions/runs/40216981225); both macOS
+bundles passed strict ad hoc signature verification. Hosted Intel captures
+remained blank. The exact x64 archive rendered the library and Settings in the
+[Rosetta recheck](https://github.com/Krablante/spotygram/actions/runs/40218218412),
+whose actual frames were inspected. This does not establish physical Intel GPU
+behavior.
+
 ## 0.2.5 playback lifecycle
 
 On 0.2.4, a normal pause lasting over 20 minutes resumed on the API-36 emulator.
