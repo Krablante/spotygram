@@ -13,7 +13,7 @@ app remains on [`main`](https://github.com/Krablante/spotygram/tree/main).
 Rust previews use `rust-v…` prerelease tags and never become GitHub's latest stable
 release. Desktop packages contain no Java runtime.
 
-[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.4)
+[Download the Rust preview](https://github.com/Krablante/spotygram/releases/tag/rust-v0.2.5)
 · [User guide](docs/usage.md) · [Build from source](docs/build.md)
 · [Verification and limits](docs/verification.md)
 

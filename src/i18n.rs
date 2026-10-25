@@ -262,6 +262,26 @@ pub fn tr<'a>(language: &str, text: &'a str) -> Cow<'a, str> {
         }
         "Search Telegram chats" => "Поиск чатов Telegram",
         "Loading…" => "Загрузка…",
+        "Loading audio…" => "Загрузка аудио…",
+        "Could not read audio. Check the file or connection and press Play to retry." => {
+            "Не удалось прочитать аудио. Проверь файл или соединение и нажми воспроизведение, чтобы повторить."
+        }
+        "This audio could not be decoded. Try another recording." => {
+            "Не удалось декодировать аудио. Попробуй другую запись."
+        }
+        "Audio playback failed. Press Play to try again." => {
+            "Не удалось воспроизвести аудио. Нажми воспроизведение, чтобы повторить."
+        }
+        "Telegram audio read timed out" => {
+            "Не удалось дождаться данных от Telegram. Нажми воспроизведение, чтобы повторить."
+        }
+        "Cannot open the audio file" => "Не удалось открыть аудиофайл.",
+        "Preparing audio timed out; press Play to try again" => {
+            "Не удалось дождаться аудио. Нажми воспроизведение, чтобы повторить."
+        }
+        "The audio engine shut down; press Play to reopen it" => {
+            "Плеер остановился. Нажми воспроизведение, чтобы открыть запись заново."
+        }
         "▶   Play all" => "▶   Слушать всё",
         "▶   Play" => "▶   Слушать",
         "Play" => "Слушать",

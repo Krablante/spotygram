@@ -243,6 +243,7 @@ impl Default for Queue {
 #[derive(Clone, Debug, Default)]
 pub struct Playback {
     pub track: Option<Track>,
+    pub requested: bool,
     pub playing: bool,
     pub buffering: bool,
     pub position: f64,
@@ -380,13 +381,17 @@ pub enum Notice {
     Status(String),
     Error(String),
     Sync(String),
-    CloudLibrary { sources_changed: bool },
+    CloudLibrary {
+        sources_changed: bool,
+    },
     Choices(u64, Vec<Source>),
     Profile(i64),
     ProfileMember(String, bool),
     Transfer(usize, f64),
     Sent,
     Engine(EngineEvent),
+    #[cfg(target_os = "android")]
+    EngineWake,
     Prepared(u64, Track, f64),
     Imported,
     Update(String),
@@ -399,9 +404,11 @@ pub enum EngineEvent {
     Position(u64, f64),
     Duration(u64, f64),
     Buffering(u64, bool),
-    Paused(u64, bool),
+    Paused(u64, bool, Option<f64>),
     Finished(u64),
     Failed(u64, String),
+    Unavailable(u64, Option<f64>),
+    Interrupted(u64, f64),
 }
 
 #[derive(Clone, Debug, Default)]

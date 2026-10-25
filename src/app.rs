@@ -23,6 +23,19 @@ script_mod! {
                 window.app_id: "app.spotygram.rust"
                 window.inner_size: vec2(1040,760)
                 pass.clear_color: theme.color_bg_app
+                caption_bar +: {windows_buttons +: {
+                    // The stock caption closes the window directly, bypassing
+                    // WindowCloseRequested and the app's playback lifetime.
+                    close +: {visible:false}
+                    app_close := DesktopButton {
+                        draw_bg.button_type: DesktopButtonType.WindowsClose
+                        width:46 height:29
+                        draw_bg +: {
+                            color:theme.color_label_inner color_hover:#FFF color_down:#FFF
+                            bg_color_hover:#E81123 bg_color_down:#F1707A
+                        }
+                    }
+                }}
                 body +: {root := RootView{}}
             }
         }
@@ -2075,6 +2088,15 @@ impl App {
         self.visible(cx, ids!(notice), !notice.is_empty());
         self.text(cx, ids!(notice), notice);
         let playback = &state.playback;
+        let player_notice = if !state.error.is_empty() {
+            state.error.as_str()
+        } else if playback.buffering {
+            "Loading audio…"
+        } else {
+            ""
+        };
+        self.visible(cx, ids!(player_notice), !player_notice.is_empty());
+        self.text(cx, ids!(player_notice), player_notice);
         let active = playback.track.is_some();
         self.visible(cx, ids!(settings_page), self.settings_open);
         self.visible(cx, ids!(player_dock), active && !self.settings_open);
@@ -2174,27 +2196,41 @@ impl App {
             for id in [ids!(mini_title), ids!(player_title)] {
                 self.text(cx, id, &track.title);
             }
-            for id in [ids!(mini_artist), ids!(player_artist)] {
-                self.text(cx, id, &ui::subtitle(&state.language, track));
-            }
+            self.text(
+                cx,
+                ids!(player_artist),
+                &ui::subtitle(&state.language, track),
+            );
+            self.text(
+                cx,
+                ids!(mini_artist),
+                &if playback.buffering {
+                    crate::i18n::tr(&state.language, "Loading audio…")
+                } else {
+                    ui::subtitle(&state.language, track)
+                },
+            );
             if old.as_ref().is_none_or(|s| {
-                s.playback.playing != playback.playing || s.playback.buffering != playback.buffering
+                s.playback.requested != playback.requested
+                    || s.playback.buffering != playback.buffering
             }) {
                 for id in [ids!(mini_play), ids!(player_play)] {
                     ui::set_icon(
                         &self.ui,
                         cx,
                         id,
-                        if playback.playing {
+                        if playback.requested {
                             include_str!("../resources/pause.svg")
                         } else {
                             include_str!("../resources/play.svg")
                         },
                     );
                     let button = self.ui.button(cx, id);
-                    button.set_loading(cx, playback.buffering);
+                    // Loading buttons reject input in Makepad. Playback controls must
+                    // still accept Pause while a source/decoder is preparing.
+                    button.set_loading(cx, false);
                     if let Some(mut button) = button.borrow_mut() {
-                        button.draw_icon.opacity = if playback.buffering { 0.0 } else { 1.0 };
+                        button.draw_icon.opacity = 1.0;
                     }
                 }
             }
@@ -2758,6 +2794,19 @@ impl App {
         }
     }
 
+    fn request_close(&mut self, cx: &mut Cx) {
+        if self.closed {
+            return;
+        }
+        let state = self.snapshot();
+        if state.playback.requested || state.downloads > 0 || state.busy {
+            self.ui.window(cx, ids!(main_window)).minimize(cx);
+            self.send(cx, data::Command::Visible(false));
+        } else {
+            self.begin_quit(cx);
+        }
+    }
+
     fn confirm(&mut self, cx: &mut Cx) {
         let state = self.snapshot();
         let input = self.ui.text_input(cx, ids!(panel_input)).text();
@@ -3154,6 +3203,10 @@ impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         use data::Command as C;
         let state = self.snapshot();
+        if self.ui.desktop_button(cx, ids!(app_close)).clicked(actions) {
+            self.request_close(cx);
+            return;
+        }
         if self.click(cx, actions, ids!(editor_close)) {
             self.handle_back_pressed(cx);
             return;
@@ -3998,13 +4051,7 @@ impl AppMain for App {
         if let Event::WindowCloseRequested(request) = event {
             if !self.closed {
                 request.accept_close.set(false);
-                let state = self.snapshot();
-                if state.playback.playing || state.downloads > 0 || state.busy {
-                    self.ui.window(cx, ids!(main_window)).minimize(cx);
-                    self.send(cx, data::Command::Visible(false));
-                } else {
-                    self.begin_quit(cx);
-                }
+                self.request_close(cx);
             }
         }
         let pointer = match event {

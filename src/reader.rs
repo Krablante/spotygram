@@ -23,6 +23,7 @@ pub struct Reader {
     file_position: i64,
     path: String,
     requested_at: i64,
+    requested_time: Instant,
     pub cancelled: Arc<AtomicBool>,
 }
 
@@ -35,6 +36,7 @@ impl Reader {
             file_position: 0,
             path: String::new(),
             requested_at: -1,
+            requested_time: Instant::now(),
             cancelled: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -48,6 +50,13 @@ impl Reader {
         Ok(offset)
     }
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize> {
+        self.read_interruptible(buffer, || false)
+    }
+    pub fn read_interruptible(
+        &mut self,
+        buffer: &mut [u8],
+        mut interrupted: impl FnMut() -> bool,
+    ) -> Result<usize> {
         if self.media.track.size > 0 && self.position >= self.media.track.size {
             return Ok(0);
         }
@@ -66,11 +75,15 @@ impl Reader {
                         !self.media.track.path.is_empty(),
                         "This recording has no local audio file"
                     );
-                    (
-                        self.media.track.path.clone(),
-                        self.media.track.size - self.position,
-                        true,
-                    )
+                    let path = &self.media.track.path;
+                    let size = if self.media.track.size > 0 {
+                        self.media.track.size
+                    } else {
+                        std::fs::metadata(path)
+                            .context("Cannot inspect the audio file")?
+                            .len() as i64
+                    };
+                    (path.clone(), size - self.position, true)
                 } else {
                     let td = self.media.telegram.as_ref().unwrap();
                     ensure!(
@@ -79,6 +92,9 @@ impl Reader {
                     );
                     let file = self.media.track.file;
                     if let Some(f) = td.files.get(file) {
+                        if f.complete && f.size > 0 && self.position >= f.size {
+                            return Ok(0);
+                        }
                         let available = if f.complete {
                             f.size - self.position
                         } else if self.position >= f.offset {
@@ -89,16 +105,27 @@ impl Reader {
                         if available > 0 && !f.path.is_empty() {
                             (f.path, available, f.complete)
                         } else {
-                            if self.requested_at != self.position {
+                            if self.requested_at != self.position
+                                || (!f.active
+                                    && self.requested_time.elapsed() >= Duration::from_secs(2))
+                            {
                                 td.download(file, self.position, 32)?;
                                 self.requested_at = self.position;
+                                self.requested_time = Instant::now();
                             }
                             ensure!(
                                 started.elapsed() < Duration::from_secs(60),
                                 "Telegram audio read timed out"
                             );
-                            td.files
-                                .wait(file, self.position, Duration::from_millis(250));
+                            ensure!(!interrupted(), "Audio read was interrupted");
+                            if f.complete || available > 0 {
+                                // A reported range without a usable path would make
+                                // wait(offset) return immediately on every iteration.
+                                td.files.wait_change(Duration::from_millis(250));
+                            } else {
+                                td.files
+                                    .wait(file, self.position, Duration::from_millis(250));
+                            }
                             continue;
                         }
                     } else {
@@ -141,11 +168,10 @@ impl Reader {
                 "Telegram audio read timed out"
             );
             if let Some(td) = &self.media.telegram {
-                td.files.wait(
-                    self.media.track.file,
-                    self.position,
-                    Duration::from_millis(250),
-                );
+                // TDLib can publish a prefix slightly before the bytes become visible.
+                // wait(offset) would return immediately for that same prefix and spin.
+                ensure!(!interrupted(), "Audio read was interrupted");
+                td.files.wait_change(Duration::from_millis(20));
             }
         }
     }

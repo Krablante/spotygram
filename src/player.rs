@@ -25,14 +25,30 @@ impl Engine {
             Ok(Self {})
         }
     }
-    pub fn load(&self, media: Arc<Media>, position: f64) -> Result<()> {
+    pub fn begin(&self, generation: u64, track: &Track) -> Result<()> {
+        #[cfg(target_os = "android")]
+        crate::android::player(
+            serde_json::json!({"action":"begin","generation":generation,"title":track.title}),
+        )?;
+        #[cfg(not(target_os = "android"))]
+        let _ = (generation, track);
+        Ok(())
+    }
+    pub fn load(
+        &self,
+        media: Arc<Media>,
+        position: f64,
+        queue: &Queue,
+        playing: bool,
+    ) -> Result<()> {
         #[cfg(not(target_os = "android"))]
         {
+            let _ = (queue, playing);
             self.inner.load(media, position)
         }
         #[cfg(target_os = "android")]
         {
-            crate::android::load(media, position)
+            crate::android::load(media, position, queue, playing)
         }
     }
     pub fn pause(&self, pause: bool) -> Result<()> {
@@ -60,8 +76,7 @@ impl Engine {
     pub fn seek(&self, position: f64) -> Result<()> {
         #[cfg(not(target_os = "android"))]
         {
-            self.inner
-                .command(&["seek", &position.max(0.).to_string(), "absolute+exact"])
+            self.inner.seek(position)
         }
         #[cfg(target_os = "android")]
         {

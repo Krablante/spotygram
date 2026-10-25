@@ -86,10 +86,13 @@ impl Api {
 
 struct StreamContext {
     media: ArcSwapOption<Media>,
+    notices: mpsc::Sender<Notice>,
 }
 struct Stream {
     reader: Mutex<Reader>,
     cancelled: Arc<AtomicBool>,
+    generation: u64,
+    notices: mpsc::Sender<Notice>,
 }
 
 pub struct Mpv {
@@ -111,6 +114,7 @@ impl Mpv {
             handle: handle as usize,
             context: Box::new(StreamContext {
                 media: ArcSwapOption::empty(),
+                notices: notices.clone(),
             }),
             generation: Arc::new(AtomicU64::new(0)),
             stop: Arc::new(AtomicBool::new(false)),
@@ -178,10 +182,16 @@ impl Mpv {
                 let mut loaded = false;
                 let mut active = 0;
                 while !stop.load(Ordering::Acquire) {
-                    let event = unsafe { &*(api.wait)(handle, 0.5) };
+                    // mpv_wakeup interrupts the wait during Drop; idle/paused engines
+                    // need no polling timer.
+                    let event = unsafe { &*(api.wait)(handle, -1.) };
                     let current = generation.load(Ordering::Acquire);
+                    let shutdown = event.id == 1;
                     let result = match event.id {
-                        1 => break,
+                        1 if !stop.load(Ordering::Acquire) => Some(EngineEvent::Failed(
+                            current,
+                            "The audio engine shut down; press Play to reopen it".into(),
+                        )),
                         6 => {
                             loaded = false;
                             active = stream_generation(&api, handle).unwrap_or(0);
@@ -235,6 +245,7 @@ impl Mpv {
                                     3 => Some(EngineEvent::Paused(
                                         active,
                                         unsafe { *(property.data as *const c_int) } != 0,
+                                        numeric_property(&api, handle, c"time-pos"),
                                     )),
                                     4 => Some(EngineEvent::Buffering(
                                         active,
@@ -263,6 +274,9 @@ impl Mpv {
                                 }
                             }
                         }
+                    }
+                    if shutdown {
+                        break;
                     }
                 }
             },
@@ -304,6 +318,12 @@ impl Mpv {
     pub fn command(&self, arguments: &[&str]) -> Result<()> {
         self.command_id(0, arguments)
     }
+    pub fn seek(&self, position: f64) -> Result<()> {
+        self.command_id(
+            self.generation.load(Ordering::Acquire),
+            &["seek", &position.max(0.).to_string(), "absolute+exact"],
+        )
+    }
     fn command_id(&self, id: u64, arguments: &[&str]) -> Result<()> {
         let strings = arguments
             .iter()
@@ -317,6 +337,19 @@ impl Mpv {
         );
         Ok(())
     }
+}
+
+fn numeric_property(api: &Api, handle: *mut c_void, name: &CStr) -> Option<f64> {
+    let pointer = unsafe { (api.get_string)(handle, name.as_ptr()) };
+    if pointer.is_null() {
+        return None;
+    }
+    let value = unsafe { CStr::from_ptr(pointer) }
+        .to_str()
+        .ok()
+        .and_then(|s| s.parse().ok());
+    unsafe { (api.free)(pointer as *mut c_void) };
+    value
 }
 
 fn stream_generation(api: &Api, handle: *mut c_void) -> Option<u64> {
@@ -361,11 +394,14 @@ unsafe extern "C" fn open_stream(
     if uri != format!("spotygram://{}", media.generation) {
         return -1;
     }
+    let generation = media.generation;
     let reader = Reader::open(media);
     let cancelled = reader.cancelled.clone();
     let stream = Box::new(Stream {
         reader: Mutex::new(reader),
         cancelled,
+        generation,
+        notices: context.notices.clone(),
     });
     unsafe {
         *info = StreamInfo {
@@ -388,6 +424,17 @@ unsafe extern "C" fn read_stream(cookie: *mut c_void, buffer: *mut c_char, size:
         Ok(count) => count as i64,
         Err(error) => {
             eprintln!("Audio reader: {error}");
+            let mut notice =
+                Notice::Engine(EngineEvent::Failed(stream.generation, error.to_string()));
+            while !stream.cancelled.load(Ordering::Acquire) {
+                match stream.notices.try_send(notice) {
+                    Ok(()) | Err(mpsc::error::TrySendError::Closed(_)) => break,
+                    Err(mpsc::error::TrySendError::Full(value)) => {
+                        notice = value;
+                        thread::park_timeout(std::time::Duration::from_millis(5));
+                    }
+                }
+            }
             -1
         }
     }

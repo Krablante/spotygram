@@ -102,7 +102,8 @@ impl Controls {
             self.track = id;
             self.playing = None;
         }
-        if self.playing != Some(playback.playing)
+        // OS controls must offer Pause while the requested audio is buffering.
+        if self.playing != Some(playback.requested)
             || self.progress.elapsed() >= Duration::from_secs(1)
         {
             let progress = Some(MediaPosition(Duration::from_secs_f64(
@@ -110,12 +111,12 @@ impl Controls {
             )));
             self.controls.set_playback(if playback.track.is_none() {
                 MediaPlayback::Stopped
-            } else if playback.playing {
+            } else if playback.requested {
                 MediaPlayback::Playing { progress }
             } else {
                 MediaPlayback::Paused { progress }
             })?;
-            self.playing = Some(playback.playing);
+            self.playing = Some(playback.requested);
             self.progress = Instant::now();
         }
         #[cfg(target_os = "linux")]

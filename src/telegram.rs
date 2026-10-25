@@ -81,6 +81,13 @@ impl Files {
             .unwrap();
         states.get(&id).cloned()
     }
+    pub fn wait_change(&self, timeout: Duration) {
+        drop(
+            self.changed
+                .wait_timeout(self.states.lock().unwrap(), timeout)
+                .unwrap(),
+        );
+    }
     fn update(&self, file: &Value) -> Option<FileState> {
         let f = FileState::parse(file);
         let mut states = self.states.lock().unwrap();

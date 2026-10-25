@@ -6,6 +6,65 @@ Verification uses manual interaction, runtime logs and screenshots. No automated
 test scaffolding, account fixtures or media are shipped with the application.
 Preview releases are independent of the stable release channel.
 
+## 0.2.5 playback lifecycle
+
+On 0.2.4, a normal pause lasting over 20 minutes resumed on the API-36 emulator.
+Stopping only its playback service reproduced the reported symptom: Play changed
+the icon but did not recreate the engine. This establishes a lifecycle failure;
+it does not establish exactly what retired playback on the owner's phone.
+
+A 0.2.5 release candidate paused a one-hour recording at 35:07.114 and 1.05×,
+went to Home with the screen off for over 20 minutes, then resumed with one Play
+tap. Android had removed foreground status after ten minutes and the media
+session was absent before the return; the activity process remained the same.
+The restored session reported PLAYING at 1.05× and actual player frames advanced
+from 35:07 to 35:09.
+
+The revised Android player registers its Media3 session, reports service loss to
+Rust and reloads the current recording on demand. Final APK checks cover service
+retirement with the activity process retained, position recovery and pausing on
+the audio-becoming-noisy event. A controlled TDLib transport delayed file
+resolution by 20 seconds while the activity was in the background: the service
+remained foreground and actual playback began when the file arrived. This also
+exposed and fixed a Media3 notification race: its initially empty controller
+snapshot could remove foreground status before preparation finished.
+
+Real short MP3, FLAC, AAC/M4A, Vorbis/Ogg and Opus files decoded and advanced
+through the queue. Progressive loading checks every 32 KiB rather than every
+1 MiB: the inspected hour-long low-bitrate Opus buffered about 69 seconds at
+startup instead of tens of minutes. This is an interval/duration observation,
+not a battery-life measurement.
+
+Linux release interaction with genuine audio and a temporary controlled transport
+covered a one-hour recording, exact long seeks, 1.05× playback, pause checkpoints
+and graceful exit. A stalled preparation cancels immediately; bytes or resolution
+responses arriving after cancellation do not restart it or replace a newer
+selection. Inactive ranges are requested again after two seconds. A published
+prefix whose bytes were not yet visible did not consume CPU in a tight loop and
+resumed when the bytes became readable. A missing range produces a visible read
+timeout after 60 seconds. Actual full-player and 320-px frames were inspected;
+Pause remains available while loading and errors appear beside the controls.
+
+The final native package also received a reported full range without a local
+path. Its reader thread's accumulated CPU time remained below one second during the wait; the error
+appeared after 60 seconds and one Play tap resumed when a path became available.
+OS controls offered Pause during preparation and accepted Pause/Quit. The stock
+caption Close button exposed another failure: it bypassed the application's
+window-close handler. Its replacement preserved requested playback during both
+preparation and actual decoding, and exited cleanly when paused. Inspected frames
+retain the original caption geometry and player surfaces.
+
+Normal/reverse order, shuffle without repeats, repeat-one/all, random history,
+removing/reordering queue entries and deleting the last item were exercised with
+real short recordings. Pause cannot be undone by a stale EOF. Exact paused
+position and bookmarks were inspected in SQLite. The paused libmpv event thread
+showed unchanged context-switch counters between observations; its old half-second
+polling wait has been removed.
+
+Verification profiles, controlled responses and media stay outside the source and
+release packages. Production Telegram exchange, the owner's physical phone and
+speaker/Bluetooth output remain outside these checks.
+
 ## 0.2.4 settings
 
 The old settings panel reproduced two concrete problems: returning from a child

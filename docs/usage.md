@@ -83,6 +83,11 @@ threshold. Android uses a media notification/service; desktop exposes operating
 system media controls. Desktop Esc closes panels, Ctrl/⌘+Q quits. Closing the
 window during an active job minimizes it; quitting explicitly cancels that job.
 
+Play/Pause remains available while audio is loading. Pausing during preparation
+cancels it; Play tries again from the retained position. Playback errors appear
+in the full player. Android can reopen a playback service reclaimed during a long
+pause without resetting the recording or speed.
+
 **Download** retains a Telegram recording. Listening can begin before the whole
 file arrives, and seeking requests the required range. Wi-Fi-only applies to
 explicit background downloads. Do not keep played tracks removes eligible

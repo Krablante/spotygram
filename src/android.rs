@@ -30,6 +30,16 @@ static MEDIA: ArcSwapOption<Media> = ArcSwapOption::const_empty();
 static READERS: OnceLock<Mutex<HashMap<u64, Arc<NativeReader>>>> = OnceLock::new();
 static READER_ID: AtomicU64 = AtomicU64::new(1);
 static CONFIGURATION_CHANGED: AtomicBool = AtomicBool::new(false);
+// State transitions must survive a busy worker without blocking Android's main thread.
+// One latest transition of each kind/generation is enough; obsolete generations expire.
+static ENGINE_EVENTS: Mutex<Vec<(jint, u64, EngineEvent)>> = Mutex::new(Vec::new());
+
+pub fn take_engine_events() -> Vec<EngineEvent> {
+    std::mem::take(&mut *ENGINE_EVENTS.lock().unwrap())
+        .into_iter()
+        .map(|(_, _, event)| event)
+        .collect()
+}
 
 pub fn take_configuration_change() -> bool {
     CONFIGURATION_CHANGED.swap(false, Ordering::AcqRel)
@@ -42,6 +52,7 @@ struct NativeReader {
     inner: Mutex<ReadBuffer>,
     cancelled: Arc<AtomicBool>,
     size: i64,
+    generation: u64,
 }
 
 pub fn set_notices(notices: mpsc::Sender<Notice>) {
@@ -75,7 +86,10 @@ pub fn call_string(method: &str, argument: &str) -> Result<String> {
     Ok(result)
 }
 
-pub fn player(value: Value) -> Result<()> {
+pub fn player(mut value: Value) -> Result<()> {
+    if value.get("generation").is_none() {
+        value["generation"] = json!(MEDIA.load().as_ref().map_or(0, |m| m.generation));
+    }
     if value["action"] == "stop" {
         if let Some(readers) = READERS.get() {
             for reader in readers.lock().unwrap().values() {
@@ -88,13 +102,13 @@ pub fn player(value: Value) -> Result<()> {
     Ok(())
 }
 
-pub fn load(media: Arc<Media>, position: f64) -> Result<()> {
+pub fn load(media: Arc<Media>, position: f64, queue: &Queue, playing: bool) -> Result<()> {
     if let Some(readers) = READERS.get() {
         for reader in readers.lock().unwrap().values() {
             reader.cancelled.store(true, Ordering::Release);
         }
     }
-    let value = json!({"action":"load","generation":media.generation,"uri":format!("spotygram://{}",media.generation),"position":position,"title":media.track.title,"artist":media.track.subtitle(),"art":media.track.art,"duration":media.track.duration});
+    let value = json!({"action":"load","generation":media.generation,"uri":format!("spotygram://{}",media.generation),"position":position,"title":media.track.title,"artist":media.track.subtitle(),"art":media.track.art,"duration":media.track.duration,"playing":playing,"speed":queue.speed,"volume":queue.volume,"muted":queue.muted});
     MEDIA.store(Some(media));
     player(value)
 }
@@ -160,13 +174,17 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_playerEvent(
         return;
     };
     let generation = generation as u64;
+    let event_kind = event;
     let event = match event {
         0 => EngineEvent::Loaded(generation),
         1 => EngineEvent::Position(generation, value),
         2 => EngineEvent::Duration(generation, value),
         3 => EngineEvent::Buffering(generation, value != 0.),
-        4 => EngineEvent::Paused(generation, value != 0.),
+        4 => EngineEvent::Paused(generation, value != 0., None),
         5 => EngineEvent::Finished(generation),
+        7 => EngineEvent::Unavailable(generation, (value >= 0.).then_some(value)),
+        8 => EngineEvent::Interrupted(generation, value),
+        9 => EngineEvent::Paused(generation, true, Some(value)),
         _ => EngineEvent::Failed(
             generation,
             env.get_string(&error)
@@ -174,7 +192,34 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_playerEvent(
                 .unwrap_or_else(|_| "Android audio error".into()),
         ),
     };
-    let _ = notices.try_send(Notice::Engine(event));
+    if event_kind == 1 || event_kind == 2 {
+        let _ = notices.try_send(Notice::Engine(event));
+    } else {
+        let mut pending = ENGINE_EVENTS.lock().unwrap();
+        let kind = if event_kind == 9 { 4 } else { event_kind };
+        pending.retain(|(previous, g, _)| *previous != kind || *g != generation);
+        pending.push((kind, generation, event));
+        if pending.len() > 16 {
+            pending.remove(0);
+        }
+        drop(pending);
+        let _ = notices.try_send(Notice::EngineWake);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_cancelAudio(
+    _env: JNIEnv,
+    _class: JClass,
+    generation: jlong,
+) {
+    if let Some(readers) = READERS.get() {
+        for reader in readers.lock().unwrap().values() {
+            if reader.generation == generation as u64 {
+                reader.cancelled.store(true, Ordering::Release);
+            }
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -193,6 +238,7 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_openAudio(
             uri == format!("spotygram://{}", media.generation),
             "Audio stream has been replaced"
         );
+        let generation = media.generation;
         let mut reader = Reader::open(media);
         reader.seek(position)?;
         let cancelled = reader.cancelled.clone();
@@ -211,6 +257,7 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_openAudio(
                     }),
                     cancelled,
                     size,
+                    generation,
                 }),
             );
         Ok(id)
@@ -226,7 +273,7 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_openAudio(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_readAudio(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     handle: jlong,
     array: JByteArray,
@@ -251,7 +298,11 @@ pub extern "system" fn Java_app_spotygram_rust_PlatformBridge_readAudio(
         let mut inner = reader.inner.lock().unwrap();
         let ReadBuffer { reader, buffer } = &mut *inner;
         let limit = (length as usize).min(buffer.len());
-        let count = reader.read(&mut buffer[..limit])?;
+        let count = reader.read_interruptible(&mut buffer[..limit], || {
+            env.call_static_method("java/lang/Thread", "interrupted", "()Z", &[])
+                .and_then(|value| value.z())
+                .unwrap_or(true)
+        })?;
         if count == 0 {
             return Ok(-1);
         }

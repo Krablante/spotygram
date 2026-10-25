@@ -341,7 +341,7 @@ script_mod! {
                 player_share := mod.spotygram.Icon{visible:false margin:Inset{right:8} draw_icon.svg:crate_resource("self:resources/share.svg")}
                 player_more := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/more.svg")}
             }
-            player_columns := mod.spotygram.TouchScroll{width:Fill height:Fill flow:Right spacing:24 align:Center
+            player_columns := mod.spotygram.TouchScroll{constrain_touch:true width:Fill height:Fill flow:Right spacing:24 align:Center
                 player_art := mod.spotygram.Cover{width:320 height:320
                     draw_bg.border_radius:24.0
                     note +:{width:100 height:100}
@@ -355,6 +355,7 @@ script_mod! {
                         }
                         player_favorite := mod.spotygram.Icon{draw_icon.svg:crate_resource("self:resources/favorite_border.svg")}
                     }
+                    player_notice := mod.spotygram.Caption{visible:false height:Fit max_lines:3 margin:Inset{top:8}}
                     View{width:Fill height:16}
                     seek := mod.spotygram.Slider{min:0.0 max:1.0 step:0.0}
                     View{width:Fill height:20 flow:Right

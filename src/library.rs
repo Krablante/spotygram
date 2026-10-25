@@ -410,6 +410,47 @@ pub async fn load_profile(
     Ok(())
 }
 
+pub async fn resolve_playback(
+    td: &Telegram,
+    store: &mut Store,
+    track: &Track,
+    notices: &mpsc::Sender<Notice>,
+) -> Result<Track> {
+    if !track.key.is_empty() && td.files.get(track.file).is_some_and(|f| f.key == track.key) {
+        return Ok(track.clone());
+    }
+    // Playing a known file does not require rescanning a whole profile. Keep this
+    // shortcut separate from send/profile operations, which must refresh permissions.
+    if !track.remote.is_empty() && !track.key.is_empty() {
+        if let Ok(value) = td
+            .request(
+                json!({"@type":"getRemoteFile","remote_file_id":track.remote,
+            "file_type":{"@type":if track.document {"fileTypeDocument"} else {"fileTypeAudio"}}}),
+            )
+            .await
+        {
+            let file = td.files.remember(&value);
+            ensure!(
+                file.key == track.key,
+                "The original Telegram recording has changed"
+            );
+            let mut current = track.clone();
+            current.file = file.id;
+            current.path = if file.complete {
+                file.path
+            } else {
+                String::new()
+            };
+            store.db.execute(
+                "UPDATE tracks SET file=?,path=? WHERE id=?",
+                params![current.file, current.path, current.id],
+            )?;
+            return Ok(current);
+        }
+    }
+    resolve(td, store, track, notices).await
+}
+
 pub async fn resolve(
     td: &Telegram,
     store: &mut Store,

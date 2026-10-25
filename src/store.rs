@@ -712,7 +712,11 @@ impl Store {
         queue.index = queue.index.min(queue.ids.len().saturating_sub(1));
         queue.speed = playback_speed_step(queue.speed);
         queue.volume = queue.volume.clamp(0., 100.);
-        if queue.shuffled.len() != queue.ids.len() {
+        queue.history.retain(|index| *index < queue.ids.len());
+        if queue.shuffled.len() != queue.ids.len()
+            || queue.shuffled.iter().any(|index| *index >= queue.ids.len())
+            || queue.shuffled.iter().collect::<HashSet<_>>().len() != queue.ids.len()
+        {
             queue.shuffled.clear();
         }
         Ok(queue)

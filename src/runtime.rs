@@ -92,8 +92,11 @@ struct Core {
     query: Query,
     generation: u64,
     loaded_generation: u64,
+    loading_position: f64,
+    preparing_deadline: Option<(u64, tokio::time::Instant)>,
     directory_generation: u64,
     intent: bool,
+    engine_paused: bool,
     visible: bool,
     observe_clock: bool,
     sync_signal: Option<mpsc::Sender<()>>,
@@ -115,6 +118,7 @@ struct Core {
     last_publication: tokio::time::Instant,
     checkpoint: tokio::time::Instant,
     pending_publish: bool,
+    controls_deadline: Option<tokio::time::Instant>,
 }
 
 impl Core {
@@ -151,8 +155,11 @@ impl Core {
             query,
             generation: 0,
             loaded_generation: 0,
+            loading_position: 0.,
+            preparing_deadline: None,
             directory_generation: 0,
             intent: false,
+            engine_paused: true,
             visible: true,
             observe_clock: false,
             sync_signal: None,
@@ -174,6 +181,7 @@ impl Core {
             last_publication: tokio::time::Instant::now(),
             checkpoint: tokio::time::Instant::now(),
             pending_publish: false,
+            controls_deadline: None,
         };
         core.refresh()?;
         if let Some(id) = core.queue.ids.get(core.queue.index) {
@@ -200,6 +208,13 @@ impl Core {
             self.start_telegram()?;
         }
         loop {
+            #[cfg(target_os = "android")]
+            for event in crate::android::take_engine_events() {
+                if let Err(error) = self.engine_event(event) {
+                    self.state.error = error.to_string();
+                    self.publish();
+                }
+            }
             tokio::select! {
                 command=commands.recv()=>{
                     let Some(command)=command else{break;};
@@ -207,7 +222,7 @@ impl Core {
                     if let Some(authorization)=self.td.as_ref().and_then(|td|td.authorization_update()){
                         if let Err(error)=self.native_event(authorization).await{self.state.error=error.to_string();self.publish();}
                     }
-                    let playback_command=matches!(&command,Command::Play(..)|Command::PlayAll|Command::PlayQueue(..)|Command::Resume|Command::Toggle|Command::Next|Command::Previous);
+                    let playback_command=matches!(&command,Command::Play(..)|Command::PlayAll|Command::PlayQueue(..)|Command::Resume|Command::Pause|Command::Toggle|Command::Next|Command::Previous);
                     let previous_generation=self.generation;
                     if let Err(error)=self.command(command).await{
                         if playback_command{if self.generation!=previous_generation || self.state.playback.buffering{let _=self.engine_event(EngineEvent::Failed(self.generation,error.to_string()));}else{self.intent=self.state.playback.playing;}}
@@ -223,6 +238,16 @@ impl Core {
                     if let Err(error)=self.native_event(event).await{self.state.error=error.to_string();self.publish();}
                 },
                 _=async{if self.pending_publish{tokio::time::sleep_until(self.last_publication+Duration::from_millis(250)).await}else{std::future::pending::<()>().await}}=>{self.publish();},
+                _=async{if let Some(deadline)=self.controls_deadline{tokio::time::sleep_until(deadline).await}else{std::future::pending::<()>().await}}=>{
+                    self.controls_deadline=None;
+                    if let Err(error)=self.store.save_queue(&self.queue,false){self.state.error=error.to_string();self.publish();}
+                },
+                _=async{if let Some((_,deadline))=self.preparing_deadline{tokio::time::sleep_until(deadline).await}else{std::future::pending::<()>().await}}=>{
+                    let (generation,_)=self.preparing_deadline.take().unwrap();
+                    if generation==self.generation && self.loaded_generation!=generation && self.engine.is_some(){
+                        if let Err(error)=self.engine_event(EngineEvent::Failed(generation,"Preparing audio timed out; press Play to try again".into())){self.state.error=error.to_string();self.publish();}
+                    }
+                },
             }
         }
         self.intent = false;
@@ -308,6 +333,7 @@ impl Core {
     }
 
     fn publish(&mut self) {
+        self.state.playback.requested = self.intent;
         #[cfg(not(target_os = "android"))]
         if let Some(media) = &mut self.media {
             if let Err(error) = media.update(&self.state.playback) {
@@ -482,12 +508,32 @@ impl Core {
             .context("Recording no longer exists")?;
         self.generation += 1;
         let generation = self.generation;
+        self.loaded_generation = 0;
+        self.engine_paused = true;
+        self.preparing_deadline = Some((
+            generation,
+            tokio::time::Instant::now() + Duration::from_secs(90),
+        ));
         self.state.playback.track = Some(track.clone());
         self.state.playback.buffering = true;
-        self.state.playback.playing = self.intent;
-        let position = position.unwrap_or(self.store.resume_position(&track)?);
+        self.state.playback.playing = false;
+        let position = match position {
+            Some(position) => position.max(0.),
+            None => self.store.resume_position(&track)?,
+        };
         self.state.playback.position = position;
+        self.queue.position = position;
         self.state.playback.duration = track.duration as f64;
+        if !self.intent {
+            if let Some(engine) = self.engine.take() {
+                engine.stop()?;
+            }
+            self.state.playback.buffering = false;
+            self.preparing_deadline = None;
+            self.queue_state();
+            self.publish();
+            return Ok(());
+        }
         if self.engine.is_none() {
             self.engine = Some(Engine::new(self.notices.clone())?);
         }
@@ -499,6 +545,7 @@ impl Core {
             }
         }
         self.engine.as_ref().unwrap().stop()?;
+        self.engine.as_ref().unwrap().begin(generation, &track)?;
         let td = self.td.clone();
         let paths = self.paths.clone();
         let notices = self.notices.clone();
@@ -508,7 +555,7 @@ impl Core {
                 let resolved = if track.local() {
                     track
                 } else {
-                    library::resolve(
+                    library::resolve_playback(
                         td.as_ref()
                             .context("Connect Telegram to play this recording")?,
                         &mut store,
@@ -642,6 +689,7 @@ impl Core {
             self.publish();
         }
         self.store.save_queue(&self.queue, false)?;
+        self.controls_deadline = None;
         self.cleanup();
         Ok(())
     }
@@ -668,16 +716,50 @@ impl Core {
             )?;
         }
         self.checkpoint = tokio::time::Instant::now();
+        self.controls_deadline = None;
+        Ok(())
+    }
+
+    fn set_playing(&mut self, playing: bool) -> Result<()> {
+        self.intent = playing;
+        if playing {
+            if self.engine.is_none() {
+                self.start_load(Some(self.state.playback.position))?;
+            } else if self.loaded_generation == self.generation {
+                self.engine.as_ref().unwrap().pause(false)?;
+            }
+        } else if self.engine.is_some() && self.loaded_generation != self.generation {
+            // Preparing audio must remain cancellable from both the UI and OS controls.
+            self.generation += 1;
+            self.loaded_generation = 0;
+            self.preparing_deadline = None;
+            if let Some(job) = self.load_job.take() {
+                job.abort();
+            }
+            if let Some(engine) = self.engine.take() {
+                engine.stop()?;
+            }
+            self.state.playback.buffering = false;
+        } else if let Some(engine) = &self.engine {
+            engine.pause(true)?;
+        }
+        self.state.playback.playing =
+            playing && !self.engine_paused && !self.state.playback.buffering;
+        if !playing {
+            self.save_checkpoint(true)?;
+        }
         Ok(())
     }
 
     fn set_speed(&mut self, value: f64) -> Result<()> {
         ensure!(value.is_finite(), "Invalid playback speed");
-        self.queue.speed = playback_speed_step(value);
+        let value = playback_speed_step(value);
         if let Some(engine) = &self.engine {
-            engine.speed(self.queue.speed)?;
+            engine.speed(value)?;
         }
-        self.store.save_queue(&self.queue, false)
+        self.queue.speed = value;
+        self.controls_deadline = Some(tokio::time::Instant::now() + Duration::from_millis(250));
+        Ok(())
     }
 
     fn set_setting(&mut self, key: &str, value: Value) -> Result<()> {
@@ -992,6 +1074,7 @@ impl Core {
             Command::PlayAll => {
                 let ids = self.store.query_ids(&self.query)?;
                 ensure!(!ids.is_empty(), "There are no recordings to play");
+                self.save_checkpoint(true)?;
                 let index = match self.queue.order {
                     Order::Reverse => ids.len() - 1,
                     Order::Shuffle | Order::Random => rand::rng().random_range(0..ids.len()),
@@ -1018,35 +1101,13 @@ impl Core {
                 self.start_load(None)?;
             }
             Command::Toggle => {
-                self.intent = !self.intent;
-                if self.engine.is_none() && self.intent {
-                    self.start_load(Some(self.queue.position))?;
-                } else if self.loaded_generation == self.generation {
-                    if let Some(engine) = &self.engine {
-                        engine.pause(!self.intent)?;
-                    }
-                }
-                self.state.playback.playing = self.intent;
-                self.save_checkpoint(true)?;
+                self.set_playing(!self.intent)?;
             }
             Command::Pause => {
-                self.intent = false;
-                if let Some(engine) = &self.engine {
-                    engine.pause(true)?;
-                }
-                self.state.playback.playing = false;
-                self.save_checkpoint(true)?;
+                self.set_playing(false)?;
             }
             Command::Resume => {
-                self.intent = true;
-                if self.engine.is_none() {
-                    self.start_load(Some(self.queue.position))?;
-                } else if self.loaded_generation == self.generation {
-                    if let Some(engine) = &self.engine {
-                        engine.pause(false)?;
-                    }
-                }
-                self.state.playback.playing = true;
+                self.set_playing(true)?;
             }
             Command::Next => self.advance(true, false)?,
             Command::Previous => self.advance(false, false)?,
@@ -1062,6 +1123,10 @@ impl Core {
                 self.save_checkpoint(true)?;
             }
             Command::Speed(value) => {
+                ensure!(value.is_finite(), "Invalid playback speed");
+                if playback_speed_step(value) == self.queue.speed {
+                    return Ok(());
+                }
                 self.set_speed(value)?;
             }
             Command::SpeedStep(steps) => {
@@ -1069,17 +1134,23 @@ impl Core {
             }
             Command::Volume(value) => {
                 ensure!(value.is_finite(), "Invalid volume");
-                self.queue.volume = value.clamp(0., 100.);
-                if let Some(engine) = &self.engine {
-                    engine.volume(self.queue.volume)?;
+                let value = value.clamp(0., 100.);
+                if value == self.queue.volume {
+                    return Ok(());
                 }
-                self.store.save_queue(&self.queue, false)?;
+                if let Some(engine) = &self.engine {
+                    engine.volume(value)?;
+                }
+                self.queue.volume = value;
+                self.controls_deadline =
+                    Some(tokio::time::Instant::now() + Duration::from_millis(250));
             }
             Command::Mute => {
-                self.queue.muted = !self.queue.muted;
+                let muted = !self.queue.muted;
                 if let Some(engine) = &self.engine {
-                    engine.mute(self.queue.muted)?;
+                    engine.mute(muted)?;
                 }
+                self.queue.muted = muted;
                 self.store.save_queue(&self.queue, false)?;
             }
             Command::Order(order) => {
@@ -1099,12 +1170,16 @@ impl Core {
             Command::QueueRemove(index) => {
                 ensure!(index < self.queue.ids.len(), "The queue changed; try again");
                 let current = index == self.queue.index;
+                if current {
+                    self.save_checkpoint(true)?;
+                }
                 self.queue.ids.remove(index);
                 if index < self.queue.index {
                     self.queue.index -= 1;
                 }
                 self.queue.index = self.queue.index.min(self.queue.ids.len().saturating_sub(1));
                 self.queue.shuffled.clear();
+                self.queue.history.clear();
                 if current {
                     if self.queue.ids.is_empty() {
                         self.intent = false;
@@ -1140,6 +1215,7 @@ impl Core {
                     selected
                 };
                 self.queue.shuffled.clear();
+                self.queue.history.clear();
                 self.store.save_queue(&self.queue, true)?;
             }
             Command::Favorite(ids, liked) => self.store.favorite(&ids, liked)?,
@@ -1561,6 +1637,7 @@ impl Core {
                 if generation != self.generation {
                     return Ok(());
                 }
+                self.load_job = None;
                 let position = self.state.playback.position;
                 let td = if track.local() { None } else { self.td.clone() };
                 let media = Arc::new(Media {
@@ -1572,15 +1649,18 @@ impl Core {
                     .engine
                     .as_ref()
                     .context("Audio engine is unavailable")
-                    .and_then(|engine| engine.load(media, position));
+                    .and_then(|engine| engine.load(media, position, &self.queue, self.intent));
                 if let Err(error) = loaded {
                     return self.engine_event(EngineEvent::Failed(generation, error.to_string()));
                 }
+                self.loading_position = position;
                 self.state.playback.track = Some(track);
                 self.state.playback.position = position;
                 self.publish();
             }
             Notice::Engine(event) => self.engine_event(event)?,
+            #[cfg(target_os = "android")]
+            Notice::EngineWake => {}
             Notice::Update(url) => {
                 self.state.status = if url.is_empty() {
                     "You have the latest Rust test build".into()
@@ -1611,31 +1691,42 @@ impl Core {
             | EngineEvent::Position(g, _)
             | EngineEvent::Duration(g, _)
             | EngineEvent::Buffering(g, _)
-            | EngineEvent::Paused(g, _)
+            | EngineEvent::Paused(g, _, _)
             | EngineEvent::Finished(g)
-            | EngineEvent::Failed(g, _) => *g,
+            | EngineEvent::Failed(g, _)
+            | EngineEvent::Unavailable(g, _)
+            | EngineEvent::Interrupted(g, _) => *g,
         };
         if generation != self.generation {
             return Ok(());
         }
         match event {
             EngineEvent::Loaded(_) => {
+                self.preparing_deadline = None;
                 self.loaded_generation = self.generation;
                 let engine = self
                     .engine
                     .as_ref()
                     .context("Audio engine is unavailable")?;
-                engine.seek(self.state.playback.position)?;
-                engine.speed(self.queue.speed)?;
-                engine.volume(self.queue.volume)?;
-                engine.mute(self.queue.muted)?;
-                engine.pause(!self.intent)?;
+                let result = (|| -> Result<()> {
+                    if (self.state.playback.position - self.loading_position).abs() > 0.001 {
+                        engine.seek(self.state.playback.position)?;
+                    }
+                    engine.speed(self.queue.speed)?;
+                    engine.volume(self.queue.volume)?;
+                    engine.mute(self.queue.muted)?;
+                    engine.pause(!self.intent)
+                })();
+                if let Err(error) = result {
+                    return self.engine_event(EngineEvent::Failed(generation, error.to_string()));
+                }
                 self.state.playback.buffering = false;
-                self.state.playback.playing = self.intent;
+                self.state.playback.playing = self.intent && !self.engine_paused;
+                self.save_checkpoint(true)?;
                 self.publish();
             }
             EngineEvent::Position(_, position) => {
-                if position.is_finite() {
+                if position.is_finite() && self.loaded_generation == generation {
                     self.state.playback.position = position.max(0.);
                     self.save_checkpoint(false)?;
                     if self.visible && self.observe_clock {
@@ -1653,12 +1744,18 @@ impl Core {
             }
             EngineEvent::Buffering(_, buffering) => {
                 self.state.playback.buffering = buffering;
+                self.state.playback.playing = self.intent && !self.engine_paused && !buffering;
                 self.publish();
             }
-            EngineEvent::Paused(_, paused) => {
-                if !self.state.playback.buffering {
-                    self.state.playback.playing = self.intent && !paused;
+            EngineEvent::Paused(_, paused, position) => {
+                self.engine_paused = paused;
+                if self.loaded_generation == generation {
+                    if let Some(position) = position.filter(|p| p.is_finite()) {
+                        self.state.playback.position = position.max(0.);
+                    }
                 }
+                self.state.playback.playing =
+                    self.intent && !paused && !self.state.playback.buffering;
                 self.save_checkpoint(true)?;
                 self.publish();
             }
@@ -1669,16 +1766,64 @@ impl Core {
                         .execute("DELETE FROM playback_progress WHERE track=?", [&t.id])?;
                 }
                 self.state.playback.position = 0.;
-                self.advance(true, true)?;
+                if self.intent {
+                    self.advance(true, true)?;
+                } else {
+                    // A queued EOF must not undo a Pause that has already been accepted.
+                    self.generation += 1;
+                    if let Some(engine) = self.engine.take() {
+                        engine.stop()?;
+                    }
+                    self.state.playback.playing = false;
+                    self.state.playback.buffering = false;
+                    self.save_checkpoint(true)?;
+                    self.publish();
+                }
             }
             EngineEvent::Failed(_, error) => {
+                self.preparing_deadline = None;
                 self.intent = false;
+                self.generation += 1;
+                self.loaded_generation = 0;
+                if let Some(job) = self.load_job.take() {
+                    job.abort();
+                }
                 if let Some(engine) = self.engine.take() {
                     let _ = engine.stop();
                 }
                 self.state.playback.playing = false;
                 self.state.playback.buffering = false;
                 self.state.error = error;
+                self.save_checkpoint(true)?;
+                self.publish();
+            }
+            EngineEvent::Unavailable(_, position) => {
+                self.preparing_deadline = None;
+                self.generation += 1;
+                self.loaded_generation = 0;
+                if let Some(job) = self.load_job.take() {
+                    job.abort();
+                }
+                self.engine = None;
+                if let Some(position) = position.filter(|p| p.is_finite()) {
+                    self.state.playback.position = position.max(0.);
+                }
+                self.state.playback.playing = false;
+                self.state.playback.buffering = false;
+                self.save_checkpoint(true)?;
+                if self.intent {
+                    self.start_load(Some(self.state.playback.position))?;
+                } else {
+                    self.publish();
+                }
+            }
+            EngineEvent::Interrupted(_, position) => {
+                self.intent = false;
+                self.engine_paused = true;
+                self.state.playback.playing = false;
+                if position.is_finite() && self.loaded_generation == generation {
+                    self.state.playback.position = position.max(0.);
+                }
                 self.save_checkpoint(true)?;
                 self.publish();
             }

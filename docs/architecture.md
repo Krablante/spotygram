@@ -80,6 +80,8 @@ meaningful playback transitions. Sound controls do not reload the catalog.
 restore use the same rounding before passing the value to either audio engine.
 −/+ commands carry relative steps; the worker applies them to its current speed
 so rapid taps do not depend on when the UI receives the next snapshot.
+Slider changes apply to the engine immediately and coalesce their queue-state
+writes for 250 ms. Pause, track changes and Quit checkpoint the current values.
 
 Small source avatars load serially at low priority for bounded visible requests.
 Hiding the app cancels that work. The source-photo table and bounded directory
@@ -134,10 +136,44 @@ Android calls a small Java bridge around ExoPlayer and a `MediaSessionService`.
 Playback intent and queue rules stay in Rust. Engine events and prepared
 recordings carry generations so an obsolete load cannot replace a newer choice.
 
+Requested playback is distinct from engine playback: buffering does not turn
+the Pause control into an inactive spinner. Pausing during preparation cancels
+that generation. Preparation has a 90-second deadline; failure aborts its job and
+invalidates subsequent callbacks. Errors appear inside the full player. Removing
+or reordering queue entries clears positional shuffle/history data; restore validates it.
+An EOF arriving after an accepted Pause cannot start the next recording.
+Desktop caption and system window-close actions share one lifetime handler, and OS
+media controls follow playback intent during buffering. Explicit Quit stops the worker and engine.
+
+Android registers its session with `MediaSessionService` so Media3 manages the
+notification and foreground lifetime. The service can be reclaimed after a pause.
+The user-started service enters foreground before asynchronous file resolution;
+a temporary notification covers preparation until the media item takes over.
+The initial empty notification-controller snapshot cannot remove foreground during
+this handoff. Foreground failures return to Rust as playback errors, and removing
+the activity task preserves requested playback while buffering.
+Initial playback parameters apply together before decoding starts. Removing the
+current item while paused selects its replacement without preparing it until Play. Media3 checks
+progressive loading at 32-KiB intervals to limit low-bitrate buffer overshoot.
+Service loss reports the final position and invalidates Rust's loaded generation;
+a missing-service resume also requests a reload instead of silently dropping Play. A new load reapplies
+position, speed, volume and mute. Pending startup commands are coalesced behind
+the current load. Scoped audio-focus/noisy events preserve pause intent, and the
+final paused position is delivered with the state transition. Critical Android
+events use a bounded, coalesced inbox; only clock/duration observations may drop
+under worker pressure. libmpv's event thread blocks until an event or shutdown.
+
 `reader.rs` supplies the engines with local or progressively downloaded bytes.
 It retains a file handle, reads available ranges and asks TDLib for missing
 ranges at the requested offset. Cancellation interrupts waits. Seeking and
 decoding remain the engine's responsibility. The app does not implement codecs.
+Inactive missing ranges are requested again after two seconds. Reads time out
+after 60 seconds and wait for delayed file visibility without spinning. Android
+range waits observe the loader thread's interruption; service teardown cancels
+readers before releasing ExoPlayer. Media3 does not repeat an already exhausted
+native read timeout, and libmpv reader failures reach Rust directly. Playback can
+rebind a known remote file without scanning its entire profile; send/profile
+operations keep their permission-refresh path.
 
 Imports are app-owned copies. Android first copies a content URI into private
 staging storage and then moves it into import storage. No external original is

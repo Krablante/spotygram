@@ -29,6 +29,7 @@ public final class PlatformBridge extends Application {
     static final Handler main = new Handler(Looper.getMainLooper());
     static final ArrayDeque<JSONObject> pending = new ArrayDeque<>();
     static PlaybackService playback;
+    static boolean playbackStarting;
     static java.lang.ref.WeakReference<MainActivity> activity = new java.lang.ref.WeakReference<>(null);
     static volatile boolean visible = true;
 
@@ -39,6 +40,7 @@ public final class PlatformBridge extends Application {
     static native int readAudio(long reader, byte[] buffer, int offset, int length);
     static native long audioSize(long reader);
     static native void closeAudio(long reader);
+    static native void cancelAudio(long generation);
     static native boolean imported(String paths);
 
     @Override public void onCreate() {
@@ -116,10 +118,33 @@ public final class PlatformBridge extends Application {
     static void player(JSONObject action) {
         try {
             if (playback != null) { playback.apply(action); return; }
-            if (!action.optString("action").equals("load")) return;
-            pending.addLast(action);
-            app.startForegroundService(new Intent(app, PlaybackService.class));
-        } catch (Exception error) { playerEvent(action.optLong("generation"), 6, 0, error.getMessage()); }
+            String kind = action.optString("action");
+            if (kind.equals("stop")) { pending.clear(); return; }
+            if (kind.equals("begin") || kind.equals("load")) {
+                pending.clear();
+                pending.addLast(action);
+                if (!playbackStarting) {
+                    playbackStarting = true;
+                    app.startForegroundService(new Intent(app, PlaybackService.class));
+                }
+            } else if (!pending.isEmpty()) {
+                // Startup is asynchronous. Keep the latest seek and each property,
+                // behind the single current load, instead of dropping early controls.
+                pending.removeIf(previous -> previous.optString("action").equals(kind)
+                    && previous.optString("key").equals(action.optString("key")));
+                pending.addLast(action);
+            } else if (kind.equals("seek") || (kind.equals("property")
+                    && action.optString("key").equals("pause")
+                    && action.optString("value").equals("no"))) {
+                // The service may have been reclaimed during a long pause.
+                // Rust owns the position and reloads this generation when requested.
+                playerEvent(action.optLong("generation"), 7, -1, "");
+            }
+        } catch (Exception error) {
+            playbackStarting = false;
+            pending.clear();
+            playerEvent(action.optLong("generation"), 6, 0, error.getMessage());
+        }
     }
 
     static String databaseKey() throws Exception {
