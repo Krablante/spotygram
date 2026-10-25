@@ -111,7 +111,7 @@ jobs:
         if: runner.os != 'Linux'
         shell: python
         run: |
-          import json, os, re, shutil, subprocess, time, urllib.request
+          import json, os, re, shutil, subprocess, time, urllib.error, urllib.request
           from pathlib import Path
           state=Path(os.environ['SPOTYGRAM_STATE'])/'rust'
           root=state/'images'/'${{ matrix.target }}'
@@ -157,9 +157,19 @@ jobs:
                       except OSError: pass
                       if app.poll() is not None or time.monotonic()>deadline: raise RuntimeError('Packaged interface did not open')
                       time.sleep(0.5)
+                  capture_deadline=time.monotonic()+45
                   for index in range(3):
                       time.sleep(1)
-                      with urllib.request.urlopen('http://127.0.0.1:46871/g',timeout=15) as response: grab=json.load(response)
+                      while True:
+                          try:
+                              with urllib.request.urlopen('http://127.0.0.1:46871/g',timeout=15) as response: grab=json.load(response)
+                              break
+                          except urllib.error.HTTPError as error:
+                              detail=error.read().decode(errors='replace')
+                              print(f'Capture response {error.code}: {detail}',flush=True)
+                              if error.code!=404 or app.poll() is not None or time.monotonic()>capture_deadline:
+                                  raise RuntimeError('Packaged interface capture failed: '+detail) from error
+                              time.sleep(1)
                       shutil.copy2(grab['png'],evidence/f'interface-{index}.png')
                   shutil.copy2(evidence/'interface-2.png',evidence/'interface.png')
                   for endpoint in ('snap','log'):
